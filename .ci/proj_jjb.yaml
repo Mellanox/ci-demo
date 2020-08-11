@@ -32,15 +32,15 @@
             cron: 'H/5 * * * *'
             trigger-phrase: '.*\bbot:retest\b.*'
             status-add-test-results: true
-            auth-id: 'github-swx-jenkins'
+            auth-id: 'mellanox-github'
             org-list: ["Mellanox"]
-            white-list: ["swx-jenkins","swx-jenkins2","swx-jenkins3","mike-dubman"]
+            white-list: ["swx-jenkins","swx-jenkins2","swx-jenkins3","mike-dubman","mellanox-github"]
             allow-whitelist-orgs-as-admins: true
     pipeline-scm:
         scm:
             - git:
                 url: "{jjb_git}"
-                credentials-id: 'github-swx-jenkins'
+                credentials-id: 'mellanox-github'
                 branches: ['$sha1']
                 shallow-clone: true
                 refspec: "+refs/pull/*:refs/remotes/origin/pr/*"
