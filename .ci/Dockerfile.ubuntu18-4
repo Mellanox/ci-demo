@@ -1,0 +1,55 @@
+FROM ubuntu:18.04
+ARG _ARCH=x86_64
+ARG _UID=2244
+ARG _GID=101
+ARG _LOGIN=jenkins
+ARG _HOME=/var/home/
+USER root
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+	apt-get install --no-install-recommends -y \
+	build-essential \
+	ca-certificates \
+	ccache \
+	clang \
+	ethtool \
+	iproute2 \
+	kmod \
+	libc-bin \
+	libkmod2 \
+	libmnl-dev \
+	libmnl0 \
+	libnl-3-dev \
+	libnl-route-3-dev \
+	libnuma-dev \
+	libnuma1 \
+	libpython3.6 \
+	libudev1 \
+	lsb-release \
+	lsof \
+	net-tools \
+	ninja-build \
+	numactl \
+	pkg-config \
+	python3 \
+	python3-pip \
+	python3-setuptools \
+	python3-wheel \
+	udev \
+	wget \
+	ibverbs-providers  infiniband-diags ibutils ibverbs-utils rdmacm-utils perftest \
+	&& apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN echo "$_LOGIN ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+RUN mkdir -p $_HOME
+RUN groupadd -f -g "$_GID" "$_LOGIN"
+RUN useradd -u "$_UID" -g "$_GID" -s /bin/bash -m -d ${_HOME} "$_LOGIN"
+
+ENV MODULEPATH /hpc/local/etc/modulefiles
+SHELL ["/bin/bash"] 
+
+USER "$_LOGIN"
+ENTRYPOINT [ "/bin/bash", "--login", "--rcfile", "/etc/bashrc", "-c" ]

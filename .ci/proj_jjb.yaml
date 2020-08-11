@@ -1,0 +1,58 @@
+- job-template:
+    name: "{jjb_proj}"
+    project-type: pipeline
+    properties:
+        - github:
+            url: "{jjb_git}"
+        - build-discarder:
+            days-to-keep: 50
+            num-to-keep: 20
+        - inject:
+            keep-system-variables: true
+            properties-content: |
+              jjb_proj={jjb_proj}
+    description: Do NOT edit this job through the Web GUI !
+    concurrent: true
+    sandbox: true
+    parameters:
+        - string:
+            name: "sha1"
+            default: "none"
+            description: "Commit to be checked, set by PR"
+        - bool:
+            name: "build_dockers"
+            default: false
+            description: "Rebuild docker containers"
+        - string:
+            name: "conf_file"
+            default: "job_matrix.yaml"
+            description: "Regex to select job config file"
+    triggers:
+        - github-pull-request:
+            cron: 'H/5 * * * *'
+            trigger-phrase: '.*\bbot:retest\b.*'
+            status-add-test-results: true
+            auth-id: 'github-swx-jenkins'
+            org-list: ["Mellanox"]
+            white-list: ["swx-jenkins","swx-jenkins2","swx-jenkins3","mike-dubman"]
+            allow-whitelist-orgs-as-admins: true
+    pipeline-scm:
+        scm:
+            - git:
+                url: "{jjb_git}"
+                credentials-id: 'github-swx-jenkins'
+                branches: ['$sha1']
+                shallow-clone: true
+                refspec: "+refs/pull/*:refs/remotes/origin/pr/*"
+                browser: githubweb
+                browser-url: "{jjb_git}"
+        script-path: ".ci/Jenkinsfile"
+
+- project:
+    name: proj_name
+    jjb_email: 'miked@mellanox.com'
+    jjb_proj: 'ci-demo'
+    jjb_git: 'https://github.com/Mellanox/ci-demo'
+    jjb_owner: 'Mike Dubman'
+    jobs:
+        - "{jjb_proj}"

@@ -1,0 +1,255 @@
+#!/usr/bin/env groovy
+
+@NonCPS
+List getMatrixAxes(matrix_axes) {
+    List axes = []
+    matrix_axes.each { axis, values ->
+        List axisList = []
+        values.each { value ->
+            axisList << [(axis): value]
+        }
+        axes << axisList
+    }
+    // calculate cartesian product
+    axes.combinations()*.sum()
+}
+
+def forceCleanupWS() {
+    env.WORKSPACE = pwd()
+    sh """
+    rm -rf ${env.WORKSPACE}/*
+    find ${env.WORKSPACE}/ -maxdepth 1 -name '.*' | xargs rm -rf 
+    """
+}
+
+def gen_image_map(config) {
+    def image_map = [:]
+
+    if (config.get("matrix") && config.matrix.axes.arch) {
+        for (arch in config.matrix.axes.arch) {
+            image_map[arch] = []
+        }
+    } else {
+        for (dfile in config.runs_on_dockers) {
+            if (dfile.arch) {
+                image_map["${dfile.arch}"] = []
+            }
+        }
+    }
+
+
+    image_map.each { arch, images ->
+        config.runs_on_dockers.each { dfile ->
+            if (!dfile.file) {
+                dfile.file = ""
+            }
+            def item = [\
+                arch: "${arch}", \
+                tag:  "${dfile.tag}", \
+                filename: "${dfile.file}", \
+                url: "${config.docker_host}${config.docker_path}/${arch}/${dfile.name}:${dfile.tag}", \
+                name: "${dfile.name}" \
+            ]
+            echo "[INFO] Adding docker to image_map for " + arch + " name: " + item.name
+            images.add(item)
+        }
+    }
+    return image_map
+}
+
+def matchMapEntry(filters, entry) {
+    def match
+    for (filter in filters) {
+        match = 1
+        filter.each { k,v ->
+            if (v != entry[k]) {
+                match = 0
+                return
+            }
+        }
+        if (match) {
+            break
+        }
+    }
+    return match
+}
+
+def stringify(key) {
+    def cmd
+    if (key instanceof ArrayList) {
+        cmd = key[0]
+    } else {
+        cmd = key
+    }
+    return cmd
+}
+
+
+Map getTasks(axes, image, config, include=null, exclude=null) {
+
+    Map tasks = [failFast: false]
+    for(int i = 0; i < axes.size(); i++) {
+        Map axis = axes[i]
+        axis.put("name", image.name)
+        axis.put("job", config.job)
+
+        if (exclude && matchMapEntry(exclude, axis)) {
+            echo "[INFO] Applying exclude filter on  " + axis.toMapString()
+            continue
+        } else if (include && ! matchMapEntry(include, axis)) {
+            echo "[INFO] Applying include filter on  " + axis.toMapString()
+            continue
+        }
+
+        def branchName = axis.values().join(', ')
+
+        // convert the Axis into valid values for withEnv step
+        if (config.get("env")) {
+            axis += config.env
+        }
+        List axisEnv = axis.collect { k, v ->
+            "${k}=${v}"
+        }
+
+        echo "[INFO] task name " + branchName
+        def arch = axis.arch
+        tasks[branchName] = { ->
+            withEnv(axisEnv) {
+                node ("${axis.arch} && docker") {
+                    stage(branchName) {
+                        docker.image(image.url).inside(config.docker_opt) {
+                            forceCleanupWS()
+                            // fetch .git from server and unpack
+                            unstash "${env.JOB_NAME}"
+                            sh """
+                            tar xf scm-repo.tar
+                            git reset --hard
+                            rm -f scm-repo.tar
+                            """
+                            config.steps.each { one->
+                                echo "Step: ${one.name}"
+                                sh """#!/bin/bash -l
+                                ${one.run}
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return tasks
+}
+Map getMatrixTasks(image, config) {
+    List axes = []
+    List include = null, exclude = null
+
+    if (config.get("matrix")) {
+        axes = getMatrixAxes(config.matrix.axes).findAll()
+        if (config.get("matrix").get("exclude")) {
+            exclude = config.matrix.exclude
+        }
+        if (config.get("matrix").get("include")) {
+            include = config.matrix.include
+        }
+    } else {
+        axes.add(image)
+    }
+
+    return getTasks(axes, image, config, include, exclude)
+}
+
+def buildImage(img, filename) {
+    unstash "${env.JOB_NAME}"
+    sh """
+    tar xf scm-repo.tar
+    git reset --hard
+    rm -f scm-repo.tar
+    """
+
+    if(filename == "") {
+        println("[WARN] No filename specified, skipping build docker")
+        return
+    }
+    juser = env.USER
+    juid  = sh(script: "id -u", returnStdout: true).trim()
+    jgid  = sh(script: "id -g", returnStdout: true).trim()
+
+    customImage = docker.build("${img}",
+        "--build-arg _UID=${juid} " +
+        "--build-arg _GID=${jgid} " +
+        "--build-arg _LOGIN=${juser} " +
+        "-f ${filename} . "
+        )
+    customImage.push()
+}
+
+
+node("master") {
+
+    stage("Prepare checkout") {
+        forceCleanupWS()
+        checkout scm
+        
+        // create git tarball on server, agents will copy it and unpack
+        sh "tar cf scm-repo.tar .git"
+        stash includes: "scm-repo.tar", name: "${env.JOB_NAME}"
+    }
+
+    files = findFiles(glob: ".ci/${env.conf_file}")
+    files.each { file ->
+        def branches = [:]
+        def config = readYaml(file: file.path)
+        println ("New Job: " + config.job + " file: " + file.path)
+
+        def arch_distro_map = gen_image_map(config)
+        arch_distro_map.each { arch, images ->
+            images.each { image ->
+                def img      = image.url
+                def filename = image.filename
+                def distro   = image.name
+
+                def customImage
+                node ("${arch} && docker") {
+                    stage("Prepare docker image for ${config.job}/$arch/$distro") {
+                        echo "Going to fetch docker image: ${img} from ${config.docker_host}"
+                        def need_build = 0
+                        docker.withRegistry("https://${config.docker_host}", config.docker_auth) {
+                            try {
+                                echo("[INFO] Pulling image - ${img}")
+                                customImage = docker.image(img).pull()
+                            } catch (exception) {
+                                echo("[INFO] Image NOT found - ${img} - building ${filename} ...")
+                                need_build++
+                            }
+
+                            if ("${env.build_dockers}" == "true") {
+                                echo("[INFO] Forcing building file: ${filename} ... ")
+                                need_build++
+                            }
+                            if (need_build) {
+                                echo("[INFO] Building - ${img} - ${filename}")
+                                buildImage(img, filename)
+                            }
+                        }
+                    }
+                }
+                branches += getMatrixTasks(image, config)
+            }
+        }
+    
+        try {
+            timestamps {
+                parallel branches
+            }
+        } finally {
+            node("master") {
+                stage("Finalize ${config.job}") {
+                    def cmd = stringify(config.steps.finalize.run)
+                    sh "${cmd}"
+                }
+            }
+        }
+    }
+
+}

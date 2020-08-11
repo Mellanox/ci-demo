@@ -1,0 +1,13 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+datarootdir=@datarootdir@
+datadir=@datadir@
+includedir=@includedir@
+
+Name: libhello
+Description: Hello World Library
+Version: @VERSION@
+Requires:
+Libs: -L${libdir} -llibhello
+Cflags: -I${includedir}
