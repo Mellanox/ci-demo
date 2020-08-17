@@ -85,6 +85,23 @@ def stringify(key) {
 }
 
 
+def runSteps() {
+    forceCleanupWS()
+    // fetch .git from server and unpack
+    unstash "${env.JOB_NAME}"
+    sh """
+    tar xf scm-repo.tar
+    git reset --hard
+    rm -f scm-repo.tar
+    """
+    config.steps.each { one->
+        echo "Step: ${one.name}"
+        sh """#!/bin/bash -l
+        ${one.run}
+        """
+    }
+}
+
 Map getTasks(axes, image, config, include=null, exclude=null) {
 
     Map tasks = [failFast: false]
@@ -118,20 +135,7 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
                 node ("${axis.arch} && docker") {
                     stage(branchName) {
                         docker.image(image.url).inside(config.docker_opt) {
-                            forceCleanupWS()
-                            // fetch .git from server and unpack
-                            unstash "${env.JOB_NAME}"
-                            sh """
-                            tar xf scm-repo.tar
-                            git reset --hard
-                            rm -f scm-repo.tar
-                            """
-                            config.steps.each { one->
-                                echo "Step: ${one.name}"
-                                sh """#!/bin/bash -l
-                                ${one.run}
-                                """
-                            }
+                            runSteps()
                         }
                     }
                 }
