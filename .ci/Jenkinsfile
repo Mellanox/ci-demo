@@ -102,6 +102,19 @@ def runSteps() {
     }
 }
 
+def getDockerOpt() {
+    def opts = ""
+    if (config.get("docker_opt")) {
+        opts += " ${config.docker_opt}"
+    }
+    if (config.get("volumes")) {
+        for (vol in config.volumes) {
+            hostPath = vol.get("hostPath")? vol.hostPath : vol.mountPath
+            opts += " -v ${vol.mountPath}:${hostPath}"
+        }
+    }
+}
+
 Map getTasks(axes, image, config, include=null, exclude=null) {
 
     Map tasks = [failFast: false]
@@ -132,9 +145,9 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
         def arch = axis.arch
         tasks[branchName] = { ->
             withEnv(axisEnv) {
-                node ("${axis.arch} && docker") {
+                node (config.docker_node) {
                     stage(branchName) {
-                        docker.image(image.url).inside(config.docker_opt) {
+                        docker.image(image.url).inside(getDockerOpt()) {
                             runSteps()
                         }
                     }

@@ -1,14 +1,17 @@
 ---
 job: ci-demo
 
+docker_provider: k8
 docker_host: harbor.mellanox.com
 docker_path: /swx-storage/ci-demo
 docker_auth: swx-storage
-docker_opt: |
-  -v /hpc/local:/hpc/local
-  -v /auto/sw_tools:/auto/sw_tools
-  -v /.autodirect/mtrswgwork:/.autodirect/mtrswgwork
-  -v /.autodirect/sw/release/mlnx_ofed/MLNX_OFED:/.autodirect/sw/release/mlnx_ofed/MLNX_OFED
+docker_node: ${axis.arch} && docker
+
+volumes:
+  - {mountPath: /hpc/local, hostPath: /hpc/local}
+  - {mountPath: /auto/sw_tools}
+  - {mountPath: /.autodirect/mtrswgwork}
+  - {mountPath: /.autodirect/sw/release/mlnx_ofed/MLNX_OFED}
 
 env:
   mofed_installer_exe: /.autodirect/sw/release/mlnx_ofed/MLNX_OFED/mlnx_ofed_install
