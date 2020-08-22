@@ -1,0 +1,46 @@
+FROM ubuntu:18.04
+ARG _ARCH=x86_64
+ARG _UID=2244
+ARG _GID=101
+ARG _LOGIN=jenkins
+ARG _HOME=/var/home/
+USER root
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y \
+        sudo \
+        automake \
+        default-jdk \
+        dh-make \
+        g++ \
+        git \
+        libcap2 \
+        libnuma-dev \
+        libtool \
+        make \
+        maven \
+        udev \
+        wget \
+        vim \
+	net-tools \
+	iputils-ping \
+	environment-modules \
+	libibverbs-dev \
+	libfile-fcntllock-perl \
+	chrpath flex gfortran graphviz dpatch libgfortran3 tcl bison tk swig \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+
+RUN echo "$_LOGIN ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+RUN mkdir -p $_HOME
+RUN groupadd -f -g "$_GID" "$_LOGIN"
+RUN useradd -u "$_UID" -g "$_GID" -s /bin/bash -m -d ${_HOME} "$_LOGIN"
+
+ENV MODULEPATH /hpc/local/etc/modulefiles
+SHELL ["/bin/bash"] 
+
+USER "$_LOGIN"
+ENTRYPOINT [ "/bin/bash", "--login", "--rcfile", "/etc/bashrc", "-c" ]
