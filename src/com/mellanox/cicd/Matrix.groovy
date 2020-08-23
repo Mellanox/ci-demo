@@ -304,6 +304,9 @@ def main() {
                     def filename = image.filename
                     def distro   = image.name
 
+                    def cmd = "git diff-tree --no-commit-id --name-only -r ${env.sha1}"
+                    def ChangedFiles = sh(returnStdout: true, script: cmd).trim().tokenize().collectEntries {[it, it.toUpperCase()]}
+
                     def customImage
                     node ("${arch} && docker") {
                         stage("Prepare docker image for ${config.job}/$arch/$distro") {
@@ -314,12 +317,16 @@ def main() {
                                     echo("[INFO] Pulling image - ${img}")
                                     customImage = docker.image(img).pull()
                                 } catch (exception) {
-                                    echo("[INFO] Image NOT found - ${img} - building ${filename} ...")
+                                    echo("[INFO] Image NOT found - ${img} - will build ${filename} ...")
                                     need_build++
                                 }
 
                                 if ("${env.build_dockers}" == "true") {
-                                    echo("[INFO] Forcing building file: ${filename} ... ")
+                                    echo("[INFO] Forcing building file per user request: ${filename} ... ")
+                                    need_build++
+                                }
+                                if (changedFiles.containsKey(filename)) {
+                                    echo("[INFO] Forcing building, file modified by commit: ${filename} ... ")
                                     need_build++
                                 }
                                 if (need_build) {
