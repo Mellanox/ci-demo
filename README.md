@@ -92,6 +92,6 @@ Jenkins behavior can be controlled by job_matrix.yaml file which has similar syn
 
 ## Jenkins job builder
 
-* Demo contains [Jenkins Job Builder](.ci/jjb_proj.yaml) config file to load Jenkins project definition into Jenkins server
+* Demo contains (Jenkins Job Builder)[https://docs.openstack.org/infra/jenkins-job-builder/] [config file](.ci/jjb_proj.yaml) which loads Jenkins project definition into Jenkins server.
 
 
