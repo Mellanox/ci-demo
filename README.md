@@ -22,6 +22,13 @@ matrix.main()
 2. Create ```.ci/matrix_job.yaml``` basic workflow file with content:
 
 ``` yaml
+---
+job: ci-demo
+
+registry_host: harbor.mellanox.com
+registry_path: /swx-storage/ci-demo
+registry_auth: swx-storage
+
 kubernetes:
   cloud: swx-k8s
   nodeSelector: 'beta.kubernetes.io/os=linux'
