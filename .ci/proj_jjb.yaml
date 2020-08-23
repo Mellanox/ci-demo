@@ -62,10 +62,10 @@
 
 - project:
     name: proj_name
-    jjb_email: 'miked@mellanox.com'
+    jjb_email: 'email@hello.org'
     jjb_proj: 'ci-demo'
     jjb_git: 'https://github.com/Mellanox/ci-demo'
-    jjb_owner: 'Mike Dubman'
+    jjb_owner: 'Hello World'
     jjb_jenkinsfile: '.ci/Jenkinsfile.shlib'
     jobs:
         - "{jjb_proj}"
