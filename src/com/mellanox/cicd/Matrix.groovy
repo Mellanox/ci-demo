@@ -292,11 +292,12 @@ def main() {
             sh 'false'
         }
 
-        sh("env;ls -al")
-        def cmd_tree = "git diff-tree --no-commit-id --name-only -r ${env.sha1}"
-        def ChangedFiles = sh(returnStdout: true, 
-                            script: cmd_tree).trim().tokenize().collectEntries {[it, it.toUpperCase()]}
+        //def cmd_tree = "git diff-tree --no-commit-id --name-only -r ${env.sha1}"
+        //def ChangedFiles = sh(returnStdout: true, 
+        //                    script: cmd_tree).trim().tokenize().collectEntries {[it, it.toUpperCase()]}
 
+        def ChangedFiles = [:]
+        
         files.each { file ->
             def branches = [:]
             def config = readYaml(file: file.path)
