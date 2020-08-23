@@ -80,7 +80,7 @@ Jenkins behavior can be controlled by job_matrix.yaml file which has similar syn
 
 * [Basic job](.ci/job_matrix_basic.yaml) definition can be found at ```.ci/job_matrix_basic.yaml```
 * [Advanced job](.ci/job_matrix.yaml) definition is at ```.ci/job_matrix.yaml```
-* The actual [Jenkinsfile](.ci/Jenkinsfile) that gets executed is here at ```.ci/Jenkinsfile```
+* The actual [Jenkinsfile](.ci/Jenkinsfile.shlib) that gets executed is here at ```.ci/Jenkinsfile.shlib```
 
 
 ## Job matrix file
