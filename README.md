@@ -9,7 +9,9 @@ You need to configure workflows using YAML syntax, and save them as workflow fil
 
 1. Copy ```.ci/Jenkinsfile.shlib``` to your new github project, under ```.ci/``` 
 
-2. Create ```.ci/job_matrix.yaml``` basic workflow file with content:
+2. Copy ```.ci/Makefile``` to your new github project, under ```.ci/``` 
+
+3. Create ```.ci/job_matrix.yaml``` basic workflow file with content:
 
 ``` yaml
 ---
@@ -50,15 +52,15 @@ steps:
       run: echo All done
 ```
 
-3. Copy ```.ci/proj_jjb.yaml``` to ```.ci``` folder in your project  and change github URL to point to your own github project as [here](.ci/proj_jjb.yaml#L67)
+4. Copy ```.ci/proj_jjb.yaml``` to ```.ci``` folder in your project  and change github URL to point to your own github project as [here](.ci/proj_jjb.yaml#L67)
 
-4. Register new Jenkins project via jenkins-job cli (or create new with UI)
+5. Register new Jenkins project via jenkins-job cli (or create new with UI)
 
 ``` bash
-jenkins-server$ sudo jenkins-jobs update proj_jjb.yaml
+% cd .ci; make jjb
 ```
 
-5. Trigger run via Jenkins UI
+6. Trigger run via Jenkins UI
 
 
 ## Matrix job example
