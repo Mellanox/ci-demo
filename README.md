@@ -60,10 +60,12 @@ steps:
       run: echo All done
 ```
 
-3. Register Jenkins project manually via Jenkins UI or with JJB file as below
+3. Copy ```.ci/proj_jjb.yaml``` to ```.ci``` folder in your project  and change github URL to point to your github project as [here](.ci/proj_jjb.yaml#L67)
+
+4. Register new Jenkins project via jenkins-job cli (or create new with UI)
 
 ``` bash
-$ sudo jenkins-jobs update proj_jjb.yaml
+jenkins-server$ sudo jenkins-jobs update proj_jjb.yaml
 ```
 
 4. Trigger run via Jenkins UI
