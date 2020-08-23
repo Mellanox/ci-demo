@@ -68,7 +68,8 @@ steps:
 jenkins-server$ sudo jenkins-jobs update proj_jjb.yaml
 ```
 
-4. Trigger run via Jenkins UI
+5. Trigger run via Jenkins UI
+
 
 ## Matrix job example
 
