@@ -292,6 +292,11 @@ def main() {
             sh 'false'
         }
 
+        sh("env;ls -al")
+        def cmd = "git diff-tree --no-commit-id --name-only -r ${env.sha1}"
+        def ChangedFiles = sh(returnStdout: true, 
+                            script: cmd).trim().tokenize().collectEntries {[it, it.toUpperCase()]}
+
         files.each { file ->
             def branches = [:]
             def config = readYaml(file: file.path)
@@ -304,8 +309,6 @@ def main() {
                     def filename = image.filename
                     def distro   = image.name
 
-                    def cmd = "git diff-tree --no-commit-id --name-only -r ${env.sha1}"
-                    def ChangedFiles = sh(returnStdout: true, script: cmd).trim().tokenize().collectEntries {[it, it.toUpperCase()]}
 
                     def customImage
                     node ("${arch} && docker") {
