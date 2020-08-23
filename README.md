@@ -9,7 +9,7 @@ You need to configure workflows using YAML syntax, and save them as workflow fil
 
 1. Copy ```.ci/Jenkinsfile.shlib``` to your new github project, under ```.ci/``` 
 
-2. Create ```.ci/matrix_job.yaml``` basic workflow file with content:
+2. Create ```.ci/job_matrix.yaml``` basic workflow file with content:
 
 ``` yaml
 ---
