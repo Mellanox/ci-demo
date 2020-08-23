@@ -7,18 +7,8 @@ You need to configure workflows using YAML syntax, and save them as workflow fil
 
 ## Quick start
 
-1. Create ```.ci/Jenkinsfile``` with content:
+1. Copy ```.ci/Jenkinsfile.shlib``` to your new github project, under ```.ci```
 
-``` groovy
-#!/usr/bin/groovy
-
-// load pipeline functions
-// Requires pipeline-github-lib plugin to load library from github
-@Library('github.com/Mellanox/ci-demo')
-def matrix = new com.mellanox.cicd.Matrix()
-
-matrix.main()
-```
 2. Create ```.ci/matrix_job.yaml``` basic workflow file with content:
 
 ``` yaml
@@ -60,7 +50,7 @@ steps:
       run: echo All done
 ```
 
-3. Copy ```.ci/proj_jjb.yaml``` to ```.ci``` folder in your project  and change github URL to point to your github project as [here](.ci/proj_jjb.yaml#L67)
+3. Copy ```.ci/proj_jjb.yaml``` to ```.ci``` folder in your project  and change github URL to point to your own github project as [here](.ci/proj_jjb.yaml#L67)
 
 4. Register new Jenkins project via jenkins-job cli (or create new with UI)
 
