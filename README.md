@@ -92,6 +92,26 @@ Jenkins behavior can be controlled by job_matrix.yaml file which has similar syn
 
 ## Jenkins job builder
 
-* Demo contains (Jenkins Job Builder)[https://docs.openstack.org/infra/jenkins-job-builder/] [config file](.ci/jjb_proj.yaml) which loads Jenkins project definition into Jenkins server.
+* Demo contains (Jenkins Job Builder)[https://docs.openstack.org/infra/jenkins-job-builder] (config file)[.ci/jjb_proj.yaml] which loads Jenkins project definition into Jenkins server.
+
+
+### Running/Debugging Job Matrix pipeline locally
+
+1. You can fetch docker image descibed in job_matrix.yaml and run steps in it to mimic Jenkins k8 approach
+
+``` shell
+% cd .ci
+% make shell NAME=ubuntu16-4
+docker%% cd /scratch
+# the step below needed so workspace files (which belongs to $USER) will be copied as user jenkins so can be modified
+docker%% cp -pr /scratch /tmp/ws
+docker%% cd /tmp/ws
+docker%% ./autogen.sh && ./configure && make
+```
+
+
+
+
+
 
 
