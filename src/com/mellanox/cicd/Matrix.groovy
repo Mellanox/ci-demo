@@ -287,6 +287,11 @@ def main() {
         }
 
         files = findFiles(glob: ".ci/${env.conf_file}")
+        if (0 == files.size()) {
+            println("[ERROR] No conf_file found by .ci/${env.conf_file}")
+            sh 'false'
+        }
+
         files.each { file ->
             def branches = [:]
             def config = readYaml(file: file.path)
