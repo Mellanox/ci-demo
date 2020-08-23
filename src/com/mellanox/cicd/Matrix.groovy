@@ -293,9 +293,9 @@ def main() {
         }
 
         sh("env;ls -al")
-        def cmd = "git diff-tree --no-commit-id --name-only -r ${env.sha1}"
+        def cmd_tree = "git diff-tree --no-commit-id --name-only -r ${env.sha1}"
         def ChangedFiles = sh(returnStdout: true, 
-                            script: cmd).trim().tokenize().collectEntries {[it, it.toUpperCase()]}
+                            script: cmd_tree).trim().tokenize().collectEntries {[it, it.toUpperCase()]}
 
         files.each { file ->
             def branches = [:]
