@@ -273,6 +273,23 @@ def buildImage(img, filename) {
     customImage.push()
 }
 
+// returns a list of changed files
+@NonCPS
+String getChangedFilesList() {
+
+    changedFiles = []
+    for (changeLogSet in currentBuild.changeSets) { 
+        for (entry in changeLogSet.getItems()) { // for each commit in the detected changes
+            for (file in entry.getAffectedFiles()) {
+                println("XXXXXX " + file.getPath())
+                changedFiles.add(file.getPath()) // add changed file to list
+            }
+        }
+    }
+
+    return changedFiles
+
+}
 
 def main() {
     node("master") {
@@ -292,11 +309,20 @@ def main() {
             sh 'false'
         }
 
-        //def cmd_tree = "git diff-tree --no-commit-id --name-only -r ${env.sha1}"
-        //def changedFiles = sh(returnStdout: true, 
-        //                    script: cmd_tree).trim().tokenize().collectEntries {[it, it.toUpperCase()]}
 
         def changedFiles = [:]
+
+        getChangedFilesList()
+        //try {
+        //    sh("git --version;")
+        //    def cmd_tree = "git diff-tree --no-commit-id --name-only -r ${env.sha1}"
+        //    def changedFiles = sh(returnStdout: true, 
+        //                        script: cmd_tree).trim().tokenize().collectEntries {[it, it.toUpperCase()]}
+//
+  //      } catch (e) {
+    //        println("XXXXX " + e)
+     //   }
+
 
         files.each { file ->
             def branches = [:]
