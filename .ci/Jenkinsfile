@@ -9,6 +9,7 @@ node("master") {
 
     // load pipeline functions
     sh("ls -al ; ls -al src")
-    def matrix = load('src/com/mellanox/cicd/Matrix.groovy')
+    def rootDir = pwd();
+    def matrix = load(rootDir + '/src/com/mellanox/cicd/Matrix.groovy')
     matrix.main()
 }
