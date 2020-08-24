@@ -314,6 +314,7 @@ def main() {
         def changedFiles = [:]
 
         getChangedFilesList()
+        sh("env;git --version")
         //try {
         //    sh("git --version;")
         //    def cmd_tree = "git diff-tree --no-commit-id --name-only -r ${env.sha1}"
