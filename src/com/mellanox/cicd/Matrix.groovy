@@ -273,23 +273,23 @@ def buildImage(img, filename) {
     customImage.push()
 }
 
-// returns a list of changed files
 @NonCPS
 String getChangedFilesList() {
 
-    changedFiles = []
-    println("XXXXXXX in")
-    for (changeLogSet in currentBuild.changeSets) { 
-        for (entry in changeLogSet.getItems()) { // for each commit in the detected changes
-            for (file in entry.getAffectedFiles()) {
-                println("XXXXXX " + file.getPath())
-                changedFiles.add(file.getPath()) // add changed file to list
-            }
+    cFiles = []
+
+    if (env.ghprbActualCommit) {
+        def bRev = sh(returnStdout: true, 
+                    script: "git merge-base origin/master ${env.ghprbActualCommit}").trim()
+        def cFiles = sh(returnStdout: true, 
+                        script: "git diff ${env.ghprbActualCommit} --name-only ${bRev}").trim().tokenize()
+
+        cFiles.each { oneFile ->
+            println("XXX Changed File: " + oneFile)
         }
     }
 
-    return changedFiles
-
+    return cFiles
 }
 
 def main() {
@@ -310,22 +310,7 @@ def main() {
             sh 'false'
         }
 
-
-        def changedFiles = [:]
-
-        getChangedFilesList()
-        sh("env;git --version")
-        //sh("git diff-tree --no-commit-id --name-only -r ${env.sha1}")
-        //try {
-        //    sh("git --version;")
-        //    def cmd_tree = "git diff-tree --no-commit-id --name-only -r ${env.sha1}"
-        //    def changedFiles = sh(returnStdout: true, 
-        //                        script: cmd_tree).trim().tokenize().collectEntries {[it, it.toUpperCase()]}
-//
-  //      } catch (e) {
-    //        println("XXXXX " + e)
-     //   }
-
+        def cFiles = getChangedFilesList()
 
         files.each { file ->
             def branches = [:]
@@ -358,7 +343,7 @@ def main() {
                                     echo("[INFO] Forcing building file per user request: ${filename} ... ")
                                     need_build++
                                 }
-                                if (changedFiles.containsKey(filename)) {
+                                if (cFiles.contains(filename)) {
                                     echo("[INFO] Forcing building, file modified by commit: ${filename} ... ")
                                     need_build++
                                 }
