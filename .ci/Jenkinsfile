@@ -1,5 +1,7 @@
 #!/usr/bin/groovy
 
 // load pipeline functions
-def matrix = load('src/com/mellanox/cicd/Matrix.groovy')
-matrix.main()
+node {
+    def matrix = load('src/com/mellanox/cicd/Matrix.groovy')
+    matrix.main()
+}
