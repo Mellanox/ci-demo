@@ -7,12 +7,14 @@ node("master") {
         checkout scm
     }
 
-    // load pipeline functions
-    def libname = pwd() + '/src/com/mellanox/cicd/Matrix.groovy'
-    def mylib = load(libname)
-    if (mylib) {
-        mylib.main()
-    } else {
-        println("[Error] Cannot load " + libname)
+    stage ("Load Lib") {
+        // load pipeline functions
+        def libname = pwd() + '/src/com/mellanox/cicd/Matrix.groovy'
+        def mylib = load(libname)
+        if (mylib) {
+            mylib.main()
+        } else {
+            println("[Error] Cannot load " + libname)
+        }
     }
 }
