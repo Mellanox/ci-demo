@@ -305,9 +305,9 @@ def main() {
             stash includes: "scm-repo.tar", name: "${env.JOB_NAME}"
         }
 
-        files = findFiles(glob: ".ci/${env.conf_file}")
+        files = findFiles(glob: "${env.conf_file}")
         if (0 == files.size()) {
-            println("[ERROR] No conf_file found by .ci/${env.conf_file}")
+            println("[ERROR] No conf_file found by ${env.conf_file}")
             sh 'false'
         }
 

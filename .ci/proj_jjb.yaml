@@ -25,7 +25,7 @@
             description: "Rebuild docker containers"
         - string:
             name: "conf_file"
-            default: "job_matrix.yaml"
+            default: ".ci/job_matrix.yaml"
             description: "Regex to select job config file"
         - bool:
             name: "do_release"
