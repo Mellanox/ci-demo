@@ -1,6 +1,6 @@
 #!/bin/bash -eE
 
-release_dir=${release_dir:=/.autodirect/sw/release/sw_acceleration/ci-demo}
+release_dir=${release_dir:=/auto/sw/release/sw_acceleration/ci-demo}
 do_release=${do_release:=0}
 
 topdir=$(git rev-parse --show-toplevel)
