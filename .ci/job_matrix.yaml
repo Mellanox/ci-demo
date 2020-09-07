@@ -53,7 +53,7 @@ steps:
 
   - name: Coverity
     run: |
-      if [ "$name" != "centos7-7" -a "$variant" = "1" ]; then
+      if [ "$name" != "centos7-7" -o "$variant" = "1" ]; then
         echo skipping coverity for $name
         exit 0
       fi
