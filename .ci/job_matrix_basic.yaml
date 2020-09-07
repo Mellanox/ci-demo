@@ -1,0 +1,48 @@
+---
+job: ci-demo-basic
+
+registry_host: harbor.mellanox.com
+registry_path: /swx-storage/ci-demo
+registry_auth: swx-storage
+
+kubernetes:
+  cloud: swx-k8s
+
+volumes:
+  - {mountPath: /hpc/local, hostPath: /hpc/local}
+  - {mountPath: /auto/sw_tools, hostPath: /auto/sw_tools}
+  - {mountPath: /.autodirect/mtrswgwork, hostPath: /.autodirect/mtrswgwork}
+  - {mountPath: /.autodirect/sw/release, hostPath: /.autodirect/sw/release}
+
+runs_on_dockers:
+  - {name: 'centos7-7', tag: 'latest', arch: 'x86_64'}
+
+steps:
+
+  - name: Configure
+    run: |
+      ./autogen.sh
+      ./configure --prefix ${WORKSPACE}/install
+
+  - name: Build
+    run: make -j 2 all
+
+  - name: Install
+    run: make -j 2 install
+
+  - name: Coverity
+    run: |
+      set -x
+      cov_build="cov_build"
+      rm -rf $cov_build
+      ncpus=$(cat /proc/cpuinfo|grep processor|wc -l)
+      export AUTOMAKE_JOBS=$ncpus
+      make -j $ncpu clean
+      module load tools/cov
+      cov-build --dir $cov_build make -j $ncpus all
+      cov-analyze --jobs $ncpus $COV_OPT --security --concurrency --dir $cov_build
+      cov-format-errors --dir $cov_build --emacs-style |& tee cov.log
+
+      nerrors=$(cov-format-errors --dir $cov_build | awk '/Processing [0-9]+ errors?/ { print $2 }')
+      rc=$(($rc+$nerrors))
+      exit $rc

@@ -1,0 +1,62 @@
+---
+job: ci-demo-adv
+
+registry_host: harbor.mellanox.com
+registry_path: /swx-storage/ci-demo
+registry_auth: swx-storage
+
+kubernetes:
+  cloud: swx-k8s
+  nodeSelector: 'beta.kubernetes.io/os=linux'
+
+volumes:
+  - {mountPath: /hpc/local, hostPath: /hpc/local}
+  - {mountPath: /auto/sw_tools, hostPath: /auto/sw_tools}
+  - {mountPath: /.autodirect/mtrswgwork, hostPath: /.autodirect/mtrswgwork}
+  - {mountPath: /.autodirect/sw/release, hostPath: /.autodirect/sw/release}
+
+
+env:
+  mofed_installer_exe: /.autodirect/sw/release/mlnx_ofed/MLNX_OFED/mlnx_ofed_install
+  mofed_installer_opt: --user-space-only --without-fw-update --all -q
+
+runs_on_dockers:
+  - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest'}
+  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
+  - {file: '.ci/Dockerfile.ubuntu18-4', name: 'ubuntu18-4', tag: 'latest'}
+
+matrix:
+  axes:
+    driver:
+      - MLNX_OFED_LINUX-4.9-0.1.8.0
+      - MLNX_OFED_LINUX-5.0-1.0.0.0
+      - MLNX_OFED_LINUX-5.1-1.0.0.0
+    cuda:
+      - dev/cuda9.2
+      - dev/cuda10.2
+      - dev/cuda11.0
+    arch:
+      - x86_64
+
+  include:
+    - {arch: x86_64, cuda: dev/cuda11.0, driver: MLNX_OFED_LINUX-4.9-0.1.8.0, name: ubuntu16-4}
+    - {arch: x86_64, cuda: dev/cuda9.2, driver: MLNX_OFED_LINUX-4.9-0.1.8.0, name: ubuntu16-4}
+
+steps:
+
+  - name: Prepare docker
+    run: |
+      echo Installing driver: ${driver} ...
+      sudo env build=$driver $mofed_installer_exe $mofed_installer_opt
+
+  - name: Build package
+    run: .ci/build_package.sh
+
+  - name: Coverity
+    run: .ci/cov.sh
+
+  - name: Check package
+    run: .ci/check_package.sh
+
+  - name: Run tests
+    run: .ci/runtests.sh

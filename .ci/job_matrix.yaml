@@ -1,0 +1,76 @@
+---
+job: ci-demo
+
+registry_host: harbor.mellanox.com
+registry_path: /swx-storage/ci-demo
+registry_auth: swx-storage
+
+kubernetes:
+  cloud: swx-k8s
+  nodeSelector: 'beta.kubernetes.io/os=linux'
+
+volumes:
+  - {mountPath: /hpc/local, hostPath: /hpc/local}
+  - {mountPath: /auto/sw_tools, hostPath: /auto/sw_tools}
+  - {mountPath: /.autodirect/mtrswgwork, hostPath: /.autodirect/mtrswgwork}
+  - {mountPath: /.autodirect/sw/release, hostPath: /.autodirect/sw/release}
+
+env:
+  mofed_installer_exe: /.autodirect/sw/release/mlnx_ofed/MLNX_OFED/mlnx_ofed_install
+  mofed_installer_opt: --user-space-only --without-fw-update --all -q --skip-unsupported-devices-check
+
+runs_on_dockers:
+  - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest'}
+  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
+
+
+matrix:
+  axes:
+    driver:
+      - MLNX_OFED_LINUX-4.9-0.1.8.0
+      - MLNX_OFED_LINUX-5.1-1.0.0.0
+    cuda:
+      - dev/cuda9.2
+    arch:
+      - x86_64
+
+steps:
+
+  - name: Prepare docker
+    run: |
+      echo Installing driver: ${driver} ...
+      sudo env build=$driver $mofed_installer_exe --help &> ofed_help.txt
+      for item in $mofed_installer_opt; do
+        if grep -qs -- $item ofed_help.txt; then
+          opt+=" $item"
+        fi
+      done
+      sudo env build=$driver $mofed_installer_exe $opt
+
+  - name: Build package
+    run: cuda=$cuda .ci/build_package.sh
+
+
+  - name: Coverity
+    run: |
+      if [ "$name" != "centos7-7" -a "$variant" = "1" ]; then
+        echo skipping coverity for $name
+        exit 0
+      fi
+      cuda=$cuda .ci/cov.sh
+
+  - name: Check package
+    run: cuda=$cuda .ci/check_package.sh
+
+  - name: Run tests
+    run: cuda=$cuda .ci/runtests.sh
+
+
+pipeline_start:
+  run: echo Starting new job
+
+pipeline_stop:
+  run: echo All done
+
+archiveArtifacts: config.log
+failFast: false
