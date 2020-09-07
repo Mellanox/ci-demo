@@ -150,6 +150,7 @@ def runSteps(config) {
             if (one.get("onfail") != null) {
                 run_shell(one.onfail, "onfail command for ${one.name}")
             }
+            attachArtifacts(config.archiveArtifacts)
             throw(e)
         } finally {
             if (one.get("always") != null) {
