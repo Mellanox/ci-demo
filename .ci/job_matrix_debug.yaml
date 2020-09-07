@@ -39,9 +39,11 @@ steps:
   - name: Check failures
     run: |
       env > myenv.log
+
       exit 1
-    onfail: ls -al myenv.log
-    archiveArtifacts: myenv.log
+    onfail: env > onfail_myenv.log
+    always: env > always_myenv.log
+    archiveArtifacts: 'onfail_myenv.log,always_myenv.log'
 
 pipeline_start:
   run: echo Starting new job
@@ -49,5 +51,5 @@ pipeline_start:
 pipeline_stop:
   run: echo All done
 
-archiveArtifacts: config.log
+archiveArtifacts: myenv.log
 failFast: false

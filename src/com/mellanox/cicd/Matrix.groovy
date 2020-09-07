@@ -146,14 +146,16 @@ def runSteps(config) {
         """
         try {
             run_shell(cmd, one.name)
-            attachArtifacts(one.archiveArtifacts)
-        } catch(e) {
+        } catch (e) {
             if (one.get("onfail") != null) {
                 run_shell(one.onfail, "onfail command for ${one.name}")
             }
-            attachArtifacts(one.archiveArtifacts)
-            attachArtifacts(config.archiveArtifacts)
             throw(e)
+        } finally {
+            if (one.get("always") != null) {
+                run_shell(one.always, "always command for ${one.name}")
+            }
+            attachArtifacts(one.archiveArtifacts)
         }
     }
     attachArtifacts(config.archiveArtifacts)
