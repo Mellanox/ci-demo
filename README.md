@@ -218,6 +218,8 @@ steps:
       cuda=$cuda .ci/cov.sh
 
   - name: Check package
+# can set shell per step or globally
+    shell: '!/bin/bash -xeEl'
     run: cuda=$cuda .ci/check_package.sh
 
   - name: Run tests
