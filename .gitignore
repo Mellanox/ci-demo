@@ -140,4 +140,7 @@ dkms.conf
 install/
 src/hello/hello-world
 
+# IDEs
+.idea/
+
 # End of https://www.toptal.com/developers/gitignore/api/autotools+strict,c++,c

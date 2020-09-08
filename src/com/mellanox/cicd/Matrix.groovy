@@ -113,7 +113,8 @@ def onUnstash() {
     env.PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     env.WORKSPACE = pwd()
 
-    def cmd = """#!/bin/bash -l
+    def shell = getDefaultShell()
+    def cmd = """${shell}
     hash -r
     tar xf scm-repo.tar
     git reset --hard
@@ -132,6 +133,22 @@ def attachArtifacts(args) {
     }
 }
 
+def getDefaultShell(config=null, step=null) {
+    if ((step != null) && (step.shell != null)) {
+        return step.shell
+    }
+
+    if ((config != null) && (config.shell != null)) {
+        return config.shell
+    }
+
+    if (env.DEBUG) {
+        return '#!/bin/bash -xeE'
+    }
+
+    return '#!/bin/bash -eE'
+}
+
 def runSteps(config) {
     forceCleanupWS()
     // fetch .git from server and unpack
@@ -139,7 +156,8 @@ def runSteps(config) {
     onUnstash()
 
     config.steps.each { one->
-        def shell = one.shell? one.shell : '#!/bin/bash -leE'
+
+        def shell = getDefaultShell(config, one)
         echo "Step: ${one.name}"
         def cmd = """${shell}
         ${one.run}
