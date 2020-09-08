@@ -43,7 +43,8 @@ steps:
 
   - name: Check python shell
     shell: '#!/usr/bin/env python'
-    run: print('Hello World!')
+    run: |
+      print('Hello World!')
 
   - name: Generate failures
     run: |

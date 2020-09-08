@@ -134,19 +134,20 @@ def attachArtifacts(args) {
 }
 
 def getDefaultShell(config=null, step=null) {
+
+    def ret
     if ((step != null) && (step.shell != null)) {
-        return step.shell
+        ret = step.shell
+    } else if ((config != null) && (config.shell != null)) {
+        ret = config.shell
+    } else if (env.DEBUG) {
+        ret = '#!/bin/bash -xeE'
+    } else {
+        ret = '#!/bin/bash -eE'
     }
 
-    if ((config != null) && (config.shell != null)) {
-        return config.shell
-    }
-
-    if (env.DEBUG) {
-        return '#!/bin/bash -xeE'
-    }
-
-    return '#!/bin/bash -eE'
+    new Logger(this).debug("shell: " + ret)
+    return ret
 }
 
 def runSteps(config) {
