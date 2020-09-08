@@ -139,7 +139,12 @@ def runSteps(config) {
     onUnstash()
 
     config.steps.each { one->
-        def shell = one.shell? one.shell : '#!/bin/bash -leE'
+        def shell = ''
+        if (env.DEBUG) {
+            shell = one.shell? one.shell : '#!/bin/bash -xeE'
+        } else {
+            shell = one.shell? one.shell : '#!/bin/bash -eE'
+        }
         echo "Step: ${one.name}"
         def cmd = """${shell}
         ${one.run}
