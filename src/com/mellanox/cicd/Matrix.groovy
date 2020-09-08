@@ -21,6 +21,11 @@ class Logger {
         this.ctx.echo this.cat + " WARN: ${message}"
     }
 
+    def fatal(String message) {
+        this.ctx.echo this.cat + " FATAL: ${message}"
+        this.ctx.sh(script: "false", label: "Fatal error")
+    }
+
 
     def debug(String message) {
         if (this.ctx.env.DEBUG)
@@ -67,6 +72,8 @@ def gen_image_map(config) {
         for (dfile in config.runs_on_dockers) {
             if (dfile.arch) {
                 image_map["${dfile.arch}"] = []
+            } else {
+                config.logger.fatal("Please define tag 'arch' for image ${dfile.name} in 'runs_on_dockers' section of yaml file")
             }
         }
     }
@@ -252,22 +259,6 @@ def resolveTemplate(varsMap, str) {
     return shell.evaluate('"' + str +'"')
 }
 
-def runDocker(image, branchName, config, axis) {
-    def label = getConfigVal(config, ['docker_node'], '${arch} && docker')
-    def nodeName = resolveTemplate(axis, label)
-
-    config.logger.info("Running docker on ${nodeName}")
-
-    node(nodeName) {
-        stage(branchName) {
-            def opts = getDockerOpt(config)
-            docker.image(image.url).inside(opts) {
-                runSteps(config)
-            }
-        }
-    }
-
-}
 
 Map getTasks(axes, image, config, include=null, exclude=null) {
 
@@ -304,16 +295,16 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
         def arch = axis.arch
         tasks[branchName] = { ->
             withEnv(axisEnv) {
-                if(config.get("kubernetes")) {
-                    runK8(image, branchName, config, axis)
-                } else {
-                    runDocker(image, branchName, config, axis)
+                if(config.get("kubernetes") == null) {
+                    config.logger.fatal("Please define kubernetes cloud name in yaml config file")
                 }
+                runK8(image, branchName, config, axis)
             }
         }
     }
     return tasks
 }
+
 Map getMatrixTasks(image, config) {
     List axes = []
     List include = null, exclude = null
