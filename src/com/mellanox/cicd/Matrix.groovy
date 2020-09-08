@@ -188,18 +188,7 @@ def runSteps(config) {
     attachArtifacts(config.archiveArtifacts)
 }
 
-def getDockerOpt(config) {
-    def opts = getConfigVal(config, ['docker_opt'], "")
-    if (config.get("volumes")) {
-        for (vol in config.volumes) {
-            hostPath = vol.get("hostPath")? vol.hostPath : vol.mountPath
-            opts += " -v ${vol.mountPath}:${hostPath}"
-        }
-    }
-    return opts
-}
-
-def getConfigVal(config, list, defaultVal) {
+def getConfigVal(config, list, defaultVal=null) {
     def val = config
     for (item in list) {
         config.logger.debug("Checking $item")
@@ -215,9 +204,9 @@ def getConfigVal(config, list, defaultVal) {
     return ret
 }
 
-def parseListV(config) {
+def parseListV(volumes) {
     def listV = []
-    for (vol in config.volumes) {
+    for (vol in volumes) {
         hostPath = vol.get("hostPath")
         mountPath = vol.get("mountPath")
         hpv = hostPathVolume(hostPath: hostPath, mountPath: mountPath)
@@ -232,7 +221,7 @@ def runK8(image, branchName, config, axis) {
 
     config.logger.info("Running kubernetes ${cloudName}")
 
-    def listV = parseListV(config)
+    def listV = parseListV(config.volumes)
     def cname = image.get("name").replaceAll("[\\.:/_]","")
     def nodeSelector = getConfigVal(config, ['kubernetes', 'nodeSelector'], "")
 
@@ -311,12 +300,8 @@ Map getMatrixTasks(image, config) {
 
     if (config.get("matrix")) {
         axes = getMatrixAxes(config.matrix.axes).findAll()
-        if (config.get("matrix").get("exclude")) {
-            exclude = config.matrix.exclude
-        }
-        if (config.get("matrix").get("include")) {
-            include = config.matrix.include
-        }
+        exclude = getConfigVal(config, ['matrix', 'exclude'])
+        include = getConfigVal(config, ['matrix', 'include'])
     } else {
         axes.add(image)
     }
@@ -326,8 +311,7 @@ Map getMatrixTasks(image, config) {
 
 def buildImage(img, filename, config) {
     if(filename == "") {
-        config.logger.error("No docker filename specified, skipping build docker")
-        sh 'false'
+        config.logger.fatal("No docker filename specified, skipping build docker")
     }
     customImage = docker.build("${img}", "-f ${filename} . ")
     customImage.push()
@@ -364,9 +348,10 @@ String getChangedFilesList(config) {
 
 def build_docker_on_k8(image, config) {
 
-    def listV = parseListV(config)
-    def v1 = hostPathVolume(hostPath: '/var/run/docker.sock', mountPath: '/var/run/docker.sock')
-    listV.add(v1)
+    def myVols = config.volumes.collect()
+    myVols.add([mountPath: '/var/run/docker.sock', hostPath: '/var/run/docker.sock'])
+
+    def listV = parseListV(myVols)
 
     def img      = image.url
     def arch     = image.arch
@@ -442,8 +427,7 @@ def main() {
 
         files = findFiles(glob: "${env.conf_file}")
         if (0 == files.size()) {
-            logger.error("No conf_file found by ${env.conf_file}")
-            sh 'false'
+            logger.fatal("No conf_file found by ${env.conf_file}")
         }
 
 
