@@ -142,15 +142,13 @@ def attachArtifacts(args) {
 
 def getDefaultShell(config=null, step=null) {
 
-    def ret
+    def ret = '#!/bin/bash -eE'
     if ((step != null) && (step.shell != null)) {
         ret = step.shell
     } else if ((config != null) && (config.shell != null)) {
         ret = config.shell
     } else if (env.DEBUG) {
-        ret = '#!/bin/bash -xeE'
-    } else {
-        ret = '#!/bin/bash -eE'
+        ret += 'x'
     }
 
     new Logger(this).debug("shell: " + ret)
@@ -268,8 +266,9 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
             continue
         }
 
-        def branchName = axis.values().join(', ')
-        //def branchName = "mypod-${UUID.randomUUID().toString()}"
+        def str = resolveTemplate(axis, '${arch}/${name}/${variant}')
+        def branchName = getConfigVal(config, ['taskName'], str)
+        //def branchName = axis.values().join(', ')
 
         // convert the Axis into valid values for withEnv step
         if (config.get("env")) {
