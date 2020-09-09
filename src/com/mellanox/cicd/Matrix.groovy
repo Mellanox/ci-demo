@@ -252,7 +252,6 @@ def resolveTemplate(varsMap, str) {
 Map getTasks(axes, image, config, include=null, exclude=null) {
 
     def val = getConfigVal(config, ['failFast'], true)
-    config.logger.debug("failFast = " + val)
 
     Map tasks = [failFast: val]
     for(int i = 0; i < axes.size(); i++) {

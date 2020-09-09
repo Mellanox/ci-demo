@@ -37,7 +37,7 @@ steps:
       rm -rf $cov_build
       ncpus=$(cat /proc/cpuinfo|grep processor|wc -l)
       export AUTOMAKE_JOBS=$ncpus
-      make -j $ncpu clean
+      make -j $ncpus clean
       module load tools/cov
       cov-build --dir $cov_build make -j $ncpus all
       cov-analyze --jobs $ncpus $COV_OPT --security --concurrency --dir $cov_build
