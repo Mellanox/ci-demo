@@ -266,8 +266,7 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
             continue
         }
 
-        def str = resolveTemplate(axis, '${arch}/${name}/${variant}')
-        def branchName = getConfigVal(config, ['taskName'], str)
+        def branchName = getConfigVal(config, ['taskName'], "${arch}/${name}/${variant}")
         //def branchName = axis.values().join(', ')
 
         // convert the Axis into valid values for withEnv step
