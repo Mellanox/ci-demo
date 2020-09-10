@@ -244,7 +244,7 @@ def runK8(image, branchName, config, axis) {
 def resolveTemplate(varsMap, str) {
     GroovyShell shell = new GroovyShell(new Binding(varsMap))
     def res = shell.evaluate('"' + str +'"')
-    new Logger(this).debug("Evaluating varsMap: " + varsMap.toString() + " tmpl: " + tmpl + " res: " + res)
+    new Logger(this).debug("Evaluating varsMap: " + varsMap.toString() + " str: " + str + " res: " + res)
     return res
 }
 
