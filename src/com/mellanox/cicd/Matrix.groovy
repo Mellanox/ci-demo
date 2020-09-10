@@ -23,7 +23,7 @@ class Logger {
 
     def fatal(String message) {
         this.ctx.echo this.cat + " FATAL: ${message}"
-        this.ctx.sh(script: "false", label: "Fatal error")
+        this.ctx.run_shell("false", "Fatal error")
     }
 
 
@@ -233,7 +233,7 @@ def runK8(image, branchName, config, axis) {
         str += "$key = $val\n"
     }
 
-    out = run_shell('printf "%s" ' +  '"' + str + '"', "Printing matrix axis parameters", true)
+    out = run_shell('printf "%s"\n' +  '"' + str + '"', "Matrix axis parameters", true)
     echo out
 
 
@@ -352,7 +352,7 @@ String getChangedFilesList(config) {
             def sha = env.ghprbActualCommit? env.ghprbActualCommit : "HEAD"
             dcmd = "git diff --name-only origin/${br}..${sha}"
         }
-        cFiles = sh(returnStdout: true, script: dcmd, label: 'Calculating changed files list').trim().tokenize()
+        cFiles = run_shell(dcmd, 'Calculating changed files list', true).trim().tokenize()
 
         cFiles.each { oneFile ->
             logger.debug("Tracking Changed File: " + oneFile)
@@ -437,9 +437,9 @@ def main() {
             env.GIT_COMMIT      = scmVars.GIT_COMMIT
             env.GIT_PREV_COMMIT = scmVars.GIT_PREVIOUS_COMMIT
 
-            logger.info("Git commit: ${env.GIT_COMMIT} prev commit: ${env.GIT_PREV_COMMIT}")
+            logger.debug("Git commit: ${env.GIT_COMMIT} prev commit: ${env.GIT_PREV_COMMIT}")
             // create git tarball on server, agents will copy it and unpack
-            sh "tar cf scm-repo.tar .git"
+            run_shell("tar cf scm-repo.tar .git", 'Extracting scm repository files')
             stash includes: "scm-repo.tar", name: "${env.JOB_NAME}"
         }
 
