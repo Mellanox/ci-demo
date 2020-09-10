@@ -162,12 +162,6 @@ def runSteps(config, axis) {
     unstash "${env.JOB_NAME}"
     onUnstash()
 
-    def str = ""
-    axis.collect { key, val ->
-        str += "$key = $val\n"
-    }
-
-    run_shell('printf "%s" ' +  '"' + str + '"', "Matrix axis parameters")
 
     config.steps.each { one->
 
@@ -226,6 +220,14 @@ def runK8(image, branchName, config, axis) {
     def cloudName = getConfigVal(config, ['kubernetes','cloud'], "")
 
     config.logger.info("Running kubernetes ${cloudName}")
+
+    def str = ""
+    axis.collect { key, val ->
+        str += "$key = $val\n"
+    }
+
+    run_shell('printf "%s" ' +  '"' + str + '"', "Printing matrix axis parameters")
+
 
     def listV = parseListV(config.volumes)
     def cname = image.get("name").replaceAll("[\\.:/_]","")

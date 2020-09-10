@@ -58,7 +58,7 @@ steps_disabled:
     archiveArtifacts: 'onfail_myenv.log,always_myenv.log'
 
 
-shell: '#!/bin/bash -eEx'
+#shell: '#!/bin/bash -eEx'
 
 pipeline_start:
   run: echo Starting new job
