@@ -28,7 +28,7 @@ class Logger {
 
 
     def debug(String message) {
-        if (this.ctx.env.DEBUG && (this.ctx.env.DEBUG == "false")) {
+        if (this.ctx.env.DEBUG && (this.ctx.env.DEBUG != "false")) {
             this.ctx.echo this.cat + " DEBUG: ${message}"
         }
     }
@@ -162,10 +162,12 @@ def runSteps(config, axis) {
     unstash "${env.JOB_NAME}"
     onUnstash()
 
-    echo "Printing Matrix Axis:"
+    def str
     axis.collect { key, val ->
-        echo ("\t$key = $val")
+        str += "$key = $val\n"
     }
+
+    echo "Printing Matrix Axis:\n$str"
 
     config.steps.each { one->
 
