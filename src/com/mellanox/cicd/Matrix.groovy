@@ -167,7 +167,7 @@ def runSteps(config, axis) {
         str += "$key = $val\n"
     }
 
-    run_shell("echo $str", "Matrix axis parameters")
+    run_shell('printf "%s" ' +  '"' + str + '"', "Matrix axis parameters")
 
     config.steps.each { one->
 
