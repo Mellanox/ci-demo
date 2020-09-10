@@ -156,11 +156,16 @@ def getDefaultShell(config=null, step=null) {
     return ret
 }
 
-def runSteps(config) {
+def runSteps(config, axis) {
     forceCleanupWS()
     // fetch .git from server and unpack
     unstash "${env.JOB_NAME}"
     onUnstash()
+
+    echo "Printing Matrix Axis:"
+    axis.collect { key, val ->
+        echo ("\t$key = $val")
+    }
 
     config.steps.each { one->
 
@@ -190,16 +195,16 @@ def runSteps(config) {
 def getConfigVal(config, list, defaultVal=null) {
     def val = config
     for (item in list) {
-        config.logger.debug("Checking $item")
+        config.logger.debug("getConfigVal: Checking $item in config file")
         val = val.get(item)
         if (val == null) {
-            config.logger.debug("Defaulting " + list.toString() + " = " + defaultVal)
+            config.logger.debug("getConfigVal: Defaulting " + list.toString() + " = " + defaultVal)
             return defaultVal
         }
     }
 
     def ret =  (val instanceof ArrayList)? val[0] : val
-    config.logger.debug("Found " + list.toString() + " = " + ret)
+    config.logger.debug("getConfigVal: Found " + list.toString() + " = " + ret)
     return ret
 }
 
@@ -235,12 +240,7 @@ def runK8(image, branchName, config, axis) {
         node(POD_LABEL) {
             stage (branchName) {
                 container(cname) {
-                    stage ('Matrix axis') {
-                        axis.collect { key, val ->
-                            config.logger.info("$key = $val")
-                        }
-                    }
-                    runSteps(config)
+                    runSteps(config, axis)
                 }
             }
         }
