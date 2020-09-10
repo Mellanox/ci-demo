@@ -223,8 +223,6 @@ def runK8(image, branchName, config, axis) {
     def cname = image.get("name").replaceAll("[\\.:/_]","")
     def nodeSelector = getConfigVal(config, ['kubernetes', 'nodeSelector'], "")
 
-    config.logger.info("Task matrix/asis parameters: " + axis.toString())
-
     podTemplate(cloud: cloudName, runAsUser: "0", runAsGroup: "0",
                 nodeSelector: nodeSelector,
                 containers: [
@@ -236,6 +234,11 @@ def runK8(image, branchName, config, axis) {
         node(POD_LABEL) {
             stage (branchName) {
                 container(cname) {
+                    stage ('Matrix axis') {
+                        axis.collect { key, val ->
+                            config.logger.info("$key = " + $val)
+                        }
+                    }
                     runSteps(config)
                 }
             }
