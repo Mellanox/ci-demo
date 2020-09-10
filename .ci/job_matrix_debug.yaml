@@ -68,4 +68,4 @@ pipeline_stop:
 
 archiveArtifacts: myenv.log
 failFast: false
-taskName: ${name}/${variant}
+taskName: '${name}/${variant}'
