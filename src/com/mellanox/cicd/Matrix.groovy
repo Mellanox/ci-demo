@@ -223,6 +223,8 @@ def runK8(image, branchName, config, axis) {
     def cname = image.get("name").replaceAll("[\\.:/_]","")
     def nodeSelector = getConfigVal(config, ['kubernetes', 'nodeSelector'], "")
 
+    config.logger.info("Task matrix/asis parameters: " + axis.toString())
+
     podTemplate(cloud: cloudName, runAsUser: "0", runAsGroup: "0",
                 nodeSelector: nodeSelector,
                 containers: [
