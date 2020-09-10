@@ -243,7 +243,9 @@ def runK8(image, branchName, config, axis) {
 
 def resolveTemplate(varsMap, str) {
     GroovyShell shell = new GroovyShell(new Binding(varsMap))
-    return shell.evaluate('"' + str +'"')
+    def res = shell.evaluate('"' + str +'"')
+    new Logger(this).debug("Evaluating varsMap: " + varsMap.toString() + " tmpl: " + tmpl + " res: " + res)
+    return res
 }
 
 
@@ -266,7 +268,8 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
             continue
         }
 
-        def branchName = getConfigVal(config, ['taskName'], "${arch}/${name}/${variant}")
+        def tmpl = getConfigVal(config, ['taskName'], '${arch}/${name}/${variant}')
+        def branchName = resolveTemplate(axis, tmpl)
         //def branchName = axis.values().join(', ')
 
         // convert the Axis into valid values for withEnv step
