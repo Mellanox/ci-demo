@@ -28,9 +28,8 @@ class Logger {
 
 
     def debug(String message) {
-        if (this.ctx.env.DEBUG) {
+        if (this.ctx.env.DEBUG && (this.ctx.env.DEBUG == "false")) {
             this.ctx.echo this.cat + " DEBUG: ${message}"
-            this.ctx.echo this.ctx.env.DEBUG
         }
     }
 }
