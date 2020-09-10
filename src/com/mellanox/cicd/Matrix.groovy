@@ -233,8 +233,8 @@ def runK8(image, branchName, config, axis) {
         str += "$key = $val\n"
     }
 
-    out = run_shell('printf "%s"' +  '"' + str + '"', "Matrix axis parameters", true)
-    echo out
+    run_shell('printf "%s"' +  '"' + str + '"', "Matrix axis parameters")
+    
 
 
     def listV = parseListV(config.volumes)
