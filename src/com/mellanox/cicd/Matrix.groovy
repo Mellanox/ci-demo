@@ -162,12 +162,12 @@ def runSteps(config, axis) {
     unstash "${env.JOB_NAME}"
     onUnstash()
 
-    def str
+    def str = ""
     axis.collect { key, val ->
         str += "$key = $val\n"
     }
 
-    echo "Printing Matrix Axis:\n$str"
+    erun_shell("echo $str", "Matrix axis parameters")
 
     config.steps.each { one->
 
