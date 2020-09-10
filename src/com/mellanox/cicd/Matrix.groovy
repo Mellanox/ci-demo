@@ -167,7 +167,7 @@ def runSteps(config, axis) {
         str += "$key = $val\n"
     }
 
-    erun_shell("echo $str", "Matrix axis parameters")
+    run_shell("echo $str", "Matrix axis parameters")
 
     config.steps.each { one->
 
