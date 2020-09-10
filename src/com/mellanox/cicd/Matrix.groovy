@@ -28,8 +28,10 @@ class Logger {
 
 
     def debug(String message) {
-        if (this.ctx.env.DEBUG)
+        if (this.ctx.env.DEBUG) {
             this.ctx.echo this.cat + " DEBUG: ${message}"
+            this.ctx.echo this.ctx.env.DEBUG
+        }
     }
 }
  
@@ -236,7 +238,7 @@ def runK8(image, branchName, config, axis) {
                 container(cname) {
                     stage ('Matrix axis') {
                         axis.collect { key, val ->
-                            config.logger.info("$key = " + $val)
+                            config.logger.info("$key = $val")
                         }
                     }
                     runSteps(config)
