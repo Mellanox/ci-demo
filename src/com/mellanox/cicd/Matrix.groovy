@@ -28,7 +28,7 @@ class Logger {
 
 
     def debug(String message) {
-        if (this.ctx.env.DEBUG && (this.ctx.env.DEBUG != "false")) {
+        if (this.ctx.isDebugMode(this.ctx.env.DEBUG)) {
             this.ctx.echo this.cat + " DEBUG: ${message}"
         }
     }
@@ -49,8 +49,8 @@ List getMatrixAxes(matrix_axes) {
     axes.combinations()*.sum()
 }
 
-def run_shell(cmd, title) {
-    sh(script: cmd, label: title)
+def run_shell(cmd, title, retOut=false) {
+    sh(script: cmd, label: title, returnStdout: retOut)
 }
 
 def forceCleanupWS() {
@@ -141,6 +141,13 @@ def attachArtifacts(args) {
     }
 }
 
+def isDebugMode(val) {
+    if (val && (val == "true")) {
+        return true
+    }
+    return false
+}
+
 def getDefaultShell(config=null, step=null) {
 
     def ret = '#!/bin/bash -eE'
@@ -148,7 +155,7 @@ def getDefaultShell(config=null, step=null) {
         ret = step.shell
     } else if ((config != null) && (config.shell != null)) {
         ret = config.shell
-    } else if (env.DEBUG) {
+    } else if (isDebugMode(env.DEBUG)) {
         ret += 'x'
     }
 
@@ -226,7 +233,8 @@ def runK8(image, branchName, config, axis) {
         str += "$key = $val\n"
     }
 
-    run_shell('printf "%s" ' +  '"' + str + '"', "Printing matrix axis parameters")
+    out = run_shell('printf "%s" ' +  '"' + str + '"', "Printing matrix axis parameters", true)
+    echo out
 
 
     def listV = parseListV(config.volumes)
