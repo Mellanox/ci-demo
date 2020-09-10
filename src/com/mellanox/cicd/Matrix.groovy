@@ -233,7 +233,7 @@ def runK8(image, branchName, config, axis) {
         str += "$key = $val\n"
     }
 
-    out = run_shell('printf "%s"\n' +  '"' + str + '"', "Matrix axis parameters", true)
+    out = run_shell('printf "%s"' +  '"' + str + '"', "Matrix axis parameters", true)
     echo out
 
 
