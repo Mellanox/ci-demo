@@ -280,7 +280,7 @@ def getDockerOpt(config) {
     return opts
 }
 
-def runDocker(image, config, branchName=null, axis=null, code) {
+def runDocker(image, config, branchName=null, axis=null, closure) {
     def nodeName = image.nodeLabel
 
     config.logger.debug("Running docker on node: ${nodeName} branch: ${branchName}")
@@ -290,7 +290,7 @@ def runDocker(image, config, branchName=null, axis=null, code) {
             def opts = getDockerOpt(config)
             docker.image(image.url).inside(opts) {
                 echo ("XXXXXXXX start ${branchName}")
-                code()
+                closure(image, config)
                 echo ("XXXXXXXX end ${branchName}")
             }
         }
@@ -338,8 +338,7 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
                     config.logger.fatal("Please define kubernetes cloud name in yaml config file or define nodeLabel for docker")
                 }
                 if (image.nodeLabel) {
-                    def code = { runSteps(config) }
-                    runDocker(image, config, branchName, axis, code)
+                    runDocker(image, config, branchName, axis, {image, config -> runSteps(config)})
                 } else {
                     runK8(image, branchName, config, axis)
                 }
@@ -516,8 +515,7 @@ def main() {
             arch_distro_map.each { arch, images ->
                 images.each { image ->
                     if (image.nodeLabel) {
-                        def code = { buildDocker(image, config) }
-                        runDocker(image, config, "Preparing docker image", null, code)
+                        runDocker(image, config, "Preparing docker image", null, {image, config -> buildDocker(image, config)})
                     } else {
                         build_docker_on_k8(image, config)
                     }
