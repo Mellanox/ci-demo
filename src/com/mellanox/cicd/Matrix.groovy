@@ -280,7 +280,7 @@ def getDockerOpt(config) {
     return opts
 }
 
-def runDocker(image, branchName, config, axis) {
+def runDocker(image, config, branchName=null, axis=null, code) {
     def nodeName = image.nodeLabel
 
     config.logger.debug("Running docker on ${label}")
@@ -289,7 +289,7 @@ def runDocker(image, branchName, config, axis) {
         stage(branchName) {
             def opts = getDockerOpt(config)
             docker.image(image.url).inside(opts) {
-                runSteps(config)
+                code()
             }
         }
     }
@@ -336,7 +336,8 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
                     config.logger.fatal("Please define kubernetes cloud name in yaml config file or define nodeLabel for docker")
                 }
                 if (image.nodeLabel) {
-                    runDocker(image, branchName, config, axis)
+                    def code = {runSteps(config)}
+                    runDocker(image, config, branchName, axis, code)
                 } else {
                     runK8(image, branchName, config, axis)
                 }
@@ -398,6 +399,43 @@ String getChangedFilesList(config) {
     return cFiles
 }
 
+def buildDocker(image, config) {
+
+    def img      = image.url
+    def arch     = image.arch
+    def filename = image.filename
+    def distro   = image.name
+
+    stage("Prepare docker image for ${config.job}/$arch/$distro") {
+        config.logger.info("Going to fetch docker image: ${img} from ${config.registry_host}")
+        def need_build = 0
+
+        docker.withRegistry("https://${config.registry_host}", config.registry_auth) {
+            try {
+                config.logger.info("Pulling image - ${img}")
+                customImage = docker.image(img).pull()
+            } catch (exception) {
+                config.logger.info("Image NOT found - ${img} - will build ${filename} ...")
+                need_build++
+            }
+
+            if ("${env.build_dockers}" == "true") {
+                config.logger.info("Forcing building file per user request: ${filename} ... ")
+                need_build++
+            }
+            if (config.get("cFiles").contains(filename)) {
+                config.logger.info("Forcing building, file modified by commit: ${filename} ... ")
+                need_build++
+            }
+            if (need_build) {
+                config.logger.info("Building - ${img} - ${filename}")
+                buildImage(img, filename, config)
+            }
+        }
+    }
+}
+
+
 def build_docker_on_k8(image, config) {
 
     def myVols = config.volumes.collect()
@@ -405,10 +443,6 @@ def build_docker_on_k8(image, config) {
 
     def listV = parseListV(myVols)
 
-    def img      = image.url
-    def arch     = image.arch
-    def filename = image.filename
-    def distro   = image.name
     def cloudName = getConfigVal(config, ['kubernetes','cloud'], "")
 
     config.logger.debug("Checking docker image $distro availability")
@@ -425,33 +459,7 @@ def build_docker_on_k8(image, config) {
             onUnstash()
 
             container('docker') {
-                stage("Prepare docker image for ${config.job}/$arch/$distro") {
-                    config.logger.info("Going to fetch docker image: ${img} from ${config.registry_host}")
-                    def need_build = 0
-
-                    docker.withRegistry("https://${config.registry_host}", config.registry_auth) {
-                        try {
-                            config.logger.info("Pulling image - ${img}")
-                            customImage = docker.image(img).pull()
-                        } catch (exception) {
-                            config.logger.info("Image NOT found - ${img} - will build ${filename} ...")
-                            need_build++
-                        }
-
-                        if ("${env.build_dockers}" == "true") {
-                            config.logger.info("Forcing building file per user request: ${filename} ... ")
-                            need_build++
-                        }
-                        if (config.get("cFiles").contains(filename)) {
-                            config.logger.info("Forcing building, file modified by commit: ${filename} ... ")
-                            need_build++
-                        }
-                        if (need_build) {
-                            config.logger.info("Building - ${img} - ${filename}")
-                            buildImage(img, filename, config)
-                        }
-                    }
-                }
+                buildDocker(image, config)
             }
         }
     }
@@ -505,7 +513,12 @@ def main() {
             def arch_distro_map = gen_image_map(config)
             arch_distro_map.each { arch, images ->
                 images.each { image ->
-                    build_docker_on_k8(image, config)
+                    if (image.nodeLabel) {
+                        def code = {buildDocker(image, config)}
+                        runDocker(image, config, "Preparing docker image", null, code)
+                    } else {
+                        build_docker_on_k8(image, config)
+                    }
                     branches += getMatrixTasks(image, config)
                 }
             }
