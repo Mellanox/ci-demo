@@ -289,7 +289,8 @@ def runDocker(image, config, branchName=null, axis=null, code) {
         stage(branchName) {
             def opts = getDockerOpt(config)
             docker.image(image.url).inside(opts) {
-                code()
+                echo ("Hello ${branchName}")
+                //code()
             }
         }
     }
