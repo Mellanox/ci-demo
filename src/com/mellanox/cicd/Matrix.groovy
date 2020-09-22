@@ -413,7 +413,7 @@ def buildDocker(image, config) {
         config.logger.info("Going to fetch docker image: ${img} from ${config.registry_host}")
         def need_build = 0
 
-        docker.withRegistry("https://${config.registry_host}", config.registry_auth) {
+    //    docker.withRegistry("https://${config.registry_host}", config.registry_auth) {
             try {
                 config.logger.info("Pulling image - ${img}")
                 docker.image(img).pull()
@@ -434,7 +434,7 @@ def buildDocker(image, config) {
                 config.logger.info("Building - ${img} - ${filename}")
                 buildImage(img, filename, config)
             }
-        }
+    //    }
     }
 }
 
