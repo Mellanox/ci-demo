@@ -446,7 +446,7 @@ def build_docker_on_k8(image, config) {
 
     def cloudName = getConfigVal(config, ['kubernetes','cloud'], "")
 
-    config.logger.debug("Checking docker image $distro availability")
+    config.logger.debug("Checking docker image availability")
 
     podTemplate(cloud: cloudName, runAsUser: "0", runAsGroup: "0",
                 containers: [
