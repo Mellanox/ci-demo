@@ -92,6 +92,9 @@ def gen_image_map(config) {
                 url: "${config.registry_host}${config.registry_path}/${arch}/${dfile.name}:${dfile.tag}", \
                 name: "${dfile.name}" \
             ]
+            if (dfile.nodeLabel) {
+                item.put('nodeLabel', dfile.nodeLabel)
+            }
             config.logger.debug("Adding docker to image_map for " + arch + " name: " + item.name)
             images.add(item)
         }
@@ -266,6 +269,33 @@ def resolveTemplate(varsMap, str) {
     return res
 }
 
+def getDockerOpt(config) {
+    def opts = getConfigVal(config, ['docker_opt'], "")
+    if (config.get("volumes")) {
+        for (vol in config.volumes) {
+            hostPath = vol.get("hostPath")? vol.hostPath : vol.mountPath
+            opts += " -v ${vol.mountPath}:${hostPath}"
+        }
+    }
+    return opts
+}
+
+def runDocker(image, branchName, config, axis) {
+    def nodeName = image.nodeLabel
+
+    config.logger.debug("Running docker on ${label}")
+
+    node(nodeName) {
+        stage(branchName) {
+            def opts = getDockerOpt(config)
+            docker.image(image.url).inside(opts) {
+                runSteps(config)
+            }
+        }
+    }
+
+}
+
 
 Map getTasks(axes, image, config, include=null, exclude=null) {
 
@@ -302,10 +332,14 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
         def arch = axis.arch
         tasks[branchName] = { ->
             withEnv(axisEnv) {
-                if(config.get("kubernetes") == null) {
-                    config.logger.fatal("Please define kubernetes cloud name in yaml config file")
+                if((config.get("kubernetes") == null) && (image.nodeLabel == null)) {
+                    config.logger.fatal("Please define kubernetes cloud name in yaml config file or define nodeLabel for docker")
                 }
-                runK8(image, branchName, config, axis)
+                if (image.nodeLabel) {
+                    runDocker(image, branchName, config, axis)
+                } else {
+                    runK8(image, branchName, config, axis)
+                }
             }
         }
     }
