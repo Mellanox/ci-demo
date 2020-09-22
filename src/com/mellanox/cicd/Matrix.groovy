@@ -283,7 +283,7 @@ def getDockerOpt(config) {
 def runDocker(image, config, branchName=null, axis=null, code) {
     def nodeName = image.nodeLabel
 
-    config.logger.debug("Running docker on ${label}")
+    config.logger.debug("Running docker on ${nodeName}")
 
     node(nodeName) {
         stage(branchName) {
