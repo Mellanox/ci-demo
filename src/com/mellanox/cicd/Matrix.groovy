@@ -475,11 +475,10 @@ def main() {
     node("master") {
 
         logger = new Logger(this)
-        def scmVars
 
         stage("Prepare checkout") {
             forceCleanupWS()
-            scmVars = checkout scm
+            def scmVars = checkout scm
             
             env.GIT_COMMIT      = scmVars.GIT_COMMIT
             env.GIT_PREV_COMMIT = scmVars.GIT_PREVIOUS_COMMIT
@@ -508,12 +507,16 @@ def main() {
             if (config.pipeline_start) {
                 cmd = config.pipeline_start.run
                 if (cmd) {
-                    logger.debug("Starting pipeline")
+                    logger.debug("Running pipeline_start")
                     stage("Start ${config.job}") {
                         run_shell("${cmd}", "start")
                     }
                 }
             }
+
+// prepare MAP in format:
+// $arch -> List[$docker, $docker, $docker]
+// this is to avoid that multiple axis from matrix will create own same copy for $docker but creating it upfront.
 
             def arch_distro_map = gen_image_map(config)
             arch_distro_map.each { arch, images ->
@@ -535,7 +538,7 @@ def main() {
                 if (config.pipeline_stop) {
                     cmd = config.pipeline_stop.run
                     if (cmd) {
-                        logger.debug("Stopping pipline")
+                        logger.debug("running pipeline_stop")
                         stage("Stop ${config.job}") {
                             run_shell("${cmd}", "stop")
                         }
