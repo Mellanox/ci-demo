@@ -277,12 +277,10 @@ def getDockerOpt(config) {
             opts += " -v ${vol.mountPath}:${hostPath}"
         }
     }
-
-    opts += " -v /var/run/docker.sock:/var/run/docker.sock"
     return opts
 }
 
-def runDocker(image, config, branchName=null, axis=null, Closure func) {
+def runDocker(image, config, branchName=null, axis=null, Closure func, runInDocker=true) {
     def nodeName = image.nodeLabel
 
     config.logger.debug("Running docker on node: ${nodeName} branch: ${branchName}")
@@ -291,8 +289,12 @@ def runDocker(image, config, branchName=null, axis=null, Closure func) {
         unstash "${env.JOB_NAME}"
         onUnstash()
         stage(branchName) {
-            def opts = getDockerOpt(config)
-            docker.image(image.url).inside(opts) {
+            if (runInDocker) {
+                def opts = getDockerOpt(config)
+                docker.image(image.url).inside(opts) {
+                    func(image, config)
+                }
+            } else {
                 func(image, config)
             }
         }
@@ -517,7 +519,7 @@ def main() {
             arch_distro_map.each { arch, images ->
                 images.each { image ->
                     if (image.nodeLabel) {
-                        runDocker(image, config, "Preparing docker image", null, { pimage, pconfig -> buildDocker(pimage, pconfig) })
+                        runDocker(image, config, "Preparing docker image", null, { pimage, pconfig -> buildDocker(pimage, pconfig) }, false)
                     } else {
                         build_docker_on_k8(image, config)
                     }
