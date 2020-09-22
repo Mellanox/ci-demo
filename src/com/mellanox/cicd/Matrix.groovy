@@ -414,7 +414,7 @@ def buildDocker(image, config) {
         docker.withRegistry("https://${config.registry_host}", config.registry_auth) {
             try {
                 config.logger.info("Pulling image - ${img}")
-                customImage = docker.image(img).pull()
+                docker.image(img).pull()
             } catch (exception) {
                 config.logger.info("Image NOT found - ${img} - will build ${filename} ...")
                 need_build++
@@ -515,7 +515,8 @@ def main() {
             arch_distro_map.each { arch, images ->
                 images.each { image ->
                     if (image.nodeLabel) {
-                        runDocker(image, config, "Preparing docker image", null, { pimage, pconfig -> buildDocker(pimage, pconfig) })
+                        //runDocker(image, config, "Preparing docker image", null, { pimage, pconfig -> buildDocker(pimage, pconfig) })
+                        echo "xxxxx no prepare"
                     } else {
                         build_docker_on_k8(image, config)
                     }
