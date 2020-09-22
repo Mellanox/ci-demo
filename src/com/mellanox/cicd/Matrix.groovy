@@ -289,7 +289,7 @@ def runDocker(image, config, branchName=null, axis=null, Closure func) {
         stage(branchName) {
             def opts = getDockerOpt(config)
             docker.image(image.url).inside(opts) {
-                echo ("XXXXXXXX start ${branchName}")
+                echo ("XXXXXXXX start ${branchName} func: " + func)
                 func(image, config)
                 echo ("XXXXXXXX end ${branchName}")
             }
