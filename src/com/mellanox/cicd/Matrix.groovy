@@ -277,6 +277,8 @@ def getDockerOpt(config) {
             opts += " -v ${vol.mountPath}:${hostPath}"
         }
     }
+
+    opts += " -v /var/run/docker.sock:/var/run/docker.sock"
     return opts
 }
 
@@ -515,8 +517,7 @@ def main() {
             arch_distro_map.each { arch, images ->
                 images.each { image ->
                     if (image.nodeLabel) {
-                        //runDocker(image, config, "Preparing docker image", null, { pimage, pconfig -> buildDocker(pimage, pconfig) })
-                        echo "xxxxx no prepare"
+                        runDocker(image, config, "Preparing docker image", null, { pimage, pconfig -> buildDocker(pimage, pconfig) })
                     } else {
                         build_docker_on_k8(image, config)
                     }
