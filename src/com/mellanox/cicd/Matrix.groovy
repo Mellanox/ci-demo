@@ -338,7 +338,7 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
                     config.logger.fatal("Please define kubernetes cloud name in yaml config file or define nodeLabel for docker")
                 }
                 if (image.nodeLabel) {
-                    runDocker(image, config, branchName, axis, {image, config -> runSteps(config)})
+                    runDocker(image, config, branchName, axis, {pimage, pconfig -> runSteps(pconfig)})
                 } else {
                     runK8(image, branchName, config, axis)
                 }
@@ -515,7 +515,7 @@ def main() {
             arch_distro_map.each { arch, images ->
                 images.each { image ->
                     if (image.nodeLabel) {
-                        runDocker(image, config, "Preparing docker image", null, {image, config -> buildDocker(image, config)})
+                        runDocker(image, config, "Preparing docker image", null, {pimage, pconfig -> buildDocker(pimage, pconfig)})
                     } else {
                         build_docker_on_k8(image, config)
                     }
