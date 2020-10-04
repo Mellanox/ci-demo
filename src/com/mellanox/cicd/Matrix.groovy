@@ -139,7 +139,7 @@ def attachArtifacts(args) {
         try {
             archiveArtifacts(artifacts: args, allowEmptyArchive: true )
         } catch (e) {
-            config.logger.error("Failed to add artifacts: " + args + " reason: " + e)
+            config.logger.warn("Failed to add artifacts: " + args + " reason: " + e)
         }
     }
 }
@@ -153,7 +153,7 @@ def isDebugMode(val) {
 
 def getDefaultShell(config=null, step=null) {
 
-    def ret = '#!/bin/bash -eE'
+    def ret = '#!/bin/bash -leE'
     if ((step != null) && (step.shell != null)) {
         ret = step.shell
     } else if ((config != null) && (config.shell != null)) {
@@ -398,7 +398,7 @@ String getChangedFilesList(config) {
             logger.debug("Tracking Changed File: " + oneFile)
         }
     } catch(e) {
-        logger.error("Unable to calc changed file list - make sure shallow clone depth is configured in Jenkins, reason: " + e)
+        logger.warn("Unable to calc changed file list - make sure shallow clone depth is configured in Jenkins, reason: " + e)
     }
 
     return cFiles
