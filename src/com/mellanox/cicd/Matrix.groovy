@@ -124,8 +124,7 @@ def onUnstash() {
     env.PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     env.WORKSPACE = pwd()
 
-    def shell = getDefaultShell()
-    def cmd = """${shell}
+    def cmd = """#!/bin/bash
     hash -r
     tar xf scm-repo.tar
     git reset --hard
@@ -151,9 +150,9 @@ def isDebugMode(val) {
     return false
 }
 
-def getDefaultShell(config=null, step=null) {
+def getDefaultShell(config=null, step=null, shell='#!/bin/bash -leE') {
 
-    def ret = '#!/bin/bash -leE'
+    def ret = shell
     if ((step != null) && (step.shell != null)) {
         ret = step.shell
     } else if ((config != null) && (config.shell != null)) {
