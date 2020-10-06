@@ -38,6 +38,16 @@ steps:
   - name: Test nomatrix
     run: env
 
+  - name: Test failure
+    run: |
+    echo going to fail no
+    false
+    echo should not see it
+
+  - name: after failure
+    run: |
+    echo should not see it either
+
 steps_disabled:
 
   - name: Check bash shell
