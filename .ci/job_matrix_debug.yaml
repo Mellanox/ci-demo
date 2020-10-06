@@ -40,13 +40,13 @@ steps:
 
   - name: Test failure
     run: |
-    echo going to fail no
-    false
-    echo should not see it
+      echo going to fail no
+      false
+      echo should not see it
 
   - name: after failure
     run: |
-    echo should not see it either
+      echo should not see it either
 
 steps_disabled:
 
