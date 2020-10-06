@@ -41,7 +41,7 @@ steps:
   - name: Test failure
     run: |
       echo going to fail no
-      false
+      exit 1
       echo should not see it
 
   - name: after failure
