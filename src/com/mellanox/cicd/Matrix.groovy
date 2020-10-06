@@ -150,7 +150,7 @@ def isDebugMode(val) {
     return false
 }
 
-def getDefaultShell(config=null, step=null, shell='#!/bin/bash -leE') {
+def getDefaultShell(config=null, step=null, shell='#!/bin/bash -l') {
 
     def ret = shell
     if ((step != null) && (step.shell != null)) {
