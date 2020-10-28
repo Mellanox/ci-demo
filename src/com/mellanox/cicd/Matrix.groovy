@@ -530,7 +530,9 @@ def main() {
             }
         
             try {
-		(branches.keySet() as List).collate(2).each {
+
+		def bSize = getConfigVal(config, ['batchSize'], 10)
+		(branches.keySet() as List).collate(bSize).each {
 		  logger.debug("batch here")
                   timestamps {
                     parallel branches.subMap(it)
