@@ -530,9 +530,12 @@ def main() {
             }
         
             try {
-                timestamps {
-                    parallel branches
-                }
+		(branches.keySet() as List).collate(2).each {
+		  logger.debug("batch here")
+                  timestamps {
+                    parallel branches.subMap(it)
+                  }
+		}
             } finally {
                 if (config.pipeline_stop) {
                     cmd = config.pipeline_stop.run
