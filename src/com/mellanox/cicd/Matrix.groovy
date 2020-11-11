@@ -366,11 +366,11 @@ Map getMatrixTasks(image, config) {
     return getTasks(axes, image, config, include, exclude)
 }
 
-def buildImage(img, filename, config) {
+def buildImage(img, filename, arch, distro, config) {
     if(filename == "") {
         config.logger.fatal("No docker filename specified, skipping build docker")
     }
-    customImage = docker.build("${img}", "-f ${filename} . ")
+    customImage = docker.build("${img}", "-f ${filename} --build-arg ARCH=${arch} --build-arg DISTRO=${distro} . ")
     customImage.push()
 }
 
@@ -433,7 +433,7 @@ def buildDocker(image, config) {
             }
             if (need_build) {
                 config.logger.info("Building - ${img} - ${filename}")
-                buildImage(img, filename, config)
+                buildImage(img, filename, arch, distro, config)
             }
         }
     }
