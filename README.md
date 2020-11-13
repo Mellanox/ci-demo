@@ -246,6 +246,17 @@ archiveArtifacts: config.log
 
 # Fail job is one of the steps fails or continue
 failFast: false
+
+# Execute parallel job in batches (default 10 jobs in the air), to prevent overload k8 with large amount of parallel jobs
+batchSize: 2
+
+# Job timeout - fail job if it runs more than specified amount of minutes (default is 90 minutes)
+timeout_minutes: 60
+
+# Customize name of the parallel subtask as appears in Jenkins UI, according to the template below
+# can use variable names from axis part of the matrix config
+taskName: '${name}/${variant}'
+
 ```
 
 
