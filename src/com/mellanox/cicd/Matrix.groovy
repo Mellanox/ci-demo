@@ -531,13 +531,15 @@ def main() {
         
             try {
 
-		def bSize = getConfigVal(config, ['batchSize'], 10)
-		(branches.keySet() as List).collate(bSize).each {
-		  logger.debug("batch here")
-                  timestamps {
-                    parallel branches.subMap(it)
-                  }
-		}
+                def bSize = getConfigVal(config, ['batchSize'], 10)
+                def timeout_min = getConfigVal(config, ['timeout_minutes'], "90")
+                timeout(time: timeout_min, unit: 'MINUTES') {
+                    (branches.keySet() as List).collate(bSize).each {
+                        timestamps {
+                            parallel branches.subMap(it)
+                        }
+                    }
+                }
             } finally {
                 if (config.pipeline_stop) {
                     cmd = config.pipeline_stop.run
