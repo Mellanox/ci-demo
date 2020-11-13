@@ -93,7 +93,8 @@ Jenkins behavior can be controlled by job_matrix.yaml file which has similar syn
 
 ## Jenkins job builder
 
-* Demo contains [Jenkins Job Builder](https://docs.openstack.org/infra/jenkins-job-builder) config [file](.ci/jjb_proj.yaml) which loads Jenkins project definition into Jenkins server.
+* Demo contains [Jenkins Job Builder](https://docs.openstack.org/infra/jenkins-job-builder) config [file](.ci/jjb_proj.yaml) 
+which loads Jenkins project definition into Jenkins server.
 * Jenkins project descibed by [file](.ci/jjb_proj.yaml) supports following UI actions/parameters:
  - boolean - rebuild docker files
  - string - Use named Dockerfile (defaul: .ci/Jenkinsfile.shlib)
@@ -161,7 +162,9 @@ env:
   mofed_installer_exe: /.autodirect/sw/release/mlnx_ofed/MLNX_OFED/mlnx_ofed_install
   mofed_installer_opt: --user-space-only --without-fw-update --all -q --skip-unsupported-devices-check
 
-# list of dockers to use for the job, `file` key is optional, if defined but docker image does not exist in registry - image will be created during 1st invocation or if file was modified
+# list of dockers to use for the job, `file` key is optional, if defined but docker image does not exist in registry.
+# image will be created during 1st invocation or if file was modified
+
 runs_on_dockers:
   - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest'}
   - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
