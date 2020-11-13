@@ -82,6 +82,6 @@ pipeline_stop:
 
 archiveArtifacts: myenv.log
 failFast: false
-batchSize: 2
-timeout_minutes: 2
+#batchSize: 2
+#timeout_minutes: 2
 taskName: '${name}/${variant}'
