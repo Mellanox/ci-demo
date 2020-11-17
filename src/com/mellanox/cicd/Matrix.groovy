@@ -405,10 +405,10 @@ String getChangedFilesList(config) {
 
 def buildDocker(image, config) {
 
-    def img      = image.url
-    def arch     = image.arch
+    def img = image.url
+    def arch = image.arch
     def filename = image.filename
-    def distro   = image.name
+    def distro = image.name
     def changed_files = config.get("cFiles")
 
     stage("Prepare docker image for ${config.job}/$arch/$distro") {
@@ -428,7 +428,7 @@ def buildDocker(image, config) {
                 config.logger.info("Forcing building file per user request: ${filename} ... ")
                 need_build++
             }
-            config.logger.debug("filename: ${filename}")
+            config.logger.debug("Dockerfile name: '${filename}'")
             config.logger.debug("Changed files: ${changed_files}")
             if (changed_files.contains(filename)) {
                 config.logger.info("Forcing building, file modified by commit: ${filename} ... ")
