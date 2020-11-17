@@ -85,12 +85,16 @@ def gen_image_map(config) {
             if (!dfile.file) {
                 dfile.file = ""
             }
+            if (!dfile.build_args) {
+                dfile.build_args = ""
+            }
             def item = [\
                 arch: "${arch}", \
                 tag:  "${dfile.tag}", \
                 filename: "${dfile.file}", \
                 url: "${config.registry_host}${config.registry_path}/${arch}/${dfile.name}:${dfile.tag}", \
-                name: "${dfile.name}" \
+                name: "${dfile.name}", \
+                build_args: "${dfile.build_args}" \
             ]
             if (dfile.nodeLabel) {
                 item.put('nodeLabel', dfile.nodeLabel)
@@ -366,11 +370,11 @@ Map getMatrixTasks(image, config) {
     return getTasks(axes, image, config, include, exclude)
 }
 
-def buildImage(img, filename, arch, distro, config) {
+def buildImage(img, filename, extra_args, config) {
     if(filename == "") {
         config.logger.fatal("No docker filename specified, skipping build docker")
     }
-    customImage = docker.build("${img}", "-f ${filename} --build-arg ARCH=${arch} --build-arg DISTRO=${distro} . ")
+    customImage = docker.build("${img}", "-f ${filename} ${extra_args} . ")
     customImage.push()
 }
 
@@ -411,6 +415,7 @@ def buildDocker(image, config) {
     // See https://stackoverflow.com/q/56829842/3648361
     def filename = image.filename.toString().trim()
     def distro = image.name
+    def extra_args = image.build_args
     def changed_files = config.get("cFiles")
 
     stage("Prepare docker image for ${config.job}/$arch/$distro") {
@@ -438,7 +443,7 @@ def buildDocker(image, config) {
             }
             if (need_build) {
                 config.logger.info("Building - ${img} - ${filename}")
-                buildImage(img, filename, arch, distro, config)
+                buildImage(img, filename, extra_args, config)
             }
         }
     }
