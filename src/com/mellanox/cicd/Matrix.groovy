@@ -407,7 +407,7 @@ def buildDocker(image, config) {
 
     def img = image.url
     def arch = image.arch
-    def filename = image.filename
+    def filename = image.filename.toString()
     def distro = image.name
     def changed_files = config.get("cFiles")
 
