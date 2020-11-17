@@ -407,7 +407,9 @@ def buildDocker(image, config) {
 
     def img = image.url
     def arch = image.arch
-    def filename = image.filename.toString()
+    // Vasily Ryabov: we need .toString() to make changed_files.contains(filename) work correctly
+    // See https://stackoverflow.com/q/56829842/3648361
+    def filename = image.filename.toString().trim()
     def distro = image.name
     def changed_files = config.get("cFiles")
 
@@ -428,7 +430,7 @@ def buildDocker(image, config) {
                 config.logger.info("Forcing building file per user request: ${filename} ... ")
                 need_build++
             }
-            config.logger.debug("Dockerfile name: '${filename}'")
+            config.logger.debug("Dockerfile name: ${filename}")
             config.logger.debug("Changed files: ${changed_files}")
             if (changed_files.contains(filename)) {
                 config.logger.info("Forcing building, file modified by commit: ${filename} ... ")
