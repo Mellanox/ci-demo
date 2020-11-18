@@ -254,7 +254,9 @@ def runK8(image, branchName, config, axis) {
         node(POD_LABEL) {
             stage (branchName) {
                 container(cname) {
-                    runSteps(image, config)
+                    catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                        runSteps(image, config)
+                    }
                 }
             }
         }
@@ -463,7 +465,9 @@ def build_docker_on_k8(image, config) {
             onUnstash()
 
             container('docker') {
-                buildDocker(image, config)
+                catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                    buildDocker(image, config)
+                }
             }
         }
     }
