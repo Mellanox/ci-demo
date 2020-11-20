@@ -67,6 +67,8 @@ def getArchConf(config, arch) {
 
     def k8sArchConfTable = [:]
 
+    config.logger.debug("getArchConf: arch=" + arch)
+    
     k8sArchConfTable['x86_64']  = [
         nodeSelector: 'kubernetes.io/arch=amd64',
         jnlpImage: 'jenkins/inbound-agent:latest'
@@ -79,17 +81,23 @@ def getArchConf(config, arch) {
 
     k8sArchConfTable['aarch64'] = [
         nodeSelector: 'kubernetes.io/arch=arm64',
-        jnlpImage: '${config.registry_host}${config.registry_jnlp_path}/jenkins-arm-agent-jnlp:latest'
+        jnlpImage: "${config.registry_host}/${config.registry_jnlp_path}/jenkins-arm-agent-jnlp:latest"
     ]
 
     def aTable = getConfigVal(config, ['kubernetes', 'arch_table'], null)
     if (aTable != null) {
         k8sArchConfTable += aTable
     }
+    
+    def varsMap = [
+        registry_path:  config.registry_path,
+        registry_jnlp_path: config.registry_jnlp_path,
+        registry_host: config.registry_host
+    ]
+
     k8sArchConfTable.each { key, val ->
-        if (val.jnlpImage) {
-            val.jnlpImage = resolveTemplate(config, val.jnlpImage)
-        }
+        config.logger.debug("getArchConf: resolving template for key=" + key + " val=" + val)
+        val.jnlpImage = resolveTemplate(varsMap, val.get("jnlpImage"))
     }
 
     config.logger.debug("k8sArchConfTable: " + k8sArchConfTable)
