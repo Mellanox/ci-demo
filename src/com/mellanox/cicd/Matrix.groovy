@@ -82,12 +82,14 @@ def getArchConf(config, arch) {
         jnlpImage: '${config.registry_host}${config.registry_jnlp_path}/jenkins-arm-agent-jnlp:latest'
     ]
 
-    def aTable = getConfigVal(config, ['kubernetes', 'arch_table'], [:])
-    if (aTable) {
+    def aTable = getConfigVal(config, ['kubernetes', 'arch_table'], null)
+    if (aTable != null) {
         k8sArchConfTable += aTable
     }
     k8sArchConfTable.each { key, val ->
-        val.jnlpImage = resolveTemplate(config, val)
+        if (val.jnlpImage) {
+            val.jnlpImage = resolveTemplate(config, val.jnlpImage)
+        }
     }
 
     config.logger.debug("k8sArchConfTable: " + k8sArchConfTable)
