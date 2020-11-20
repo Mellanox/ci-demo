@@ -88,11 +88,23 @@ def gen_image_map(config) {
             if (!dfile.build_args) {
                 dfile.build_args = ""
             }
+            if (!dfile.uri) {
+                // default URI subpath for Docker image on a harbor
+                dfile.uri = "${arch}/${name}"
+            }
+
+            def env_map = env.getEnvironment()
+            dfile.each { key, value ->
+                env_map[key] = value
+            }
+            GroovyShell env_shell = new GroovyShell(new Binding(env_map))
+            dfile.uri = env_shell.evaluate('"' + dfile.uri +'"')
+
             def item = [\
                 arch: "${arch}", \
                 tag:  "${dfile.tag}", \
                 filename: "${dfile.file}", \
-                url: "${config.registry_host}${config.registry_path}/${arch}/${dfile.name}:${dfile.tag}", \
+                url: "${config.registry_host}${config.registry_path}/${dfile.uri}:${dfile.tag}", \
                 name: "${dfile.name}", \
                 build_args: "${dfile.build_args}" \
             ]
