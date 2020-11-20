@@ -96,4 +96,4 @@ archiveArtifacts: myenv.log
 failFast: false
 #batchSize: 2
 #timeout_minutes: 2
-#taskName: '${name}/${variant}'
+#taskName: '${name}/${axis_index}'

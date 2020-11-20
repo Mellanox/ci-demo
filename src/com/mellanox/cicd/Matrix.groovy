@@ -339,6 +339,7 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
         axis.put("name", image.name)
         axis.put("job", config.job)
         axis.put("variant", i + 1)
+        axis.put("axis_index", i + 1)
 
         if (exclude && matchMapEntry(exclude, axis)) {
             config.logger.info("Applying exclude filter on  " + axis.toMapString())
@@ -348,7 +349,7 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
             continue
         }
 
-        def tmpl = getConfigVal(config, ['taskName'], '${arch}/${name} v${variant}')
+        def tmpl = getConfigVal(config, ['taskName'], '${arch}/${name} v${axis_index}')
         def branchName = resolveTemplate(axis, tmpl)
         //def branchName = axis.values().join(', ')
 
