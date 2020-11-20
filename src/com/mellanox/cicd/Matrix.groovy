@@ -62,6 +62,35 @@ def forceCleanupWS() {
     run_shell(cmd, "Clean workspace")
 }
 
+
+def getArchConf(config, arch) {
+
+    def k8sArchConfTable = [:]
+
+    k8sArchConfTable['x86_64']  = [
+        nodeSelector: 'kubernetes.io/arch=amd64',
+        jnlpImage: 'jenkins/inbound-agent:latest'
+    ]
+
+    if (!config.registry_jnlp_path) {
+        def array = config.registry_path.split("/")
+        config.registry_jnlp_path = array[array.length - 2]
+    }
+
+    k8sArchConfTable['aarch64'] = [
+        nodeSelector: 'kubernetes.io/arch=arm64',
+        jnlpImage: '${config.registry_host}${config.registry_jnlp_path}/jenkins-arm-agent-jnlp:latest'
+    ]
+
+    k8sArchConfTable += getConfigVal(config, ['kubernetes', 'arch_table'], [:])
+    k8sArchConfTable.each { key, val ->
+        val.jnlpImage = resolveTemplate(config, val)
+    }
+
+    config.logger.debug("k8sArchConfTable: " + k8sArchConfTable)
+    return k8sArchConfTable[arch]
+}
+
 def gen_image_map(config) {
     def image_map = [:]
 
@@ -81,10 +110,24 @@ def gen_image_map(config) {
 
 
     image_map.each { arch, images ->
+
+        def k8sArchConf = getArchConf(config, arch)
+        if (!k8sArchConf) {
+            config.logger.warn("gen_image_map | skipped unsupported arch (${arch})")
+            return
+        }
+
         config.runs_on_dockers.each { dfile ->
+
             if (!dfile.file) {
                 dfile.file = ""
             }
+
+            if (dfile.arch && dfile.arch != arch) {
+                config.logger.warn("skipped conf: " + arch + " name: " + dfile.name)
+                return
+            }
+
             if (!dfile.build_args) {
                 dfile.build_args = ""
             }
@@ -99,7 +142,12 @@ def gen_image_map(config) {
             if (dfile.nodeLabel) {
                 item.put('nodeLabel', dfile.nodeLabel)
             }
-            config.logger.debug("Adding docker to image_map for " + arch + " name: " + item.name)
+
+            if (dfile.nodeSelector) {
+                item.put('nodeSelector', dfile.nodeSelector)
+            }
+
+            config.logger.debug("Adding docker to image_map for " + item.arch + " name: " + item.name)
             images.add(item)
         }
     }
