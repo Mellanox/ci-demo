@@ -20,11 +20,12 @@ env:
   mofed_installer_opt: --user-space-only --without-fw-update --all -q --skip-unsupported-devices-check
 
 runs_on_dockers:
-  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest', arch: 'x86_64', nodeLabel: '(dockerserver || docker) && x86_64'}
+#  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest', arch: 'x86_64', nodeLabel: '(dockerserver || docker) && x86_64'}
   - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest', arch: 'x86_64'}
+  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest', arch: 'x86_64'}
+ 
 
-
-matrix:
+matrix_disabled:
   axes:
     driver:
       - MLNX_OFED_LINUX-4.9-0.1.8.0
@@ -38,8 +39,19 @@ matrix:
       - x86_64
 
 steps:
-  - name: Test nomatrix
-    run: env
+  - name: step1
+    run: touch aaa
+
+  - name: step2
+    run: ls -al aaa
+    parallel: true
+
+  - name: step3
+    run: ls -al aaa
+    parallel: true
+
+  - name: step4
+    run: rm aaa
 
 
 steps_disabled:
@@ -84,4 +96,4 @@ archiveArtifacts: myenv.log
 failFast: false
 #batchSize: 2
 #timeout_minutes: 2
-taskName: '${name}/${variant}'
+#taskName: '${name}/${variant}'

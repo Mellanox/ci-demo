@@ -219,11 +219,15 @@ steps:
         exit 0
       fi
       cuda=$cuda .ci/cov.sh
+# run this step in parallel with others
+    parallel: true
 
   - name: Check package
 # can set shell per step or globally
     shell: '!/bin/bash -xeEl'
     run: cuda=$cuda .ci/check_package.sh
+# run this step in parallel with others
+    parallel: true
 
   - name: Run tests
     run: cuda=$cuda .ci/runtests.sh

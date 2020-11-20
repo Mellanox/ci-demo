@@ -169,22 +169,45 @@ def getDefaultShell(config=null, step=null, shell='#!/bin/bash -l') {
     return ret
 }
 
-def runSteps(image, config) {
+def run_step(cmd,title) {
+    run_shell("echo Starting step: ${title}", title)
+    run_shell(cmd, title)
+}
+
+def runSteps(image, config, branchName) {
     forceCleanupWS()
     // fetch .git from server and unpack
     unstash "${env.JOB_NAME}"
     onUnstash()
 
-
-    config.steps.each { one->
+    def parallelNestedSteps = [:]
+    config.steps.eachWithIndex { one, i ->
 
         def shell = getDefaultShell(config, one)
-        echo "Step: ${one.name}"
         def cmd = """${shell}
         ${one.run}
         """
+        def par = one.get("parallel")
+        // collect parallel steps (if any) and run it when non-parallel step discovered or last element.
+        if ( par != null && par == true) {
+            def stepName = branchName + "->" + one.name
+            parallelNestedSteps[stepName] = {run_step(cmd, stepName)}
+            // last element - run and flush
+            if (i == config.steps.size() -1) {
+                parallel(parallelNestedSteps)
+                parallelNestedSteps = [:]
+            }
+            return
+        }
+        // non-parallel step discovered, need to flush all parallel 
+        // steps collected previously to keep ordering.
+        // run non-parallel step right after
+        if (parallelNestedSteps.size() > 0) {
+            parallel(parallelNestedSteps)
+            parallelNestedSteps = [:]
+        }
         try {
-            run_shell(cmd, one.name)
+            run_step(cmd, one.name)
         } catch (e) {
             if (one.get("onfail") != null) {
                 run_shell(one.onfail, "onfail command for ${one.name}")
@@ -258,7 +281,7 @@ def runK8(image, branchName, config, axis) {
         node(POD_LABEL) {
             stage (branchName) {
                 container(cname) {
-                    runSteps(image, config)
+                    runSteps(image, config, branchName)
                 }
             }
         }
@@ -325,7 +348,7 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
             continue
         }
 
-        def tmpl = getConfigVal(config, ['taskName'], '${arch}/${name}/${variant}')
+        def tmpl = getConfigVal(config, ['taskName'], '${arch}/${name} v${variant}')
         def branchName = resolveTemplate(axis, tmpl)
         //def branchName = axis.values().join(', ')
 
@@ -345,7 +368,7 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
                     config.logger.fatal("Please define kubernetes cloud name in yaml config file or define nodeLabel for docker")
                 }
                 if (image.nodeLabel) {
-                    runDocker(image, config, branchName, axis, { pimage, pconfig -> runSteps(pimage, pconfig) })
+                    runDocker(image, config, branchName, axis, { pimage, pconfig -> runSteps(pimage, pconfig, branchName) })
                 } else {
                     runK8(image, branchName, config, axis)
                 }
