@@ -263,7 +263,7 @@ timeout_minutes: 60
 # Customize name of the parallel subtask as appears in Jenkins UI, according to the template below
 # can use variable names from `axis` part of the `matrix` config section
 # also can use variable names from `runs_on_dockers` config section.
-# `${name}` comes from `run_on_dockers` section
+# `${name}` comes from `runs_on_dockers` section
 # `${axis_index}` is built-in variable representing axis serial number
 taskName: '${name}/${axis_index}'
 
