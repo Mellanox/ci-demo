@@ -564,6 +564,11 @@ def build_docker_on_k8(image, config) {
     }
 }
 
+def run_parallel_in_chunks(myTasks, bSize) {
+    (myTasks.keySet() as List).collate(bSize).each {
+        parallel myTasks.subMap(it)
+    }
+}
 
 def main() {
     node("master") {
@@ -612,27 +617,29 @@ def main() {
 // $arch -> List[$docker, $docker, $docker]
 // this is to avoid that multiple axis from matrix will create own same copy for $docker but creating it upfront.
 
+            def parallelBuildDockers = [:]
+
             def arch_distro_map = gen_image_map(config)
             arch_distro_map.each { arch, images ->
                 images.each { image ->
-                    if (image.nodeLabel) {
-                        runDocker(image, config, "Preparing docker image", null, { pimage, pconfig -> buildDocker(pimage, pconfig) }, false)
-                    } else {
-                        build_docker_on_k8(image, config)
+                    parallelBuildDockers[image.name] = {
+                        if (image.nodeLabel) {
+                            runDocker(image, config, "Preparing docker image", null, { pimage, pconfig -> buildDocker(pimage, pconfig) }, false)
+                        } else {
+                            build_docker_on_k8(image, config)
+                        }
                     }
                     branches += getMatrixTasks(image, config)
                 }
             }
         
             try {
-
                 def bSize = getConfigVal(config, ['batchSize'], 10)
                 def timeout_min = getConfigVal(config, ['timeout_minutes'], "90")
                 timeout(time: timeout_min, unit: 'MINUTES') {
-                    (branches.keySet() as List).collate(bSize).each {
-                        timestamps {
-                            parallel branches.subMap(it)
-                        }
+                    timestamps {
+                        run_parallel_in_chunks(parallelBuildDockers, bSize)
+                        run_parallel_in_chunks(branches, bSize)
                     }
                 }
             } finally {
