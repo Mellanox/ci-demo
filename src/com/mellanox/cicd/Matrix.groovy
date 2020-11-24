@@ -153,8 +153,7 @@ def gen_image_map(config) {
             dfile.each { key, value ->
                 env_map[key] = value
             }
-            GroovyShell env_shell = new GroovyShell(new Binding(env_map))
-            dfile.uri = env_shell.evaluate('"' + dfile.uri +'"')
+            dfile.uri = resolveTemplate(env_map, dfile.uri)
 
             def item = [\
                 arch: "${arch}", \
