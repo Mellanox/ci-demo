@@ -62,6 +62,48 @@ def forceCleanupWS() {
     run_shell(cmd, "Clean workspace")
 }
 
+
+def getArchConf(config, arch) {
+
+    def k8sArchConfTable = [:]
+
+    config.logger.debug("getArchConf: arch=" + arch)
+    
+    k8sArchConfTable['x86_64']  = [
+        nodeSelector: 'kubernetes.io/arch=amd64',
+        jnlpImage: 'jenkins/inbound-agent:latest'
+    ]
+
+    if (!config.registry_jnlp_path) {
+        def array = config.registry_path.split("/")
+        config.registry_jnlp_path = array[array.length - 2]
+    }
+
+    k8sArchConfTable['aarch64'] = [
+        nodeSelector: 'kubernetes.io/arch=arm64',
+        jnlpImage: "${config.registry_host}/${config.registry_jnlp_path}/jenkins-arm-agent-jnlp:latest"
+    ]
+
+    def aTable = getConfigVal(config, ['kubernetes', 'arch_table'], null)
+    if (aTable != null) {
+        k8sArchConfTable += aTable
+    }
+    
+    def varsMap = [
+        registry_path:  config.registry_path,
+        registry_jnlp_path: config.registry_jnlp_path,
+        registry_host: config.registry_host
+    ]
+
+    k8sArchConfTable.each { key, val ->
+        config.logger.debug("getArchConf: resolving template for key=" + key + " val=" + val)
+        val.jnlpImage = resolveTemplate(varsMap, val.get("jnlpImage"))
+    }
+
+    config.logger.debug("k8sArchConfTable: " + k8sArchConfTable)
+    return k8sArchConfTable[arch]
+}
+
 def gen_image_map(config) {
     def image_map = [:]
 
@@ -81,10 +123,24 @@ def gen_image_map(config) {
 
 
     image_map.each { arch, images ->
+
+        def k8sArchConf = getArchConf(config, arch)
+        if (!k8sArchConf) {
+            config.logger.warn("gen_image_map | skipped unsupported arch (${arch})")
+            return
+        }
+
         config.runs_on_dockers.each { dfile ->
+
             if (!dfile.file) {
                 dfile.file = ""
             }
+
+            if (dfile.arch && dfile.arch != arch) {
+                config.logger.warn("skipped conf: " + arch + " name: " + dfile.name)
+                return
+            }
+
             if (!dfile.build_args) {
                 dfile.build_args = ""
             }
@@ -111,7 +167,12 @@ def gen_image_map(config) {
             if (dfile.nodeLabel) {
                 item.put('nodeLabel', dfile.nodeLabel)
             }
-            config.logger.debug("Adding docker to image_map for " + arch + " name: " + item.name)
+
+            if (dfile.nodeSelector) {
+                item.put('nodeSelector', dfile.nodeSelector)
+            }
+
+            config.logger.debug("Adding docker to image_map for " + item.arch + " name: " + item.name)
             images.add(item)
         }
     }
@@ -515,6 +576,11 @@ def build_docker_on_k8(image, config) {
     }
 }
 
+def run_parallel_in_chunks(myTasks, bSize) {
+    (myTasks.keySet() as List).collate(bSize).each {
+        parallel myTasks.subMap(it)
+    }
+}
 
 def main() {
     node("master") {
@@ -563,27 +629,29 @@ def main() {
 // $arch -> List[$docker, $docker, $docker]
 // this is to avoid that multiple axis from matrix will create own same copy for $docker but creating it upfront.
 
+            def parallelBuildDockers = [:]
+
             def arch_distro_map = gen_image_map(config)
             arch_distro_map.each { arch, images ->
                 images.each { image ->
-                    if (image.nodeLabel) {
-                        runDocker(image, config, "Preparing docker image", null, { pimage, pconfig -> buildDocker(pimage, pconfig) }, false)
-                    } else {
-                        build_docker_on_k8(image, config)
+                    parallelBuildDockers[image.name] = {
+                        if (image.nodeLabel) {
+                            runDocker(image, config, "Preparing docker image", null, { pimage, pconfig -> buildDocker(pimage, pconfig) }, false)
+                        } else {
+                            build_docker_on_k8(image, config)
+                        }
                     }
                     branches += getMatrixTasks(image, config)
                 }
             }
         
             try {
-
                 def bSize = getConfigVal(config, ['batchSize'], 10)
                 def timeout_min = getConfigVal(config, ['timeout_minutes'], "90")
                 timeout(time: timeout_min, unit: 'MINUTES') {
-                    (branches.keySet() as List).collate(bSize).each {
-                        timestamps {
-                            parallel branches.subMap(it)
-                        }
+                    timestamps {
+                        run_parallel_in_chunks(parallelBuildDockers, bSize)
+                        run_parallel_in_chunks(branches, bSize)
                     }
                 }
             } finally {

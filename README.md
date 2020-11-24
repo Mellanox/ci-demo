@@ -140,6 +140,10 @@ registry_host: harbor.mellanox.com
 # Path to project`s dockers space under registry
 registry_path: /swx-storage/ci-demo
 
+# optional: Path to jnlp containers under $registry_host
+# if not set - auto-calculated to $registry_path/..
+registry_jnlp_path: /swx-storage
+
 # Credentials (must be defined in Jenkins server configuration) to for access to registry
 registry_auth: swx-storage
 
@@ -149,6 +153,17 @@ kubernetes:
   cloud: swx-k8s
 # Example how to use k8 node selector to request specific nodes for allocation
   nodeSelector: 'beta.kubernetes.io/os=linux'
+
+# optional: for multi-arch k8 support, can define arch-specific nodeSelectors
+# and jnlpImage locations
+
+  arch_table:
+    x86_64:
+      nodeSelector: 'kubernetes.io/arch=amd64'
+      jnlpImage: 'jenkins/inbound-agent:latest'
+    aarch64:
+      nodeSelector: 'kubernetes.io/arch=arm64'
+      jnlpImage: '${registry_host}/${registry_jnlp_path}/jenkins-arm-agent-jnlp:latest'
 
 # volumes to map into dockers
 volumes:
@@ -262,8 +277,8 @@ timeout_minutes: 60
 
 # Customize name of the parallel subtask as appears in Jenkins UI, according to the template below
 # can use variable names from `axis` part of the `matrix` config section
-# also can use variable names from `run_on_dockers` config section.
-# `${name}` comes from `run_on_dockers` section
+# also can use variable names from `runs_on_dockers` config section.
+# `${name}` comes from `runs_on_dockers` section
 # `${axis_index}` is built-in variable representing axis serial number
 taskName: '${name}/${axis_index}'
 
