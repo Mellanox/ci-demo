@@ -144,16 +144,18 @@ def gen_image_map(config) {
             if (!dfile.build_args) {
                 dfile.build_args = ""
             }
+
             if (!dfile.uri) {
                 // default URI subpath for Docker image on a harbor
-                dfile.uri = "${arch}/${name}"
+                dfile.uri = "${arch}/${dfile.name}"
+            } else {
+                def env_map = env.getEnvironment()
+                dfile.each { key, value ->
+                    env_map[key] = value
+                }
+                dfile.uri = resolveTemplate(env_map, dfile.uri)
             }
 
-            def env_map = env.getEnvironment()
-            dfile.each { key, value ->
-                env_map[key] = value
-            }
-            dfile.uri = resolveTemplate(env_map, dfile.uri)
 
             def item = [\
                 arch: "${arch}", \
