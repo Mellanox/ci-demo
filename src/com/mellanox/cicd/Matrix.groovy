@@ -336,21 +336,46 @@ def runK8(image, branchName, config, axis) {
         str += "$key = $val\n"
     }
 
-    run_shell('printf "%s"' +  '"' + str + '"', "Matrix axis parameters")
-    
-
+    config.logger.debug("runK8 | str: ${str}")
 
     def listV = parseListV(config.volumes)
     def cname = image.get("name").replaceAll("[\\.:/_]","")
-    def nodeSelector = getConfigVal(config, ['kubernetes', 'nodeSelector'], "")
 
-    podTemplate(cloud: cloudName, runAsUser: "0", runAsGroup: "0",
-                nodeSelector: nodeSelector,
-                containers: [
-                    containerTemplate(name: cname, image: image.url, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
-                ],
-                volumes: listV
-                )
+    config.logger.debug("runK8 | arch: ${axis.arch}")
+
+    def k8sArchConf = getArchConf(config, axis.arch)
+    def nodeSelector = ''
+    def jnlpImage = ''
+
+    if (!k8sArchConf) {
+        config.logger.error("runK8 | arch conf is not defined for ${axis.arch}")
+        return
+    }
+
+    nodeSelector = k8sArchConf.nodeSelector
+    jnlpImage = k8sArchConf.jnlpImage
+    config.logger.info("runK8 | nodeSelector: ${nodeSelector}")
+    config.logger.info("runK8 | jnlpImage: ${jnlpImage}")
+
+    if (axis.nodeSelector) {
+        if (nodeSelector) {
+            nodeSelector = nodeSelector + ',' + axis.nodeSelector
+        } else {
+            nodeSelector = axis.nodeSelector
+        }
+    }
+
+    podTemplate(
+        cloud: cloudName,
+        runAsUser: "0",
+        runAsGroup: "0",
+        nodeSelector: nodeSelector,
+        containers: [
+            containerTemplate(name: 'jnlp', image: jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
+            containerTemplate(name: cname, image: image.url, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
+        ],
+        volumes: listV
+    )
     {
         node(POD_LABEL) {
             stage (branchName) {
@@ -559,12 +584,39 @@ def build_docker_on_k8(image, config) {
 
     config.logger.debug("Checking docker image availability")
 
-    podTemplate(cloud: cloudName, runAsUser: "0", runAsGroup: "0",
-                containers: [
-                    containerTemplate(name: 'docker', image: 'docker:19.03', ttyEnabled: true, alwaysPullImage: true, command: 'cat')
-                ],
-                volumes: listV
-                )
+    def k8sArchConf = getArchConf(config, image.arch)
+    def nodeSelector = ''
+    def jnlpImage = ''
+
+    if (!k8sArchConf) {
+        config.logger.error("build_docker_on_k8 | arch conf is not defined for ${image.arch}")
+        return
+    }
+
+    nodeSelector = k8sArchConf.nodeSelector
+    jnlpImage = k8sArchConf.jnlpImage
+    config.logger.info("build_docker_on_k8 | nodeSelector: ${nodeSelector}")
+    config.logger.info("build_docker_on_k8 | jnlpImage: ${jnlpImage}")
+
+    if (image.nodeSelector) {
+        if (nodeSelector) {
+            nodeSelector = nodeSelector + ',' + image.nodeSelector
+        } else {
+            nodeSelector = image.nodeSelector
+        }
+    }
+
+    podTemplate(
+        cloud: cloudName,
+        runAsUser: "0",
+        runAsGroup: "0",
+        nodeSelector: nodeSelector,
+        containers: [
+            containerTemplate(name: 'jnlp', image: jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
+            containerTemplate(name: 'docker', image: 'docker:19.03', ttyEnabled: true, alwaysPullImage: true, command: 'cat')
+        ],
+        volumes: listV
+    )
     {
         node(POD_LABEL) {
             unstash "${env.JOB_NAME}"
@@ -667,9 +719,7 @@ def main() {
                 }
             }
         }
-
     }
-
 }
 
 return this
