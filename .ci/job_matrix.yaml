@@ -7,7 +7,6 @@ registry_auth: swx-storage
 
 kubernetes:
   cloud: swx-k8s
-  nodeSelector: 'beta.kubernetes.io/os=linux'
 
 volumes:
   - {mountPath: /hpc/local, hostPath: /hpc/local}
