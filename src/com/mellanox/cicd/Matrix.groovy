@@ -318,7 +318,13 @@ def getConfigVal(config, list, defaultVal=null) {
         }
     }
 
-    def ret =  (val instanceof ArrayList)? val[0] : val
+    def ret
+    if (val instanceof ArrayList && val.size() == 1) {
+        ret = val[0]
+    } else {
+        ret = val
+    }
+    //def ret =  (val instanceof ArrayList)? val[0] : val
     config.logger.debug("getConfigVal: Found " + list.toString() + " = " + ret)
     return ret
 }
@@ -434,9 +440,11 @@ def runDocker(image, config, branchName=null, axis=null, Closure func, runInDock
 }
 
 
-Map getTasks(axes, image, config, include=null, exclude=null) {
+Map getTasks(axes, image, config, include, exclude) {
 
     def val = getConfigVal(config, ['failFast'], true)
+
+    config.logger.debug("getTasks() -->")
 
     Map tasks = [failFast: val]
     for(int i = 0; i < axes.size(); i++) {
@@ -446,13 +454,15 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
         axis.put("variant", i + 1)
         axis.put("axis_index", i + 1)
 
-        if (exclude && matchMapEntry(exclude, axis)) {
-            config.logger.info("Applying exclude filter on  " + axis.toMapString())
+        if (exclude.size() && matchMapEntry(config, exclude, axis)) {
+            config.logger.debug("Excluding by 'exclude' rule, axis " + axis.toMapString())
             continue
-        } else if (include && ! matchMapEntry(include, axis)) {
-            config.logger.info("Applying include filter on  " + axis.toMapString())
+        } else if (include.size() && ! matchMapEntry(config, include, axis)) {
+            config.logger.debug("Excluding by 'include' rule, axis " + axis.toMapString())
             continue
         }
+
+        config.logger.info("Working on axis " + axis.toMapString())
 
         def tmpl = getConfigVal(config, ['taskName'], '${arch}/${name} v${axis_index}')
         def branchName = resolveTemplate(axis, tmpl)
@@ -485,17 +495,19 @@ Map getTasks(axes, image, config, include=null, exclude=null) {
 }
 
 Map getMatrixTasks(image, config) {
-    List axes = []
-    List include = null, exclude = null
+
+    def include = [], exclude = [], axes = []
+    config.logger.debug("getMatrixTasks() -->")
 
     if (config.get("matrix")) {
         axes = getMatrixAxes(config.matrix.axes).findAll()
-        exclude = getConfigVal(config, ['matrix', 'exclude'])
-        include = getConfigVal(config, ['matrix', 'include'])
+        exclude = getConfigVal(config, ['matrix', 'exclude'], [])
+        include = getConfigVal(config, ['matrix', 'include'], [])
     } else {
         axes.add(image)
     }
 
+    config.logger.debug("Filters include size: " + include.size() + " exclude size: " + exclude.size())
     return getTasks(axes, image, config, include, exclude)
 }
 
