@@ -454,10 +454,10 @@ Map getTasks(axes, image, config, include, exclude) {
         axis.put("variant", i + 1)
         axis.put("axis_index", i + 1)
 
-        if (exclude.size() && matchMapEntry(config, exclude, axis)) {
+        if (exclude.size() && matchMapEntry(exclude, axis)) {
             config.logger.debug("Excluding by 'exclude' rule, axis " + axis.toMapString())
             continue
-        } else if (include.size() && ! matchMapEntry(config, include, axis)) {
+        } else if (include.size() && ! matchMapEntry(include, axis)) {
             config.logger.debug("Excluding by 'include' rule, axis " + axis.toMapString())
             continue
         }
