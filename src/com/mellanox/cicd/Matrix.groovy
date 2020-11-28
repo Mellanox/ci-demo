@@ -183,7 +183,8 @@ def matchMapEntry(filters, entry) {
     for (filter in filters) {
         match = 1
         filter.each { k,v ->
-            if (v != entry[k]) {
+            // if some attribute is absent (null), we don't consider it in matching algorithm
+            if (v != entry[k] && entry[k] != null) {
                 match = 0
                 return
             }
@@ -701,7 +702,7 @@ def main() {
                     branches += getMatrixTasks(image, config)
                 }
             }
-        
+
             try {
                 def bSize = getConfigVal(config, ['batchSize'], 10)
                 def timeout_min = getConfigVal(config, ['timeout_minutes'], "90")
