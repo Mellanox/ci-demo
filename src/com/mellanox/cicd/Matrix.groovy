@@ -93,8 +93,12 @@ def getArchConf(config, arch) {
     ]
 
     def aTable = getConfigVal(config, ['kubernetes', 'arch_table'], null)
-    if (aTable != null) {
-        k8sArchConfTable += aTable
+    if (aTable != null && aTable.containsKey(arch)) {
+        if (k8sArchConfTable[arch] != null) {
+            k8sArchConfTable[arch] += aTable[arch]
+        } else {
+            k8sArchConfTable[arch] = aTable[arch]
+        }
     }
     
     def varsMap = [
@@ -103,13 +107,11 @@ def getArchConf(config, arch) {
         registry_host: config.registry_host
     ]
 
-    k8sArchConfTable.each { key, val ->
-        config.logger.debug("getArchConf: resolving template for key=" + key + " val=" + val)
-        val.jnlpImage = resolveTemplate(varsMap, val.get("jnlpImage"))
-        val.dockerImage = resolveTemplate(varsMap, val.get("dockerImage"))
+    k8sArchConfTable[arch].each { key, val ->
+        key = resolveTemplate(varsMap, val)
     }
 
-    config.logger.debug("k8sArchConfTable: " + k8sArchConfTable)
+    config.logger.debug("getArchConf[${arch}] " + k8sArchConfTable[arch])
     return k8sArchConfTable[arch]
 }
 
@@ -165,22 +167,9 @@ def gen_image_map(config) {
                 dfile.uri = resolveTemplate(env_map, dfile.uri)
             }
 
-
-            def item = [\
-                arch: "${arch}", \
-                tag:  "${dfile.tag}", \
-                filename: "${dfile.file}", \
-                url: "${config.registry_host}${config.registry_path}/${dfile.uri}:${dfile.tag}", \
-                name: "${dfile.name}", \
-                build_args: "${dfile.build_args}" \
-            ]
-            if (dfile.nodeLabel) {
-                item.put('nodeLabel', dfile.nodeLabel)
-            }
-
-            if (dfile.nodeSelector) {
-                item.put('nodeSelector', dfile.nodeSelector)
-            }
+            def item = dfile
+            dfile.url = "${config.registry_host}${config.registry_path}/${dfile.uri}:${dfile.tag}"
+            dfile.filename = "${dfile.file}"
 
             config.logger.debug("Adding docker to image_map for " + item.arch + " name: " + item.name)
             images.add(item)
