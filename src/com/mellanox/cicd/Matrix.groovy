@@ -701,7 +701,9 @@ def main() {
 // $arch -> List[$docker, $docker, $docker]
 // this is to avoid that multiple axis from matrix will create own same copy for $docker but creating it upfront.
 
-            def parallelBuildDockers = [:]
+
+            def val = getConfigVal(config, ['failFast'], true)
+            def parallelBuildDockers = [failFast: val]
 
             def arch_distro_map = gen_image_map(config)
             arch_distro_map.each { arch, images ->
