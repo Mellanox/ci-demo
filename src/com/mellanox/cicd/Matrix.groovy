@@ -118,8 +118,10 @@ def getArchConf(config, arch) {
 def gen_image_map(config) {
     def image_map = [:]
 
-    if (config.get("matrix") && config.matrix.axes.arch) {
-        for (arch in config.matrix.axes.arch) {
+    def arch_list = getConfigVal(config, ['matrix', 'axes', 'arch'], null, false)
+
+    if (arch_list) {
+        for (arch in arch_list) {
             image_map[arch] = []
         }
     } else {
@@ -141,12 +143,18 @@ def gen_image_map(config) {
             return
         }
 
-        config.runs_on_dockers.each { dfile ->
+        config.runs_on_dockers.each { item ->
+
+            def dfile = item.clone()
+
+            if (!dfile.arch) {
+                dfile.arch = arch
+            }
 
             if (!dfile.file) {
                 dfile.file = ""
             }
-
+    
             if (dfile.arch && dfile.arch != arch) {
                 config.logger.warn("skipped conf: " + arch + " name: " + dfile.name)
                 return
@@ -167,12 +175,11 @@ def gen_image_map(config) {
                 dfile.uri = resolveTemplate(env_map, dfile.uri)
             }
 
-            def item = dfile
             dfile.url = "${config.registry_host}${config.registry_path}/${dfile.uri}:${dfile.tag}"
             dfile.filename = "${dfile.file}"
 
-            config.logger.debug("Adding docker to image_map for " + item.arch + " name: " + item.name)
-            images.add(item)
+            config.logger.debug("Adding docker to image_map for " + dfile.arch + " name: " + dfile.name)
+            images.add(dfile)
         }
     }
     return image_map
@@ -296,7 +303,7 @@ def runSteps(image, config, branchName) {
     attachArtifacts(config.archiveArtifacts)
 }
 
-def getConfigVal(config, list, defaultVal=null) {
+def getConfigVal(config, list, defaultVal=null, toString=true) {
     def val = config
     for (item in list) {
         config.logger.debug("getConfigVal: Checking $item in config file")
@@ -308,7 +315,7 @@ def getConfigVal(config, list, defaultVal=null) {
     }
 
     def ret
-    if (val instanceof ArrayList && val.size() == 1) {
+    if (toString && (val instanceof ArrayList) && (val.size() == 1)) {
         ret = val[0]
     } else {
         ret = val
@@ -438,10 +445,19 @@ Map getTasks(axes, image, config, include, exclude) {
     Map tasks = [failFast: val]
     for(int i = 0; i < axes.size(); i++) {
         Map axis = axes[i]
-        axis.put("name", image.name)
+
+        if(axis.arch != image.arch) {
+            config.logger.debug("getTasks: skipping axis=" + axis + " as its arch does not match image=" + image)
+            continue
+        }
+
+        // todo: some keys from matrix can be same as in image map and it will cause confusion
+        // maybe need to prefix image keys with special prefix to distinguish or copy only non-existing keys
+        axis += image
         axis.put("job", config.job)
         axis.put("variant", i + 1)
         axis.put("axis_index", i + 1)
+
 
         if (exclude.size() && matchMapEntry(exclude, axis)) {
             config.logger.debug("Excluding by 'exclude' rule, axis " + axis.toMapString())
@@ -453,9 +469,8 @@ Map getTasks(axes, image, config, include, exclude) {
 
         config.logger.info("Working on axis " + axis.toMapString())
 
-        def tmpl = getConfigVal(config, ['taskName'], '${arch}/${name} v${axis_index}')
+        def tmpl = getConfigVal(config, ['taskName'], "${axis.arch}/${image.name} v${axis.axis_index}")
         def branchName = resolveTemplate(axis, tmpl)
-        //def branchName = axis.values().join(', ')
 
         // convert the Axis into valid values for withEnv step
         if (config.get("env")) {
@@ -483,10 +498,10 @@ Map getTasks(axes, image, config, include, exclude) {
     return tasks
 }
 
-Map getMatrixTasks(image, config) {
+def getMatrixTasks(image, config) {
 
     def include = [], exclude = [], axes = []
-    config.logger.debug("getMatrixTasks() -->")
+    config.logger.debug("getMatrixTasks() --> image=" + image)
 
     if (config.get("matrix")) {
         axes = getMatrixAxes(config.matrix.axes).findAll()
