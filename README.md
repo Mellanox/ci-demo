@@ -179,9 +179,12 @@ env:
 
 # list of dockers to use for the job, `file` key is optional, if defined but docker image does not exist in registry.
 # image will be created during 1st invocation or if file was modified
+# runs_on_dockers list can contain use-defined keys as well
+# category:tools has special meaning - it will run for steps, that explicitly request it in step`s containerSelector key.
+# the use-case if some step requires special container with pre-installed toolchain (clang?)
 
 runs_on_dockers:
-  - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest'}
+  - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest', category: 'tools'}
   - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
 
 
@@ -227,13 +230,20 @@ include:
 
 steps:
 
-  - name: Coverity
-    run: |
-      if [ "$name" != "centos7-7" -a "$variant" = "1" ]; then
-        echo skipping coverity for $name
-        exit 0
-      fi
-      cuda=$cuda .ci/cov.sh
+  - name: Coverity scan
+# `shell` can be type of action, it will run script located in ci-demo/vars/actions/scriptname.sh with parameters
+# defined by `args` key.
+    shell: action
+# dynamicAction is pre-defined action defined at https://github.com/Mellanox/ci-demo/blob/master/vars/dynamicAction.groovy 
+# dynamicAction will execute ci-demo/vars/actions/$args[0] and will pass $args[1..] to it as command line arguments
+    run: dynamicAction
+# step can specify containerSelector filter to apply on `runs_on_dockers` section
+    containerSelector: '{category:tool, variant:1}'
+    args:
+      - "coverity.sh"
+      - "./autogen.sh;./configure;make -j 3 clean"
+      - "make -j 3"
+    archiveArtifacts: 'cov.log'
 # run this step in parallel with others
 # each non-parallel step is a barrier for previous group of parallel steps
     parallel: true

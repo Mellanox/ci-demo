@@ -30,9 +30,8 @@ env:
 
 runs_on_dockers:
 #  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest', arch: 'x86_64', nodeLabel: '(dockerserver || docker) && x86_64'}
-  - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest', arch: 'x86_64'}
-  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest', arch: 'x86_64'}
- 
+  - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest', category: 'tool'}
+  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
 
 matrix_disabled:
   axes:
@@ -48,20 +47,38 @@ matrix_disabled:
       - x86_64
 
 steps:
-  - name: step1
+  - name: Run on all containers
     run: touch aaa
 
-  - name: step2
-    run: ls -al aaa
-    parallel: true
+  - name: once
+    containerSelector: '{name:ubuntu16-4,variant:1}'
+    run: touch aaa
 
-  - name: step3
-    run: ls -al aaa
-    parallel: true
+  - name: Coverity scan
+    shell: action
+    run: dynamicAction
+    containerSelector: '{category:tool, variant:1}'
+    args:
+      - "coverity.sh"
+      - "./autogen.sh;./configure;make -j 3 clean"
+      - "make -j 3"
+    archiveArtifacts: 'cov.log'
 
-  - name: step4
-    run: rm aaa
 
+  - name: Blackduck scan source
+    enable: false
+    shell: action
+    run: blackDuck
+    containerSelector: '{category:tool, variant:1}'
+    args:
+      - "ci-demo"
+      - "1.0"
+      - "${env.WORKSPACE}/src"
+      - "true"
+      - "BlackDuck report"
+      - "source"
+    env:
+      SPRING_APPLICATION_JSON: '{"blackduck.url":"https://blackduck.mellanox.com/","blackduck.api.token":"ODMwOWYwMzEtODA2ZC00MzBjLWI1ZDEtNmFiMjBkYzQzMzkwOjNmNjExN2M1LWE2ZmEtNDZlYS1hZjRiLTZlNDgwNjAwOTVjNw=="}'
 
 steps_disabled:
 

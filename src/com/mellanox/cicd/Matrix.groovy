@@ -269,8 +269,60 @@ def getDefaultShell(config=null, step=null, shell='#!/bin/bash -l') {
     return ret
 }
 
-def run_step(cmd,title) {
+def run_step(image, config, title, oneStep) {
+
+    if (oneStep.get("enable") != null && !oneStep.enable) {
+        config.logger.debug("Step '${oneStep.name}' is disabled in project yaml file, skipping")
+        return
+    }
+
+    def skip = 0
+    if (image.get("category") != null && image.category == "tool") {
+        config.logger.debug("Detected image category=tool")
+        skip++
+    }
+
+    def customSel = oneStep.get("containerSelector")
+    if (customSel != null && matchMapEntry(customSel, image)) {
+        config.logger.debug("step name='" + oneStep.name + "' requests container with attr=" + customSel)
+        skip--
+    }
+
+    if (skip) {
+        config.logger.debug("Skipping step=" + oneStep.name + " for image category=tool")
+        return
+    }
+
+    def shell = getDefaultShell(config, oneStep)
+    def script = oneStep.run
+
+    config.logger.debug("Running step with shell=" + shell)
     run_shell("echo Starting step: ${title}", title)
+
+    if (oneStep.env) {
+        oneStep.env.each {k,v ->
+            env[k] = v
+        }
+    }
+
+    if (shell == "action") {
+
+        def argList = []
+        def vars = [:]
+        vars['env'] = env
+        for (arg in oneStep.args) {
+            arg = resolveTemplate(vars, arg)
+            argList.add(arg)
+        }
+
+        config.logger.debug("Running step action=" + script + " args=" + argList)
+        this."${script}"(argList)
+        return
+    }
+
+    def cmd = """${shell}
+    ${script}
+    """
     run_shell(cmd, title)
 }
 
@@ -283,15 +335,12 @@ def runSteps(image, config, branchName) {
     def parallelNestedSteps = [:]
     config.steps.eachWithIndex { one, i ->
 
-        def shell = getDefaultShell(config, one)
-        def cmd = """${shell}
-        ${one.run}
-        """
         def par = one.get("parallel")
+        def oneStep = one
         // collect parallel steps (if any) and run it when non-parallel step discovered or last element.
         if ( par != null && par == true) {
             def stepName = branchName + "->" + one.name
-            parallelNestedSteps[stepName] = {run_step(cmd, stepName)}
+            parallelNestedSteps[stepName] = {run_step(image, config, stepName, oneStep)}
             // last element - run and flush
             if (i == config.steps.size() -1) {
                 parallel(parallelNestedSteps)
@@ -307,7 +356,7 @@ def runSteps(image, config, branchName) {
             parallelNestedSteps = [:]
         }
         try {
-            run_step(cmd, one.name)
+            run_step(image, config, one.name, oneStep)
         } catch (e) {
             if (one.get("onfail") != null) {
                 run_shell(one.onfail, "onfail command for ${one.name}")
