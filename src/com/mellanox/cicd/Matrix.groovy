@@ -235,23 +235,22 @@ def attachArtifacts(args) {
 }
 
 @NonCPS
-def getDebugLevel() {
+def int getDebugLevel() {
     def val = env.DEBUG
-    if (val) {
+    def intValue = 0
+    if (val != null) {
         if (val == "true") {
-            return 1
+            intValue = 1
+        } else {
+            intValue = val.isInteger()? val.toInteger() : 0
         }
-
-        if (val == "false") {
-            return 0
-        }
-
-        return val
     }
-    return 0
+
+    return intValue
 }
+
 def isDebugMode() {
-    return (getDebugLevel() > 0)
+    def mode = (getDebugLevel())? true : false
 }
 
 def getDefaultShell(config=null, step=null, shell='#!/bin/bash -l') {
