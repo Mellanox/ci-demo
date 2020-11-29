@@ -4,10 +4,12 @@ package com.mellanox.cicd;
 class Logger {
     def ctx
     def cat
+    def traceLevel
 
     Logger(ctx) {
         this.ctx = ctx
         this.cat = "matrix_job"
+        this.traceLevel = ctx.getDebugLevel()
     }
     def info(String message) {
         this.ctx.echo this.cat + " INFO: ${message}"
@@ -28,8 +30,14 @@ class Logger {
 
 
     def debug(String message) {
-        if (this.ctx.isDebugMode(this.ctx.env.DEBUG)) {
+        if (this.ctx.isDebugMode()) {
             this.ctx.echo this.cat + " DEBUG: ${message}"
+        }
+    }
+
+    def trace(int level, String message) {
+        if (level <= this.traceLevel) {
+            this.ctx.echo this.cat + " TRACE[${level}]: ${message}"
         }
     }
 }
@@ -226,11 +234,24 @@ def attachArtifacts(args) {
     }
 }
 
-def isDebugMode(val) {
-    if (val && (val == "true")) {
-        return true
+@NonCPS
+def getDebugLevel() {
+    def val = env.DEBUG
+    if (val) {
+        if (val == "true") {
+            return 1
+        }
+
+        if (val == "false") {
+            return 0
+        }
+
+        return val
     }
-    return false
+    return 0
+}
+def isDebugMode() {
+    return (getDebugLevel() > 0)
 }
 
 def getDefaultShell(config=null, step=null, shell='#!/bin/bash -l') {
@@ -240,7 +261,7 @@ def getDefaultShell(config=null, step=null, shell='#!/bin/bash -l') {
         ret = step.shell
     } else if ((config != null) && (config.shell != null)) {
         ret = config.shell
-    } else if (isDebugMode(env.DEBUG)) {
+    } else if (isDebugMode()) {
         ret += 'x'
     }
 
@@ -306,7 +327,7 @@ def runSteps(image, config, branchName) {
 def getConfigVal(config, list, defaultVal=null, toString=true) {
     def val = config
     for (item in list) {
-        config.logger.debug("getConfigVal: Checking $item in config file")
+        config.logger.trace(2, "getConfigVal: Checking $item in config file")
         val = val.get(item)
         if (val == null) {
             config.logger.debug("getConfigVal: Defaulting " + list.toString() + " = " + defaultVal)
@@ -320,7 +341,6 @@ def getConfigVal(config, list, defaultVal=null, toString=true) {
     } else {
         ret = val
     }
-    //def ret =  (val instanceof ArrayList)? val[0] : val
     config.logger.debug("getConfigVal: Found " + list.toString() + " = " + ret)
     return ret
 }
@@ -398,7 +418,7 @@ def runK8(image, branchName, config, axis) {
 def resolveTemplate(varsMap, str) {
     GroovyShell shell = new GroovyShell(new Binding(varsMap))
     def res = shell.evaluate('"' + str +'"')
-    new Logger(this).debug("Evaluating varsMap: " + varsMap.toString() + " str: " + str + " res: " + res)
+    new Logger(this).trace(3, "resolveTemplate: Evaluating varsMap: " + varsMap.toString() + " str: " + str + " res: " + res)
     return res
 }
 
@@ -654,6 +674,21 @@ def run_parallel_in_chunks(myTasks, bSize) {
     }
 }
 
+
+def loadConfigFile(filepath, logger) {
+    def config = readYaml(file: filepath)
+    def rawFile = readFile(filepath)
+
+    logger.debug("loadConfigFile:\n" + rawFile)
+
+    if (config.get("matrix")) {
+        if (config.matrix.include != null && config.matrix.exclude != null) {
+            logger.fatal("matrix.include and matrix.exclude sections in config file=${filepath} are mutually exclusive. Please keep only one.")
+        }
+    }
+    return config
+}
+
 def main() {
     node("master") {
 
@@ -680,15 +715,14 @@ def main() {
 
         files.each { file ->
             def branches = [:]
-            def config = readYaml(file: file.path)
-            def cmd
+            def config = loadConfigFile(file.path, logger)
             logger.info("New Job: " + config.job + " file: " + file.path)
 
             config.put("logger", logger)
             config.put("cFiles", getChangedFilesList(config))
 
             if (config.pipeline_start) {
-                cmd = config.pipeline_start.run
+                def cmd = config.pipeline_start.run
                 if (cmd) {
                     logger.debug("Running pipeline_start")
                     stage("Start ${config.job}") {
@@ -730,7 +764,7 @@ def main() {
                 }
             } finally {
                 if (config.pipeline_stop) {
-                    cmd = config.pipeline_stop.run
+                    def cmd = config.pipeline_stop.run
                     if (cmd) {
                         logger.debug("running pipeline_stop")
                         stage("Stop ${config.job}") {

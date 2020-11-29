@@ -39,10 +39,10 @@
             name: "script"
             default: "{jjb_jenkinsfile}"
             description: "Jenkinsfile to load on trigger"
-        - bool:
+        - string:
             name: "DEBUG"
-            default: false
-            description: "Enable debug prints"
+            default: 0
+            description: "Enable debug prints and traces, valid values are 0-9"
     triggers:
         - github-pull-request:
             cron: 'H/5 * * * *'
