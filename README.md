@@ -172,16 +172,19 @@ volumes:
   - {mountPath: /.autodirect/mtrswgwork, hostPath: /.autodirect/mtrswgwork}
   - {mountPath: /.autodirect/sw/release, hostPath: /.autodirect/sw/release}
 
-# environment varibles to insert into Job shell environment, can be referenced from steps or user-scripts or shell commands
+# environment varibles to insert into Job shell environment, can be referenced from steps 
+# or user-scripts or shell commands
 env:
   mofed_installer_exe: /.autodirect/sw/release/mlnx_ofed/MLNX_OFED/mlnx_ofed_install
   mofed_installer_opt: --user-space-only --without-fw-update --all -q --skip-unsupported-devices-check
 
-# list of dockers to use for the job, `file` key is optional, if defined but docker image does not exist in registry.
+# list of dockers to use for the job, `file` key is optional, if defined but docker image 
+# does not exist in registry.
 # image will be created during 1st invocation or if file was modified
 # runs_on_dockers list can contain use-defined keys as well
-# category:tools has special meaning - it will run for steps, that explicitly request it in step`s containerSelector key.
-# the use-case if some step requires special container with pre-installed toolchain (clang?)
+# category:tools has special meaning - it will run for steps, that explicitly request it in the
+# step`s containerSelector key.
+# The use-case is as following: if some step requires special container with pre-installed toolchain (clang?)
 
 runs_on_dockers:
   - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest', category: 'tools'}
@@ -212,7 +215,8 @@ matrix:
       - x86_64
 
 # include only dimensions as below. Exclude has same syntax. Only either include or exclude can be used.
-# all keywords in include/exclude command are optional - if all provided keys match - the dimension will be include/excluded
+# all keywords in include/exclude command are optional - if all provided keys 
+# match - the dimension will be include/excluded
 
 include:
   - {arch: x86_64, cuda: dev/cuda11.0, driver: MLNX_OFED_LINUX-4.9-0.1.8.0, name: ubuntu16-4}
@@ -223,7 +227,8 @@ include:
 # every matrix dimension will run in parallel with all other dimensions
 # steps itself has sequential execution
 # NOTE:
-# shell environment variable representing dimension values will be inserted automatically and can be used run section (see below)
+# shell environment variable representing dimension values will be inserted automatically and 
+# can be used run section (see below)
 # $name represents current value for docker name
 # Also $driver $cuda,$arch env vars are available and can be used from shell
 # $variant represents current axis serial number (relative to docker loop)
@@ -231,7 +236,8 @@ include:
 steps:
 
   - name: Coverity scan
-# `shell` can be type of action, it will run script located in ci-demo/vars/actions/scriptname.sh with parameters
+# `shell` can be type of action, it will run script located in ci-demo/vars/actions/scriptname.sh
+# with parameters
 # defined by `args` key.
     shell: action
 # dynamicAction is pre-defined action defined at https://github.com/Mellanox/ci-demo/blob/master/vars/dynamicAction.groovy 
@@ -279,7 +285,8 @@ archiveArtifacts: config.log
 # Fail job is one of the steps fails or continue
 failFast: false
 
-# Execute parallel job in batches (default 10 jobs in the air), to prevent overload k8 with large amount of parallel jobs
+# Execute parallel job in batches (default 10 jobs in the air), to prevent overload k8 
+# with large amount of parallel jobs
 batchSize: 2
 
 # Job timeout - fail job if it runs more than specified amount of minutes (default is 90 minutes)
