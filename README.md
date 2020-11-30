@@ -244,6 +244,8 @@ steps:
 # dynamicAction will execute ci-demo/vars/actions/$args[0] and will pass $args[1..] to it as command line arguments
     run: dynamicAction
 # step can specify containerSelector filter to apply on `runs_on_dockers` section
+# `variant` is built-in variable, available for every axis of the run and represents serial number for 
+# execution of matrix dimension
     containerSelector: '{category:tool, variant:1}'
     args:
       - "coverity.sh"
