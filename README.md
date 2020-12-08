@@ -246,7 +246,7 @@ steps:
 # step can specify containerSelector filter to apply on `runs_on_dockers` section
 # `variant` is built-in variable, available for every axis of the run and represents serial number for 
 # execution of matrix dimension
-    containerSelector: '{category:tool, variant:1}'
+    containerSelector: '{category:tools, variant:1}'
     args:
       - "coverity.sh"
       - "./autogen.sh;./configure;make -j 3 clean"
