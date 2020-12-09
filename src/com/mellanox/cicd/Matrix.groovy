@@ -61,6 +61,12 @@ def run_shell(cmd, title, retOut=false) {
     sh(script: cmd, label: title, returnStdout: retOut)
 }
 
+@NonCPS
+def run_step_shell(cmd, title, retOut=false) {
+    sh(script: cmd, label: title, returnStdout: retOut)
+}
+
+
 def forceCleanupWS() {
     env.WORKSPACE = pwd()
     def cmd = """
@@ -269,7 +275,6 @@ def getDefaultShell(config=null, step=null, shell='#!/bin/bash -l') {
     return ret
 }
 
-@NonCPS
 def run_step(image, config, title, oneStep) {
 
     if (oneStep.get("enable") != null && !oneStep.enable) {
@@ -324,7 +329,7 @@ def run_step(image, config, title, oneStep) {
     def cmd = """${shell}
     ${script}
     """
-    run_shell(cmd, title)
+    run_step_shell(cmd, title)
 }
 
 def runSteps(image, config, branchName) {
@@ -818,9 +823,6 @@ def main() {
                         run_parallel_in_chunks(config, branches, bSize)
                     }
                 }
-            } catch (e) {
-                logger.warn("Pipeline was terminated by exception: " + e)
-
             } finally {
                 if (config.pipeline_stop) {
                     def cmd = config.pipeline_stop.run
