@@ -339,8 +339,8 @@ def runSteps(image, config, branchName) {
     onUnstash()
 
     def parallelNestedSteps = [:]
-    config.steps.eachWithIndex { one, i ->
-
+    for (int i=0; i < config.steps.size();i++) {
+        def one = config.steps[i]
         def par = one.get("parallel")
         def oneStep = one
         // collect parallel steps (if any) and run it when non-parallel step discovered or last element.
