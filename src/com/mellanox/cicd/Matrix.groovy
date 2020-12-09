@@ -375,10 +375,10 @@ def runSteps(image, config, branchName) {
 def getConfigVal(config, list, defaultVal=null, toString=true) {
     def val = config
     for (item in list) {
-        config.logger.trace(2, "getConfigVal: Checking $item in config file")
+        config.logger.trace(5, "getConfigVal: Checking $item in config file")
         val = val.get(item)
         if (val == null) {
-            config.logger.debug("getConfigVal: Defaulting " + list.toString() + " = " + defaultVal)
+            config.logger.trace(5, "getConfigVal: Defaulting " + list.toString() + " = " + defaultVal)
             return defaultVal
         }
     }
@@ -389,7 +389,7 @@ def getConfigVal(config, list, defaultVal=null, toString=true) {
     } else {
         ret = val
     }
-    config.logger.debug("getConfigVal: Found " + list.toString() + " = " + ret)
+    config.logger.trace(5, "getConfigVal: Found " + list.toString() + " = " + ret)
     return ret
 }
 
@@ -716,7 +716,13 @@ def build_docker_on_k8(image, config) {
     }
 }
 
-def run_parallel_in_chunks(myTasks, bSize) {
+def run_parallel_in_chunks(config, myTasks, bSize) {
+    if (bSize <= 0) {
+        bSize = myTasks.size()
+    }
+
+    config.logger.trace(3, "run_parallel_in_chunks: batch size is ${bSize}")
+
     (myTasks.keySet() as List).collate(bSize).each {
         parallel myTasks.subMap(it)
     }
@@ -802,14 +808,17 @@ def main() {
             }
         
             try {
-                def bSize = getConfigVal(config, ['batchSize'], 10)
+                def bSize = getConfigVal(config, ['batchSize'], 0)
                 def timeout_min = getConfigVal(config, ['timeout_minutes'], "90")
                 timeout(time: timeout_min, unit: 'MINUTES') {
                     timestamps {
-                        run_parallel_in_chunks(parallelBuildDockers, bSize)
-                        run_parallel_in_chunks(branches, bSize)
+                        run_parallel_in_chunks(config, parallelBuildDockers, bSize)
+                        run_parallel_in_chunks(config, branches, bSize)
                     }
                 }
+            } catch (e) {
+                logger.warn("Pipeline was terminated by exception: " + e)
+
             } finally {
                 if (config.pipeline_stop) {
                     def cmd = config.pipeline_stop.run
