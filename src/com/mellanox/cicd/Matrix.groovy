@@ -251,6 +251,7 @@ def int getDebugLevel() {
 
 def isDebugMode() {
     def mode = (getDebugLevel())? true : false
+    return mode
 }
 
 def getDefaultShell(config=null, step=null, shell='#!/bin/bash -l') {
