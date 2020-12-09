@@ -187,7 +187,7 @@ env:
 # The use-case is as following: if some step requires special container with pre-installed toolchain (clang?)
 
 runs_on_dockers:
-  - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest', category: 'tools'}
+  - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest', category: 'tool'}
   - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
 
 
@@ -246,7 +246,7 @@ steps:
 # step can specify containerSelector filter to apply on `runs_on_dockers` section
 # `variant` is built-in variable, available for every axis of the run and represents serial number for 
 # execution of matrix dimension
-    containerSelector: '{category:tools, variant:1}'
+    containerSelector: '{category:tool, variant:1}'
     args:
       - "coverity.sh"
       - "./autogen.sh;./configure;make -j 3 clean"

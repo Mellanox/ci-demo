@@ -287,7 +287,7 @@ def run_step(image, config, title, oneStep) {
         skip--
     }
 
-    if (skip) {
+    if (skip > 0) {
         config.logger.debug("Skipping step=" + oneStep.name + " for image category=tool")
         return
     }
