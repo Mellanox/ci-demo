@@ -269,6 +269,7 @@ def getDefaultShell(config=null, step=null, shell='#!/bin/bash -l') {
     return ret
 }
 
+@NonCPS
 def run_step(image, config, title, oneStep) {
 
     if (oneStep.get("enable") != null && !oneStep.enable) {
