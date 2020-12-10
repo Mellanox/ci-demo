@@ -125,7 +125,7 @@ def getArchConf(config, arch) {
         key = resolveTemplate(varsMap, val)
     }
 
-    config.logger.debug("getArchConf[${arch}] " + k8sArchConfTable[arch])
+    config.logger.trace(7, "getArchConf[${arch}] " + k8sArchConfTable[arch])
     return k8sArchConfTable[arch]
 }
 
@@ -230,8 +230,8 @@ def onUnstash() {
     run_shell(cmd, "Extracting project files into workspace")
 }
 
-def attachArtifacts(args) {
-    if(args) {
+def attachArtifacts(config, args) {
+    if(args != null) {
         try {
             archiveArtifacts(artifacts: args, allowEmptyArchive: true )
         } catch (e) {
@@ -367,16 +367,16 @@ def runSteps(image, config, branchName) {
             if (one.get("onfail") != null) {
                 run_shell(one.onfail, "onfail command for ${one.name}")
             }
-            attachArtifacts(config.archiveArtifacts)
+            attachArtifacts(config, config.archiveArtifacts)
             throw(e)
         } finally {
             if (one.get("always") != null) {
                 run_shell(one.always, "always command for ${one.name}")
             }
-            attachArtifacts(one.archiveArtifacts)
+            attachArtifacts(config, one.archiveArtifacts)
         }
     }
-    attachArtifacts(config.archiveArtifacts)
+    attachArtifacts(config, config.archiveArtifacts)
 }
 
 def getConfigVal(config, list, defaultVal=null, toString=true) {
@@ -570,6 +570,7 @@ Map getTasks(axes, image, config, include, exclude) {
             }
         }
     }
+
     return tasks
 }
 
@@ -679,7 +680,7 @@ def build_docker_on_k8(image, config) {
 
     def cloudName = getConfigVal(config, ['kubernetes','cloud'], "")
 
-    config.logger.debug("Checking docker image availability")
+    config.logger.trace(7, "Checking docker image availability for " + image)
 
     def k8sArchConf = getArchConf(config, image.arch)
     def nodeSelector = ''
@@ -724,6 +725,7 @@ def build_docker_on_k8(image, config) {
 }
 
 def run_parallel_in_chunks(config, myTasks, bSize) {
+
     if (bSize <= 0) {
         bSize = myTasks.size()
     }
