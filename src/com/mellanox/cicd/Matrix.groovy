@@ -339,7 +339,7 @@ def runSteps(image, config, branchName) {
     onUnstash()
 
     def parallelNestedSteps = [:]
-    for (int i=0; i < config.steps.size();i++) {
+    for (int i = 0; i < config.steps.size(); i++) {
         def one = config.steps[i]
         def par = one.get("parallel")
         def oneStep = one
@@ -348,11 +348,11 @@ def runSteps(image, config, branchName) {
             def stepName = branchName + "->" + one.name
             parallelNestedSteps[stepName] = {run_step(image, config, stepName, oneStep)}
             // last element - run and flush
-            if (i == config.steps.size() -1) {
+            if (i == config.steps.size() - 1) {
                 parallel(parallelNestedSteps)
                 parallelNestedSteps = [:]
             }
-            return
+            continue
         }
         // non-parallel step discovered, need to flush all parallel 
         // steps collected previously to keep ordering.
