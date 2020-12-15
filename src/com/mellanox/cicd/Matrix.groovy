@@ -42,7 +42,6 @@ class Logger {
     }
 }
  
-
 @NonCPS
 List getMatrixAxes(matrix_axes) {
     List axes = []
@@ -61,11 +60,6 @@ def run_shell(cmd, title, retOut=false) {
     sh(script: cmd, label: title, returnStdout: retOut)
 }
 
-@NonCPS
-def run_step_shell(cmd, title, retOut=false) {
-    sh(script: cmd, label: title, returnStdout: retOut)
-}
-
 
 def forceCleanupWS() {
     env.WORKSPACE = pwd()
@@ -81,7 +75,7 @@ def getArchConf(config, arch) {
 
     def k8sArchConfTable = [:]
 
-    config.logger.debug("getArchConf: arch=" + arch)
+    config.logger.trace(4, "getArchConf: arch=" + arch)
     
     k8sArchConfTable['x86_64']  = [
         nodeSelector: 'kubernetes.io/arch=amd64',
@@ -230,6 +224,7 @@ def onUnstash() {
     run_shell(cmd, "Extracting project files into workspace")
 }
 
+
 def attachArtifacts(config, args) {
     if(args != null) {
         try {
@@ -271,7 +266,6 @@ def getDefaultShell(config=null, step=null, shell='#!/bin/bash -l') {
         ret += 'x'
     }
 
-    new Logger(this).debug("shell: " + ret)
     return ret
 }
 
@@ -289,7 +283,7 @@ def run_step(image, config, title, oneStep) {
     }
 
     def customSel = oneStep.get("containerSelector")
-    if (customSel != null && matchMapEntry(customSel, image)) {
+    if (customSel != null && matchMapEntry([customSel], image)) {
         config.logger.debug("step name='" + oneStep.name + "' requests container with attr=" + customSel + " for image with attr=" + image)
         skip--
     }
@@ -302,8 +296,7 @@ def run_step(image, config, title, oneStep) {
     def shell = getDefaultShell(config, oneStep)
     def script = oneStep.run
 
-    config.logger.debug("Running step with shell=" + shell)
-    run_shell("echo Starting step: ${title}", title)
+    run_shell("echo Setting env for step: ${title}", title)
 
     if (oneStep.env) {
         oneStep.env.each {k,v ->
@@ -329,7 +322,7 @@ def run_step(image, config, title, oneStep) {
     def cmd = """${shell}
     ${script}
     """
-    run_step_shell(cmd, title)
+    run_shell(cmd, title)
 }
 
 def runSteps(image, config, branchName) {
@@ -438,7 +431,7 @@ def runK8(image, branchName, config, axis) {
     }
 
     nodeSelector = k8sArchConf.nodeSelector
-    config.logger.info("runK8 | nodeSelector: ${nodeSelector}")
+    config.logger.info("runK8 ${branchName} | nodeSelector: ${nodeSelector}")
 
     if (axis.nodeSelector) {
         if (nodeSelector) {
@@ -468,12 +461,12 @@ def runK8(image, branchName, config, axis) {
             }
         }
     }
+    config.logger.debug("runK8 ${branchName} done")
 }
 
 def resolveTemplate(varsMap, str) {
     GroovyShell shell = new GroovyShell(new Binding(varsMap))
     def res = shell.evaluate('"' + str +'"')
-    new Logger(this).trace(3, "resolveTemplate: Evaluating varsMap: " + varsMap.toString() + " str: " + str + " res: " + res)
     return res
 }
 
@@ -513,11 +506,10 @@ def runDocker(image, config, branchName=null, axis=null, Closure func, runInDock
 
 Map getTasks(axes, image, config, include, exclude) {
 
-    def val = getConfigVal(config, ['failFast'], true)
 
-    config.logger.debug("getTasks() -->")
+    config.logger.trace(3, "getTasks() -->")
 
-    Map tasks = [failFast: val]
+    Map tasks = [:]
     for(int i = 0; i < axes.size(); i++) {
         Map axis = axes[i]
 
@@ -570,6 +562,9 @@ Map getTasks(axes, image, config, include, exclude) {
             }
         }
     }
+
+    config.logger.debug("getTasks() done")
+
 
     return tasks
 }
@@ -670,7 +665,6 @@ def buildDocker(image, config) {
     }
 }
 
-
 def build_docker_on_k8(image, config) {
 
     def myVols = config.volumes.collect()
@@ -691,7 +685,6 @@ def build_docker_on_k8(image, config) {
     }
 
     nodeSelector = k8sArchConf.nodeSelector
-    config.logger.info("build_docker_on_k8 | nodeSelector: ${nodeSelector}")
 
     if (image.nodeSelector) {
         if (nodeSelector) {
@@ -700,6 +693,8 @@ def build_docker_on_k8(image, config) {
             nodeSelector = image.nodeSelector
         }
     }
+
+    config.logger.info("build_docker_on_k8 for image ${image.name} | nodeSelector: ${nodeSelector}")
 
     podTemplate(
         cloud: cloudName,
@@ -730,10 +725,13 @@ def run_parallel_in_chunks(config, myTasks, bSize) {
         bSize = myTasks.size()
     }
 
-    config.logger.trace(3, "run_parallel_in_chunks: batch size is ${bSize}")
+    def val = getConfigVal(config, ['failFast'], true)
 
+    config.logger.trace(3, "run_parallel_in_chunks: batch size is ${bSize}")
     (myTasks.keySet() as List).collate(bSize).each {
-        parallel myTasks.subMap(it)
+        def batchMap = myTasks.subMap(it)
+        batchMap['failFast'] = val
+        parallel batchMap
     }
 }
 
@@ -799,8 +797,7 @@ def main() {
 // this is to avoid that multiple axis from matrix will create own same copy for $docker but creating it upfront.
 
 
-            def val = getConfigVal(config, ['failFast'], true)
-            def parallelBuildDockers = [failFast: val]
+            def parallelBuildDockers = [:]
 
             def arch_distro_map = gen_image_map(config)
             arch_distro_map.each { arch, images ->
