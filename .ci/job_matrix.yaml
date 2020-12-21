@@ -51,11 +51,8 @@ steps:
 
 
   - name: Coverity
+    containerSelector: "{name:'centos7-7', variant:1}"
     run: |
-      if [ "$name" != "centos7-7" -o "$variant" = "1" ]; then
-        echo skipping coverity for $name
-        exit 0
-      fi
       cuda=$cuda .ci/cov.sh
 
   - name: Check package
