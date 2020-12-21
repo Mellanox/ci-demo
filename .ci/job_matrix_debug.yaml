@@ -32,8 +32,10 @@ runs_on_dockers:
 #  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest', arch: 'x86_64', nodeLabel: '(dockerserver || docker) && x86_64'}
   - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest', category: 'tool'}
   - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
+  - {name: 'blackduck', url: 'harbor.mellanox.com/toolbox/ngci-centos:7.9.2009', category: 'tool'}
 
-matrix_disabled:
+
+matrix:
   axes:
     driver:
       - MLNX_OFED_LINUX-4.9-0.1.8.0
@@ -51,32 +53,33 @@ steps:
     run: touch aaa
 
   - name: once
-    containerSelector: '{name:ubuntu16-4,variant:1}'
+    containerSelector: "{name:'ubuntu16-4',variant:1}"
     run: touch aaa
 
   - name: Coverity scan
     shell: action
-    run: dynamicAction
-    containerSelector: '{category:tool, variant:1}'
+    module: dynamicAction
+    run: coverity.sh 
+    containerSelector: "{name:'centos7-7', variant:1}"
     args:
-      - "coverity.sh"
       - "./autogen.sh;./configure;make -j 3 clean"
       - "make -j 3"
     archiveArtifacts: 'cov.log'
 
 
   - name: Blackduck scan source
-    enable: false
+    containerSelector: "{category:'tool', name: 'blackduck', variant:1}"
     shell: action
-    run: blackDuck
-    containerSelector: '{category:tool, variant:1}'
+    module: ngci
+    run: NGCIBlackDuckScan
     args:
-      - "ci-demo"
-      - "1.0"
-      - "${env.WORKSPACE}/src"
-      - "true"
-      - "BlackDuck report"
-      - "source"
+      projectName: "NGCIBlackDuckScan"
+      projectVersion: "ci-demo"
+      projectVersion: "1.0"
+      projectSrcPath: "${env.WORKSPACE}/src"
+      attachArtifact: true
+      reportName: "BlackDuck report"
+      scanMode: "source"
     env:
       SPRING_APPLICATION_JSON: '{"blackduck.url":"https://blackduck.mellanox.com/","blackduck.api.token":"ODMwOWYwMzEtODA2ZC00MzBjLWI1ZDEtNmFiMjBkYzQzMzkwOjNmNjExN2M1LWE2ZmEtNDZlYS1hZjRiLTZlNDgwNjAwOTVjNw=="}'
 
@@ -105,8 +108,10 @@ steps_disabled:
     run: |
       env > myenv.log
       exit 1
-    onfail: env > onfail_myenv.log
-    always: env > always_myenv.log
+
+
+      onfail: env > onfail_myenv.log
+      always: env > always_myenv.log
     archiveArtifacts: 'onfail_myenv.log,always_myenv.log'
 
 

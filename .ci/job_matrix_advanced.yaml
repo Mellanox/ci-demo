@@ -44,13 +44,13 @@ matrix:
     arch:
       - x86_64
 
-  include:
+  exclude:
     - {arch: x86_64, cuda: dev/cuda11.0, driver: MLNX_OFED_LINUX-4.9-0.1.8.0, name: ubuntu16-4}
     - {arch: x86_64, cuda: dev/cuda9.2, driver: MLNX_OFED_LINUX-4.9-0.1.8.0, name: ubuntu16-4}
 
 steps:
 
-  - name: Prepare docker
+  - name: Install mofed
     run: |
       echo Installing driver: ${driver} ...
       sudo env build=$driver $mofed_installer_exe $mofed_installer_opt

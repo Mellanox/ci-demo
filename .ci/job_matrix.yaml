@@ -35,7 +35,7 @@ matrix:
 
 steps:
 
-  - name: Prepare docker
+  - name: Install mofed
     run: |
       echo Installing driver: ${driver} ...
       sudo env build=$driver $mofed_installer_exe --help &> ofed_help.txt

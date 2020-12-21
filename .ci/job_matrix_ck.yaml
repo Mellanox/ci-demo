@@ -1,0 +1,125 @@
+---
+job: clusterkit
+
+registry_host: harbor.mellanox.com
+registry_path: /swx-storage/clusterkit
+registry_auth: swx-storage
+
+kubernetes:
+  cloud: swx-k8s
+  nodeSelector: 'beta.kubernetes.io/os=linux'
+
+volumes:
+  - {mountPath: /hpc/local, hostPath: /hpc/local}
+  - {mountPath: /auto/sw_tools, hostPath: /auto/sw_tools}
+  - {mountPath: /auto/mtrswgwork, hostPath: /auto/mtrswgwork}
+  - {mountPath: /auto/sw/release/mlnx_ofed, hostPath: /auto/sw/release/mlnx_ofed}
+  - {mountPath: /auto/sw/release/sw_acceleration, hostPath: /auto/sw/release/sw_acceleration}
+
+env:
+  mofed_installer_exe: /auto/sw/release/mlnx_ofed/MLNX_OFED/mlnx_ofed_install
+  mofed_installer_opt: --user-space-only --without-fw-update --all -q --skip-unsupported-devices-check
+
+runs_on_dockers:
+  - {file: '.ci/Dockerfile.centos7.2.1511', name: 'centos7-2', tag: 'latest'}
+  - {file: '.ci/Dockerfile.centos7.3.1611', name: 'centos7-3', tag: 'latest'}
+  - {file: '.ci/Dockerfile.centos7.4.1708', name: 'centos7-4', tag: 'latest'}
+  - {file: '.ci/Dockerfile.centos7.5.1804', name: 'centos7-5', tag: 'latest'}
+  - {file: '.ci/Dockerfile.centos7.6.1810', name: 'centos7-6', tag: 'latest'}
+  - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest'}
+  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
+  - {file: '.ci/Dockerfile.ubuntu18-4', name: 'ubuntu18-4', tag: 'latest'}
+  - {file: '.ci/Dockerfile.ubuntu19-4', name: 'ubuntu19-4', tag: 'latest'}
+  - {file: '.ci/Dockerfile.ubuntu20-4', name: 'ubuntu20-4', tag: 'latest'}
+  - {file: '.ci/Dockerfile.sles12sp4', name: 'sles12-sp4', tag: 'latest'}
+  - {file: '.ci/Dockerfile.sles12sp5', name: 'sles12-sp5', tag: 'latest'}
+  - {file: '.ci/Dockerfile.sles15sp1', name: 'sles15-sp1', tag: 'latest'}
+  - {file: '.ci/Dockerfile.sles15sp2', name: 'sles15-sp2', tag: 'latest'}
+
+
+matrix:
+  axes:
+    driver:
+      - MLNX_OFED_LINUX-4.9-0.1.8.0
+      - MLNX_OFED_LINUX-5.1-1.0.0.0
+      - MLNX_OFED_LINUX-5.1-2.3.7.1
+    cuda:
+      - dev/cuda9.2
+      - dev/cuda10.2
+      - dev/cuda11.0
+    arch:
+      - x86_64
+
+  include:
+    - {arch: x86_64, name: 'centos7-2', driver: 'MLNX_OFED_LINUX-5.1-1.0.0.0', cuda: 'dev/cuda9.2'}
+    - {arch: x86_64, name: 'centos7-2', driver: 'MLNX_OFED_LINUX-5.1-2.3.7.1', cuda: 'dev/cuda10.2'}
+    - {arch: x86_64, name: 'centos7-3', driver: 'MLNX_OFED_LINUX-5.1-2.3.7.1', cuda: 'dev/cuda11.0'}
+    - {arch: x86_64, name: 'centos7-4', driver: 'MLNX_OFED_LINUX-5.1-2.3.7.1', cuda: 'dev/cuda9.2'}
+    - {arch: x86_64, name: 'centos7-5', driver: 'MLNX_OFED_LINUX-4.9-0.1.8.0', cuda: 'dev/cuda10.2'}
+    - {arch: x86_64, name: 'centos7-5', driver: 'MLNX_OFED_LINUX-5.1-1.0.0.0', cuda: 'dev/cuda11.0'}
+    - {arch: x86_64, name: 'centos7-5', driver: 'MLNX_OFED_LINUX-5.1-2.3.7.1', cuda: 'dev/cuda9.2'}
+    - {arch: x86_64, name: 'centos7-6', driver: 'MLNX_OFED_LINUX-5.1-2.3.7.1', cuda: 'dev/cuda10.2'}
+    - {arch: x86_64, name: 'centos7-7', driver: 'MLNX_OFED_LINUX-5.1-2.3.7.1', cuda: 'dev/cuda11.0'}
+    - {arch: x86_64, name: 'ubuntu16-4', driver: 'MLNX_OFED_LINUX-4.9-0.1.8.0', cuda: 'dev/cuda9.2'}
+    - {arch: x86_64, name: 'ubuntu16-4', driver: 'MLNX_OFED_LINUX-5.1-1.0.0.0', cuda: 'dev/cuda10.2'}
+    - {arch: x86_64, name: 'ubuntu16-4', driver: 'MLNX_OFED_LINUX-5.1-2.3.7.1', cuda: 'dev/cuda11.0'}
+    - {arch: x86_64, name: 'ubuntu18-4', driver: 'MLNX_OFED_LINUX-5.1-2.3.7.1', cuda: 'dev/cuda9.2'}
+    - {arch: x86_64, name: 'ubuntu19-4', driver: 'MLNX_OFED_LINUX-5.1-2.3.7.1', cuda: 'dev/cuda10.2'}
+    - {arch: x86_64, name: 'ubuntu20-4', driver: 'MLNX_OFED_LINUX-4.9-0.1.8.0', cuda: 'dev/cuda11.0'}
+    - {arch: x86_64, name: 'ubuntu20-4', driver: 'MLNX_OFED_LINUX-5.1-1.0.0.0', cuda: 'dev/cuda9.2'}
+    - {arch: x86_64, name: 'ubuntu20-4', driver: 'MLNX_OFED_LINUX-5.1-2.3.7.1', cuda: 'dev/cuda10.2'}
+    - {arch: x86_64, name: 'sles12-sp4', driver: 'MLNX_OFED_LINUX-4.9-0.1.8.0', cuda: 'dev/cuda11.0'}
+    - {arch: x86_64, name: 'sles12-sp4', driver: 'MLNX_OFED_LINUX-5.1-1.0.0.0', cuda: 'dev/cuda9.2'}
+    - {arch: x86_64, name: 'sles12-sp4', driver: 'MLNX_OFED_LINUX-5.1-2.3.7.1', cuda: 'dev/cuda10.2'}
+    - {arch: x86_64, name: 'sles12-sp5', driver: 'MLNX_OFED_LINUX-5.1-2.3.7.1', cuda: 'dev/cuda11.0'}
+    - {arch: x86_64, name: 'sles15-sp1', driver: 'MLNX_OFED_LINUX-5.1-2.3.7.1', cuda: 'dev/cuda9.2'}
+    - {arch: x86_64, name: 'sles15-sp2', driver: 'MLNX_OFED_LINUX-4.9-0.1.8.0', cuda: 'dev/cuda10.2'}
+    - {arch: x86_64, name: 'sles15-sp2', driver: 'MLNX_OFED_LINUX-5.1-1.0.0.0', cuda: 'dev/cuda11.0'}
+    - {arch: x86_64, name: 'sles15-sp2', driver: 'MLNX_OFED_LINUX-5.1-2.3.7.1', cuda: 'dev/cuda9.2'}
+
+# Fail job if one of the steps fails or continue
+failFast: false
+
+steps:
+
+  - name: Install mofed
+    run: |
+      echo Installing driver: ${driver} ...
+      sudo env build=$driver $mofed_installer_exe --help &> ofed_help.txt
+      for item in $mofed_installer_opt; do
+        if grep -qs -- $item ofed_help.txt; then
+          opt+=" $item"
+        fi
+      done
+      echo sudo env build=$driver $mofed_installer_exe $opt
+
+  - name: Configure
+    run: |
+      pwd
+      ls -al
+      ./autogen.sh
+      ./configure --prefix ${WORKSPACE}/install
+
+  - name: Build
+    run: |
+      pwd
+      ls -al
+      make -j 2 all
+
+  - name: Install
+    run: |
+      pwd
+      ls -al
+      make -j 2 install
+    parallel: true
+
+  - name: Coverity scan  
+    shell: action
+    containerSelector: "{name:'centos7-7', variant:1}"
+    module: dynamicAction
+    run: coverity.sh
+    args:
+      - "./autogen.sh;./configure;make -j 3 clean"
+      - "make -j 3"
+    parallel: true
+    archiveArtifacts: 'cov.log'

@@ -1,27 +1,47 @@
 #!/usr/bin/env groovy
 
+@NonCPS
+def resolveTemplate(varsMap, str) {
+    GroovyShell shell = new GroovyShell(new Binding(varsMap))
+    def res = shell.evaluate('"' + str +'"')
+    return res
+}
 
-def call(List args) {
+
+def call(oneStep) {
+
+    def args = oneStep.args
+    def actionName = oneStep.run
 
     println("==>DynamicAction(" + args + ")")
 
+    def argList = []
+    def vars = [:]
+    vars['env'] = env
+
+    if (args != null) {
+        for (int i=0; i<args.size(); i++) {
+            arg = args[i]
+            arg = resolveTemplate(vars, arg)
+            argList.add(arg)
+        }
+    }
+
     if (args.size() < 1) {
         println("fatal: DynamicAction() expects at least 1 parameter")
-        sh("false")
+        sh(script: "false", label: "action failed", returnStatus: true)
     }
-    def actionName = args[0]
     def actionScript = libraryResource "actions/${actionName}"
-    def toFile = new File (env.WORKSPACE + "/cidemo_" + actionName)
+    def toFile = env.WORKSPACE + "/cidemo_${actionName}"
 
-    println("action file: " + toFile.getAbsolutePath())
-    writeFile(file: toFile.getAbsolutePath(), text: actionScript)
-    sh("chmod +x " + toFile.getAbsolutePath())
+    writeFile(file: toFile, text: actionScript)
+    sh(script: "chmod +x " + toFile, label: "Set script permissions", returnStatus: true)
 
-    def cmd = toFile.getAbsolutePath()
+    def cmd = toFile
     if (args.size() > 1) {
-        cmd += " " + args.subList(1,args.size()).collect{ "'" + it + "'"}.join(" ")
+        for (int i=0; i< args.size(); i++) {
+            cmd += " '" + args[i] + "'"
+        }
     }
-    println("Running " + cmd)
-    sh(cmd)
-    return;
+    return sh(script: cmd, label: "Runing ${actionName}", returnStatus: true)
 }

@@ -31,4 +31,6 @@ cov-format-errors --dir $cov_build --emacs-style |& tee cov.log
 nerrors=$(cov-format-errors --dir $cov_build | awk '/Processing [0-9]+ errors?/ { print $2 }')
 rc=$(($rc+$nerrors))
 
+echo status $rc
+
 exit $rc
