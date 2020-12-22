@@ -108,10 +108,8 @@ steps_disabled:
     run: |
       env > myenv.log
       exit 1
-
-
-      onfail: env > onfail_myenv.log
-      always: env > always_myenv.log
+    onfail: env > onfail_myenv.log
+    always: env > always_myenv.log
     archiveArtifacts: 'onfail_myenv.log,always_myenv.log'
 
 
