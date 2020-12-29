@@ -376,7 +376,26 @@ def run_step(image, config, title, oneStep, axis) {
         } else {
             def String cmd = shell + "\n" + oneStep.run
             config.logger.trace(4, "Running step script=" + cmd)
-            run_step_shell(cmd, title, oneStep, config)
+            if (oneStep.credentialsId) {
+                Map found = null
+                for (int i=0; i<config.credentials.size(); i++) {
+                    Map entry = config.credentials[i]
+                    if (entry.credentialsId == oneStep.credentialsId) {
+                        found = entry
+                        break
+                    }
+                }
+                if (!found || !found.usernameVariable || !found.passwordVariable) {
+                    reportFail(title, "Credentials requested but undefined in yaml file")
+                }
+                withCredentials([usernamePassword(credentialsId: oneStep.credentialsId,
+                                passwordVariable: found.passwordVariable,
+                                usernameVariable: found.usernameVariable)]) {
+                        run_step_shell(cmd, title, oneStep, config)
+                    }
+            } else {
+                run_step_shell(cmd, title, oneStep, config)
+            }
         }
     }
 }

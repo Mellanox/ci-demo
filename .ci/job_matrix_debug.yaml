@@ -5,6 +5,11 @@ registry_host: harbor.mellanox.com
 registry_path: /swx-storage/ci-demo
 registry_auth: swx-storage
 
+credentials:
+  - {credentialsId: '311997c9-cc1c-4d5d-8ba2-6eb43ba0a06d', usernameVariable: 'SWX_REPOS_USER', passwordVariable: 'SWX_REPOS_PASS'}
+  - {credentialsId: 'jenkins-pulp', usernameVariable: 'pulp_usr', passwordVariable: 'pulp_pwd'}
+
+
 kubernetes:
   cloud: swx-k8s
   arch_table:
@@ -54,7 +59,8 @@ steps:
 
   - name: once
     containerSelector: "{name:'ubuntu16-4',variant:1}"
-    run: touch aaa
+    run: env
+    credentialsId: 'jenkins-pulp'
 
   - name: Coverity scan
     shell: action
