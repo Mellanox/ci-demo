@@ -149,7 +149,10 @@ registry_auth: swx-storage
 
 # k8 cloud name (must be defined in Jenkins server configuration)
 kubernetes:
-# cloud name
+# cloud name configured in Jenkins->Config->Clouds section
+# it can also be added to `runs_on_dockers` entries to specify different cloud for different
+# container
+
   cloud: swx-k8s
 # Example how to use k8 node selector to request specific nodes for allocation
   nodeSelector: 'beta.kubernetes.io/os=linux'
@@ -248,9 +251,9 @@ steps:
 # execution of matrix dimension
     containerSelector: '{category:tool, variant:1}'
     args:
-      - "coverity.sh"
-      - "./autogen.sh;./configure;make -j 3 clean"
-      - "make -j 3"
+      - "--pre_script './autogen.sh;./configure;make -j 3 clean'"
+      - "--build_script 'make -j 3'"
+      - "--ignore_files 'devx googletest tests'"
     archiveArtifacts: 'cov.log'
 # run this step in parallel with others
 # each non-parallel step is a barrier for previous group of parallel steps

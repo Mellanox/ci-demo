@@ -1,17 +1,7 @@
 #!/usr/bin/env groovy
 
-@NonCPS
-def resolveTemplate(varsMap, str) {
-    GroovyShell shell = new GroovyShell(new Binding(varsMap))
-    def res = shell.evaluate('"' + str +'"')
-    return res
-}
-
-
-def call(oneStep) {
-
-    def args = oneStep.args
-    def actionName = oneStep.run
+int call(ctx, oneStep) {
+    args = oneStep.args
 
     println("==>DynamicAction(" + args + ")")
 
@@ -22,26 +12,27 @@ def call(oneStep) {
     if (args != null) {
         for (int i=0; i<args.size(); i++) {
             arg = args[i]
-            arg = resolveTemplate(vars, arg)
+            arg = ctx.resolveTemplate(vars, arg)
             argList.add(arg)
         }
     }
 
     if (args.size() < 1) {
-        println("fatal: DynamicAction() expects at least 1 parameter")
-        sh(script: "false", label: "action failed", returnStatus: true)
+        ctx.reportFail(oneStep.name, "fatal: DynamicAction() expects at least 1 parameter")
     }
-    def actionScript = libraryResource "actions/${actionName}"
-    def toFile = env.WORKSPACE + "/cidemo_${actionName}"
+
+    def actionScript = libraryResource "actions/${oneStep.run}"
+    def toFile = env.WORKSPACE + "/cidemo_${oneStep.run}"
 
     writeFile(file: toFile, text: actionScript)
     sh(script: "chmod +x " + toFile, label: "Set script permissions", returnStatus: true)
 
-    def cmd = toFile
+    String cmd = toFile
     if (args.size() > 1) {
         for (int i=0; i< args.size(); i++) {
-            cmd += " '" + args[i] + "'"
+            cmd += " " + args[i]
         }
     }
-    return sh(script: cmd, label: "Runing ${actionName}", returnStatus: true)
+    println("Running cmd: ${oneStep.run} " + cmd)
+    return sh(script: cmd, label: "Runing ${oneStep.run}", returnStatus: true)
 }

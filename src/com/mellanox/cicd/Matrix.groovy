@@ -1,5 +1,9 @@
 #!/usr/bin/groovy
+/* groovylint-disable BlockEndsWithBlankLine, BlockStartsWithBlankLine, ClassStartsWithBlankLine, CompileStatic, DuplicateListLiteral, DuplicateNumberLiteral, DuplicateStringLiteral, FactoryMethodName, FieldTypeRequired, GStringExpressionWithinString, ImplicitClosureParameter, Instanceof, LineLength, MethodCount, MethodParameterTypeRequired, MethodReturnTypeRequired, NestedForLoop, ParameterCount, ParameterName, PrintStackTrace, SpaceAroundOperator, TrailingWhitespace, UnnecessaryGString, UnnecessaryGetter, UnnecessaryNullCheck, UnusedMethodParameter, VariableTypeRequired */
+/* groovylint-disable ConsecutiveBlankLines, ImplicitReturnStatement */
+/* groovylint-disable LineLength, NoDef, UnnecessarySemicolon, VariableName */
 package com.mellanox.cicd;
+
 
 class Logger {
     def ctx
@@ -23,12 +27,6 @@ class Logger {
         this.ctx.echo this.cat + " WARN: ${message}"
     }
 
-    def fatal(String message) {
-        this.ctx.echo this.cat + " FATAL: ${message}"
-        this.ctx.run_shell("false", "Fatal error")
-    }
-
-
     def debug(String message) {
         if (this.ctx.isDebugMode()) {
             this.ctx.echo this.cat + " DEBUG: ${message}"
@@ -40,6 +38,7 @@ class Logger {
             this.ctx.echo this.cat + " TRACE[${level}]: ${message}"
         }
     }
+
 }
  
 @NonCPS
@@ -60,7 +59,7 @@ List getMatrixAxes(matrix_axes) {
 
 @NonCPS 
 def entrySet(m) {
-    m.collect {k, v -> [key: k, value: v]}
+    m.collect { k, v -> [key: k, value: v] }
 }
 
 
@@ -76,7 +75,7 @@ def run_shell(cmd, title, retOut=false) {
             rc = sh(script: cmd, label: title, returnStatus: true)
         }
 
-    } catch(e) {
+    } catch (e) {
         err = e
         org.codehaus.groovy.runtime.StackTraceUtils.printSanitizedStackTrace(e)
     }
@@ -99,12 +98,11 @@ def run_step_shell(cmd, title, oneStep, config) {
     attachArtifacts(config, oneStep.archiveArtifacts)
 
     if (ret.rc != 0) {
-        currentBuild.result = 'FAILURE'
         def msg = "Step ${title} failed with exit code=${ret.rc}"
         if (ret.exception != null) {
             msg += " exception=${ret.exception}"
         }
-        error(msg)
+        reportFail(title, msg)
     }
 }
 
@@ -177,17 +175,17 @@ def gen_image_map(config) {
     def arch_list = getConfigVal(config, ['matrix', 'axes', 'arch'], null, false)
 
     if (arch_list) {
-        for (int i=0; i<arch_list.size();i++) {
+        for (int i=0; i<arch_list.size(); i++) {
             def arch = arch_list[i]
             image_map[arch] = []
         }
     } else {
-        for (int i=0; i<config.runs_on_dockers.size();i++) {
+        for (int i=0; i<config.runs_on_dockers.size(); i++) {
             def dfile = config.runs_on_dockers[i]
             if (dfile.arch) {
                 image_map["${dfile.arch}"] = []
             } else {
-                config.logger.fatal("Please define tag 'arch' for image ${dfile.name} in 'runs_on_dockers' section of yaml file")
+                reportFail('config', "Please define tag 'arch' for image ${dfile.name} in 'runs_on_dockers' section of yaml file")
             }
         }
     }
@@ -204,41 +202,29 @@ def gen_image_map(config) {
         config.runs_on_dockers.each { item ->
 
             def dfile = item.clone()
+            dfile.arch = dfile.arch ?: arch
 
-            if (!dfile.arch) {
-                dfile.arch = arch
-            }
-
-            if (!dfile.file) {
-                dfile.file = ""
-            }
-    
             if (dfile.arch && dfile.arch != arch) {
                 config.logger.warn("skipped conf: " + arch + " name: " + dfile.name)
                 return
             }
 
-            if (!dfile.build_args) {
-                dfile.build_args = ""
-            }
+            dfile.file = dfile.file ?: ''
+            dfile.tag = dfile.tag ?: 'latest'
+            dfile.build_args = dfile.build_args ?: ''
+            dfile.uri = dfile.uri ?: "${arch}/${dfile.name}"
+            dfile.filename = dfile.file
 
-            if (!dfile.uri) {
-                // default URI subpath for Docker image on a harbor
-                dfile.uri = "${arch}/${dfile.name}"
-            } else {
-                def env_map = env.getEnvironment()
-                dfile.each { key, value ->
-                    env_map[key] = value
-                }
-                dfile.uri = resolveTemplate(env_map, dfile.uri)
-            }
+            
+            def vars = [:]
+            vars += env.getEnvironment()
+            vars += config
 
-            if (!dfile.url) {
-                dfile.url = "${config.registry_host}${config.registry_path}/${dfile.uri}:${dfile.tag}"
-            }
-            dfile.filename = "${dfile.file}"
+            dfile.uri = resolveTemplate(vars + dfile, dfile.uri)
+            dfile.url = dfile.url ?: "${config.registry_host}${config.registry_path}/${dfile.uri}:${dfile.tag}"
+            dfile.url = resolveTemplate(vars + dfile, dfile.url)
 
-            config.logger.debug("Adding docker to image_map for " + dfile.arch + " name: " + dfile.name)
+            config.logger.debug("Adding docker to image_map for " + dfile.arch + ' name: ' + dfile.name)
             images.add(dfile)
         }
     }
@@ -249,7 +235,7 @@ def matchMapEntry(filters, entry) {
     def match
     for (int i=0; i<filters.size(); i++) {
         match = true
-        filters[i].each { k,v ->
+        filters[i].each { k, v ->
             if (entry[k] == null || v != entry[k]) {
                 match = false
             }
@@ -277,7 +263,7 @@ def onUnstash() {
 
 
 def attachArtifacts(config, args) {
-    if(args != null) {
+    if (args != null) {
         try {
             archiveArtifacts(artifacts: args, allowEmptyArchive: true )
         } catch (e) {
@@ -287,7 +273,7 @@ def attachArtifacts(config, args) {
 }
 
 @NonCPS
-def int getDebugLevel() {
+int getDebugLevel() {
     def val = env.DEBUG
     def intValue = 0
     if (val != null) {
@@ -321,10 +307,11 @@ def getDefaultShell(config=null, step=null, shell='#!/bin/bash -l') {
 }
 
 
-def toStringMap(strMap) {
-    def ret = [:]
+Map toStringMap(String param) {
+    Map ret = [:]
+    String strMap = param
     if (strMap != null) {
-        strMap = '[' + strMap.replaceAll('[\\{\\}]',' ') + ']';
+        strMap = '[' + strMap.replaceAll('[\\{\\}]', ' ') + ']'
         ret = evaluate(strMap)
     }
     return ret
@@ -342,7 +329,7 @@ def check_skip_stage(image, config, title, oneStep, axis) {
     if (customSel.size() > 0) {
 
         // no match - skip
-        if (false == matchMapEntry([customSel], axis)) {
+        if (!matchMapEntry([customSel], axis)) {
             config.logger.trace(2, "Step '" + title + "' skipped as no match by containerSelector=" + customSel + " for image with axis=" + axis)
             return true
         }
@@ -354,6 +341,11 @@ def check_skip_stage(image, config, title, oneStep, axis) {
             return true
     }
     return false
+}
+
+void reportFail(String stage, String msg) {
+    currentBuild.result = 'FAILURE'
+    error(stage + " failed with msg: " + msg)
 }
 
 def run_step(image, config, title, oneStep, axis) {
@@ -373,11 +365,14 @@ def run_step(image, config, title, oneStep, axis) {
 
         if (shell == "action") {
             if (oneStep.module == null) {
-                config.logger.fatal("Step is type of action but has no 'module' defined")
+                reportFail(title, "Step is type of action but has no 'module' defined")
             }
 
             config.logger.trace(4, "Running step action module=" + oneStep.module + " args=" + oneStep.args + " run=" + oneStep.run)
-            this."${oneStep.module}"(oneStep)
+            int rc = this."${oneStep.module}"(this, oneStep)
+            if (rc != 0) {
+                reportFail(oneStep.name, "exit with error code=${rc}")
+            }
         } else {
             def String cmd = shell + "\n" + oneStep.run
             config.logger.trace(4, "Running step script=" + cmd)
@@ -400,7 +395,7 @@ def runSteps(image, config, branchName, axis) {
         // collect parallel steps (if any) and run it when non-parallel step discovered or last element.
         if ( par != null && par == true) {
             def stepName = branchName + "->" + one.name
-            parallelNestedSteps[stepName] = {run_step(image, config, stepName, oneStep, axis)}
+            parallelNestedSteps[stepName] = { run_step(image, config, stepName, oneStep, axis) }
             // last element - run and flush
             if (i == config.steps.size() - 1) {
                 parallel(parallelNestedSteps)
@@ -422,12 +417,12 @@ def runSteps(image, config, branchName, axis) {
 
 def getConfigVal(config, list, defaultVal=null, toString=true) {
     def val = config
-    for (int i=0; i<list.size();i++) {
+    for (int i=0; i<list.size(); i++) {
         item = list[i]
         config.logger.trace(5, "getConfigVal: Checking $item in config file")
         val = val[item]
         if (val == null) {
-            config.logger.trace(5, "getConfigVal: Defaulting " + list.toString() + " = " + defaultVal)
+            config.logger.trace(5, "getConfigVal: Defaulting " + list + " = " + defaultVal)
             return defaultVal
         }
     }
@@ -438,7 +433,7 @@ def getConfigVal(config, list, defaultVal=null, toString=true) {
     } else {
         ret = val
     }
-    config.logger.trace(5, "getConfigVal: Found " + list.toString() + " = " + ret)
+    config.logger.trace(5, "getConfigVal: Found " + list + " = " + ret)
     return ret
 }
 
@@ -456,12 +451,12 @@ def parseListV(volumes) {
 def runK8(image, branchName, config, axis) {
 
 
-    def cloudName = getConfigVal(config, ['kubernetes','cloud'], "")
+    def cloudName = getConfigVal(config, ['kubernetes', 'cloud'], "")
 
     config.logger.trace(2, "Using kubernetes ${cloudName}, axis=" + axis)
 
     def listV = parseListV(config.volumes)
-    def cname = image.get("name").replaceAll("[\\.:/_]","")
+    def cname = image.get("name").replaceAll("[\\.:/_]", "")
 
     def k8sArchConf = getArchConf(config, axis.arch)
     def nodeSelector = ''
@@ -515,7 +510,7 @@ def resolveTemplate(varsMap, str) {
 def getDockerOpt(config) {
     def opts = getConfigVal(config, ['docker_opt'], "")
     if (config.get("volumes")) {
-        for (int i=0; i<config.volumes.size();i++) {
+        for (int i=0; i<config.volumes.size(); i++) {
             def vol = config.volumes[i]
             hostPath = vol.get("hostPath")? vol.hostPath : vol.mountPath
             opts += " -v ${vol.mountPath}:${hostPath}"
@@ -557,7 +552,7 @@ Map getTasks(axes, image, config, include, exclude) {
     for (int i = 0; i < axes.size(); i++) {
         Map axis = axes[i]
 
-        if(axis.arch != image.arch) {
+        if (axis.arch != image.arch) {
             config.logger.debug("getTasks: skipping axis=" + axis + " as its arch does not match image=" + image)
             continue
         }
@@ -590,7 +585,7 @@ Map getTasks(axes, image, config, include, exclude) {
         def canSkip = true
         for (int j = 0; j < config.steps.size(); j++) {
             def oneStep = config.steps[j]
-            if (false == check_skip_stage(image, config, branchName, oneStep, axis)) {
+            if (!check_skip_stage(image, config, branchName, oneStep, axis)) {
                 canSkip = false
                 break
             }
@@ -608,16 +603,15 @@ Map getTasks(axes, image, config, include, exclude) {
         }
 
         def axisEnv = []
-        axis.each { k,v ->
+        axis.each { k, v ->
             axisEnv.add("${k}=${v}")
         }
 
         config.logger.trace(5, "task name " + branchName)
-        def arch = axis.arch
         tasks[branchName] = { ->
             withEnv(axisEnv) {
-                if((config.get("kubernetes") == null) && (image.nodeLabel == null)) {
-                    config.logger.fatal("Please define kubernetes cloud name in yaml config file or define nodeLabel for docker")
+                if ((config.get("kubernetes") == null) && (image.nodeLabel == null)) {
+                    reportFail('config', "Please define kubernetes cloud name in yaml config file or define nodeLabel for docker")
                 }
                 if (image.nodeLabel) {
                     runDocker(image, config, branchName, axis, { pimage, pconfig -> runSteps(pimage, pconfig, branchName, axis) })
@@ -652,8 +646,9 @@ def getMatrixTasks(image, config) {
 }
 
 def buildImage(img, filename, extra_args, config) {
-    if(filename == "") {
-        config.logger.fatal("No docker filename specified, skipping build docker")
+    if (filename == "") {
+        config.logger.warn("No docker filename specified, skipping build docker")
+        return
     }
     customImage = docker.build("${img}", "-f ${filename} ${extra_args} . ")
     customImage.push()
@@ -681,7 +676,7 @@ String getChangedFilesList(config) {
         cFiles.each { oneFile ->
             logger.debug("Tracking Changed File: " + oneFile)
         }
-    } catch(e) {
+    } catch (e) {
         logger.warn("Unable to calc changed file list - make sure shallow clone depth is configured in Jenkins, reason: " + e)
     }
 
@@ -691,11 +686,9 @@ String getChangedFilesList(config) {
 def buildDocker(image, config) {
 
     def img = image.url
-    def arch = image.arch
     // Vasily Ryabov: we need .toString() to make changed_files.contains(filename) work correctly
     // See https://stackoverflow.com/q/56829842/3648361
     def filename = image.filename.toString().trim()
-    def distro = image.name
     def extra_args = image.build_args
     def changed_files = config.get("cFiles")
 
@@ -737,7 +730,7 @@ def build_docker_on_k8(image, config) {
 
     def listV = parseListV(config.volumes)
 
-    def cloudName = getConfigVal(config, ['kubernetes','cloud'], "")
+    def cloudName = image.cloud ?: getConfigVal(config, ['kubernetes', 'cloud'], "")
 
     config.logger.trace(7, "Checking docker image availability for " + image)
 
@@ -778,13 +771,17 @@ def build_docker_on_k8(image, config) {
             onUnstash()
 
             container('docker') {
-                buildDocker(image, config)
+ //               stage ('Build Docker') {
+                    buildDocker(image, config)
+ //               }
             }
         }
     }
 }
 
-def run_parallel_in_chunks(config, myTasks, bSize) {
+def run_parallel_in_chunks(config, myTasks, depth) {
+
+    int bSize = depth
 
     if (bSize <= 0) {
         bSize = myTasks.size()
@@ -813,7 +810,7 @@ def loadConfigFile(filepath, logger) {
 
     if (config.get("matrix")) {
         if (config.matrix.include != null && config.matrix.exclude != null) {
-            logger.fatal("matrix.include and matrix.exclude sections in config file=${filepath} are mutually exclusive. Please keep only one.")
+            reportFail('config', "matrix.include and matrix.exclude sections in config file=${filepath} are mutually exclusive. Please keep only one.")
         }
     }
     return config
@@ -838,8 +835,8 @@ def main() {
         }
 
         files = findFiles(glob: "${env.conf_file}")
-        if (0 == files.size()) {
-            logger.fatal("No conf_file found by ${env.conf_file}")
+        if (!files.size()) {
+            reportFail('config', "No conf_file found by ${env.conf_file}")
         }
 
 
@@ -871,7 +868,6 @@ def main() {
 
             def arch_distro_map = gen_image_map(config)
             for (def entry in entrySet(arch_distro_map)) {
-                def arch = entry.key
                 def images = entry.value
                 for (int j=0; j<images.size(); j++) {
                     def image = images[j]
@@ -898,6 +894,9 @@ def main() {
                         run_parallel_in_chunks(config, branches, bSize)
                     }
                 }
+            } catch (e) {
+                reportFail('parallel task', e)
+
             } finally {
                 if (config.pipeline_stop) {
                     def cmd = config.pipeline_stop.run

@@ -119,7 +119,8 @@ steps:
     module: dynamicAction
     run: coverity.sh
     args:
-      - "./autogen.sh;./configure;make -j 3 clean"
-      - "make -j 3"
+      - "--pre_script './autogen.sh;./configure;make -j 3 clean'"
+      - "--build_script 'make -j 3'"
+      - "--ignore_files 'devx googletest tests'"
     parallel: true
     archiveArtifacts: 'cov.log'

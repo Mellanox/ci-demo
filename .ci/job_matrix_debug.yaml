@@ -62,10 +62,10 @@ steps:
     run: coverity.sh 
     containerSelector: "{name:'centos7-7', variant:1}"
     args:
-      - "./autogen.sh;./configure;make -j 3 clean"
-      - "make -j 3"
+      - "--pre_script './autogen.sh;./configure;make -j 3 clean'"
+      - "--build_script 'make -j 3'"
+      - "--ignore_files 'devx googletest tests'"
     archiveArtifacts: 'cov.log'
-
 
   - name: Blackduck scan source
     containerSelector: "{category:'tool', name: 'blackduck', variant:1}"
