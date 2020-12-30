@@ -914,7 +914,7 @@ def main() {
                     }
                 }
             } catch (e) {
-                reportFail('parallel task', e)
+                reportFail('parallel task', e.toString())
 
             } finally {
                 if (config.pipeline_stop) {
