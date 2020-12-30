@@ -18,5 +18,9 @@ int call(ctx, oneStep) {
     }
     println("Calling ${oneStep.run} with args=" + args)
 
-    return "${oneStep.run}"(args)
+    def ret =  "${oneStep.run}"(args)
+    if (ret) {
+        return 0
+    }
+    return 1
 }

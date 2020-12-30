@@ -195,7 +195,7 @@ def gen_image_map(config) {
 
         def k8sArchConf = getArchConf(config, arch)
         if (!k8sArchConf) {
-            config.logger.warn("gen_image_map | skipped unsupported arch (${arch})")
+            config.logger.trace(3, "gen_image_map | skipped unsupported arch (${arch})")
             return
         }
 
@@ -205,7 +205,7 @@ def gen_image_map(config) {
             dfile.arch = dfile.arch ?: arch
 
             if (dfile.arch && dfile.arch != arch) {
-                config.logger.warn("skipped conf: " + arch + " name: " + dfile.name)
+                config.logger.trace(3, "skipped conf: " + arch + " name: " + dfile.name)
                 return
             }
 
@@ -711,7 +711,7 @@ def buildDocker(image, config) {
     def extra_args = image.build_args
     def changed_files = config.get("cFiles")
 
-    config.logger.info("Going to fetch docker image: ${img} from ${config.registry_host}")
+    config.logger.trace(3, "Going to fetch docker image: ${img} from ${config.registry_host}")
     def need_build = 0
 
     docker.withRegistry("https://${config.registry_host}", config.registry_auth) {
