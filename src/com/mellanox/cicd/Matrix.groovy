@@ -106,14 +106,25 @@ def run_step_shell(cmd, title, oneStep, config) {
     }
 }
 
+def forceCleanup(prefix="") {
+    env.WORKSPACE = pwd()
+
+    def cmd = """
+    set -eE
+    $prefix bash -c 'shopt -s dotglob; rm -rf ${env.WORKSPACE}/*'
+    """
+    return run_shell(cmd, "Clean workspace $prefix")
+}
 
 def forceCleanupWS() {
-    env.WORKSPACE = pwd()
-    def cmd = """
-    rm -rf ${env.WORKSPACE}/*
-    find ${env.WORKSPACE}/ -maxdepth 1 -name '.*' | xargs rm -rf 
-    """
-    run_shell(cmd, "Clean workspace")
+
+    def res = forceCleanup("")
+    if (res.rc != 0) {
+        res = forceCleanup("sudo")
+        if (res.rc != 0) {
+            reportFail('clean workspace', "Unable to cleanup workspace rc=" + res)
+        }
+    }
 }
 
 
@@ -546,6 +557,7 @@ def runDocker(image, config, branchName=null, axis=null, Closure func, runInDock
     config.logger.debug("Running docker on node: ${nodeName} branch: ${branchName}")
 
     node(nodeName) {
+        forceCleanupWS()
         unstash "${env.JOB_NAME}"
         onUnstash()
         stage(branchName) {
