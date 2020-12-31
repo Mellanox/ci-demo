@@ -353,6 +353,8 @@ def run_step(image, config, title, oneStep, axis) {
     if (check_skip_stage(image, config, title, oneStep, axis)) {
         return
     }
+    env.WORKSPACE = pwd()
+
 
     stage("${title}") {
         def shell = getDefaultShell(config, oneStep)
