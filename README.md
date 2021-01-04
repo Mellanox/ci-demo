@@ -22,12 +22,18 @@ registry_host: harbor.mellanox.com
 registry_path: /swx-storage/ci-demo
 registry_auth: swx-storage
 
+volumes:
+  - {mountPath: /hpc/local, hostPath: /hpc/local}
+  - {mountPath: /auto/sw_tools, hostPath: /auto/sw_tools}
+  - {mountPath: /.autodirect/mtrswgwork, hostPath: /.autodirect/mtrswgwork}
+  - {mountPath: /.autodirect/sw/release, hostPath: /.autodirect/sw/release}
+
 kubernetes:
   cloud: swx-k8s
-  nodeSelector: 'beta.kubernetes.io/os=linux'
 
 runs_on_dockers:
-  - {name: 'ubuntu16-4', tag: 'latest'}
+  - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest'}
+  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
 
 matrix:
   axes:
@@ -36,7 +42,20 @@ matrix:
       - '--prefix=/tmp/install'
     arch:
       - x86_64
+
+pipeline_start:
+  run: echo Starting new job
+
+pipeline_stop:
+  run: echo All done
+
 steps:
+  - name: Install mofed
+    run: |
+      echo Installing driver: ${driver} ...
+      mofed_installer_exe=/auto/sw/release/mlnx_ofed/MLNX_OFED/mlnx_ofed_install
+      mofed_installer_opt='--user-space-only --without-fw-update --all -q --skip-unsupported-devices-check'
+      sudo env build=$driver $mofed_installer_exe $mofed_installer_opt
 
   - name: Configure
     run: |
@@ -149,13 +168,18 @@ registry_auth: swx-storage
 
 # k8 cloud name (must be defined in Jenkins server configuration)
 kubernetes:
-# cloud name configured in Jenkins->Config->Clouds section
-# it can also be added to `runs_on_dockers` entries to specify different cloud for different
-# container
-
+# cloud name to use for all containers
+# cloud tag can be specified per specific container in run_on_containers section
   cloud: swx-k8s
 # Example how to use k8 node selector to request specific nodes for allocation
   nodeSelector: 'beta.kubernetes.io/os=linux'
+
+# optional: can specify jenkins defined credentials and refer/request by credentialsId in step that
+# requires it
+credentials:
+  - {credentialsId: '311997c9-cc1c-4d5d-8ba2-6eb43ba0a06d', usernameVariable: 'SWX_REPOS_USER', passwordVariable: 'SWX_REPOS_PASS'}
+  - {credentialsId: 'jenkins-pulp', usernameVariable: 'pulp_usr', passwordVariable: 'pulp_pwd'}
+
 
 # optional: for multi-arch k8 support, can define arch-specific nodeSelectors
 # and jnlpImage locations
