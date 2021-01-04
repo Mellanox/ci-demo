@@ -266,7 +266,6 @@ def onUnstash() {
     def cmd = """#!/bin/bash
     hash -r
     tar xf scm-repo.tar
-    git reset --hard
     rm -f scm-repo.tar
     """
     run_shell(cmd, "Extracting project files into workspace")
@@ -863,7 +862,7 @@ def main() {
 
             logger.debug("Git commit: ${env.GIT_COMMIT} prev commit: ${env.GIT_PREV_COMMIT}")
             // create git tarball on server, agents will copy it and unpack
-            run_shell("tar cf scm-repo.tar .git", 'Extracting scm repository files')
+            run_shell("tar -c --exclude scm-repo.tar -f scm-repo.tar .", 'Creating workspace copy')
             stash includes: "scm-repo.tar", name: "${env.JOB_NAME}"
         }
 
