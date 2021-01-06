@@ -480,9 +480,7 @@ def parseListV(volumes) {
 }
 
 def runK8(image, branchName, config, axis) {
-
-
-    def cloudName = getConfigVal(config, ['kubernetes', 'cloud'], "")
+    def cloudName = image.cloud ?: getConfigVal(config, ['kubernetes', 'cloud'], "")
 
     config.logger.trace(2, "Using kubernetes ${cloudName}, axis=" + axis)
 
@@ -747,6 +745,9 @@ def buildDocker(image, config) {
             need_build++
         }
         if (need_build) {
+            if (image.prepare) {
+                run_shell(image.prepare, "Preparing Docker build context for ${filename}")
+            }
             config.logger.info("Building - ${img} - ${filename}")
             buildImage(img, filename, extra_args, config)
         }
@@ -903,12 +904,12 @@ def main() {
                 def images = entry.value
                 for (int j=0; j<images.size(); j++) {
                     def image = images[j]
-                    def tmpl = getConfigVal(config, ['taskNameSetupImage'], "Setup Image ${image.arch}/${image.name}")
+                    def tmpl = getConfigVal(config, ['taskNameSetupImage'], "Setup Image ${image.arch}/${image.name}/${j}")
                     def branchName = resolveTemplate(image, tmpl)
 
                     parallelBuildDockers[branchName] = {
                         if (image.nodeLabel) {
-                            runDocker(image, config, "Preparing docker image", null, { pimage, pconfig -> buildDocker(pimage, pconfig) }, false)
+                            runDocker(image, config, "Preparing docker image ${image.arch}/${image.name}/${j}", null, { pimage, pconfig -> buildDocker(pimage, pconfig) }, false)
                         } else {
                             build_docker_on_k8(image, config)
                         }
@@ -916,7 +917,7 @@ def main() {
                     branches += getMatrixTasks(image, config)
                 }
             }
-        
+
             try {
                 def bSize = getConfigVal(config, ['batchSize'], 0)
                 def timeout_min = getConfigVal(config, ['timeout_minutes'], "90")
@@ -933,7 +934,7 @@ def main() {
                 if (config.pipeline_stop) {
                     def cmd = config.pipeline_stop.run
                     if (cmd) {
-                        logger.debug("running pipeline_stop")
+                        logger.debug("Running pipeline_stop")
                         stage("Stop ${config.job}") {
                             run_shell("${cmd}", "stop")
                         }
