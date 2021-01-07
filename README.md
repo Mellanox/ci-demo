@@ -211,8 +211,6 @@ defaults:
   var1: value1
   var2: value2
 
-
-
 # list of dockers to use for the job, `file` key is optional, if defined but docker image 
 # does not exist in registry.
 # image will be created during 1st invocation or if file was modified
@@ -315,6 +313,13 @@ pipeline_start:
 # executed once, after steps are done
 pipeline_stop:
   run: echo All done
+
+# executed before each container image build phase
+# user can run any script to modify container image content
+# also, can define 'on_image_build: script' key in runs_on_containers
+# section , per specific containers
+pipeline_on_image_build:
+  run: echo Building image
 
 # List of artifacts to attach to Jenkins results page for build
 archiveArtifacts: config.log
