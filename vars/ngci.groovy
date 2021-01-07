@@ -1,11 +1,10 @@
 #!/usr/bin/env groovy
 
 int call(ctx, oneStep) {
-
     def args = oneStep.args
 
     library(identifier: 'ngci@ci_version-3.1',
-            retriever: modernSCM([$class: 'GitSCMSource', 
+            retriever: modernSCM([$class: 'GitSCMSource',
             remote: 'http://l-gerrit.mtl.labs.mlnx:8080/DevOps/Jenkins/ci_framework']))
 
     if (args.size() < 1) {
