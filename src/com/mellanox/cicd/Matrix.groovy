@@ -682,10 +682,18 @@ def getMatrixTasks(image, config) {
     return getTasks(axes, image, config, include, exclude)
 }
 
-def buildImage(img, filename, extra_args, config) {
+def buildImage(img, filename, extra_args, config, image) {
     if (filename == "") {
         config.logger.warn("No docker filename specified, skipping build docker")
         return
+    }
+
+    def preBuild = null
+    preBuild = preBuild ?: image.on_image_build
+    preBuild = preBuild ?: getConfigVal(config, ['pipeline_on_image_build', 'run'], null)
+
+    if (preBuild) {
+        run_shell(preBuild, "Image preparation script")
     }
     customImage = docker.build("${img}", "-f ${filename} ${extra_args} . ")
     customImage.push()
@@ -752,7 +760,7 @@ def buildDocker(image, config) {
         }
         if (need_build) {
             config.logger.info("Building - ${img} - ${filename}")
-            buildImage(img, filename, extra_args, config)
+            buildImage(img, filename, extra_args, config, image)
         }
     }
 }
