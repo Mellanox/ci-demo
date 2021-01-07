@@ -205,6 +205,14 @@ env:
   mofed_installer_exe: /.autodirect/sw/release/mlnx_ofed/MLNX_OFED/mlnx_ofed_install
   mofed_installer_opt: --user-space-only --without-fw-update --all -q --skip-unsupported-devices-check
 
+
+# default variables and values that can be used in yaml file
+defaults:
+  var1: value1
+  var2: value2
+
+
+
 # list of dockers to use for the job, `file` key is optional, if defined but docker image 
 # does not exist in registry.
 # image will be created during 1st invocation or if file was modified
