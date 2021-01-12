@@ -169,7 +169,7 @@ registry_auth: swx-storage
 # k8 cloud name (must be defined in Jenkins server configuration)
 kubernetes:
 # cloud name to use for all containers
-# cloud tag can be specified per specific container in run_on_containers section
+# cloud tag can be specified per specific container in runs_on_containers section
   cloud: swx-k8s
 # Example how to use k8 node selector to request specific nodes for allocation
   nodeSelector: 'beta.kubernetes.io/os=linux'

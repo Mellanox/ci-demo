@@ -482,8 +482,7 @@ def parseListV(volumes) {
 
 def runK8(image, branchName, config, axis) {
 
-
-    def cloudName = getConfigVal(config, ['kubernetes', 'cloud'], "")
+    def cloudName = image.cloud ?: getConfigVal(config, ['kubernetes', 'cloud'], "")
 
     config.logger.trace(2, "Using kubernetes ${cloudName}, axis=" + axis)
 
@@ -915,12 +914,13 @@ def main() {
                 def images = entry.value
                 for (int j=0; j<images.size(); j++) {
                     def image = images[j]
-                    def tmpl = getConfigVal(config, ['taskNameSetupImage'], "Setup Image ${image.arch}/${image.name}")
+                    def imgName = "${image.arch}/${image.name}/${j}"
+                    def tmpl = getConfigVal(config, ['taskNameSetupImage'], "Setup Image ${imgName}")
                     def branchName = resolveTemplate(image, tmpl, config)
 
                     parallelBuildDockers[branchName] = {
                         if (image.nodeLabel) {
-                            runDocker(image, config, "Preparing docker image", null, { pimage, pconfig -> buildDocker(pimage, pconfig) }, false)
+                            runDocker(image, config, "Preparing image ${imgName}", null, { pimage, pconfig -> buildDocker(pimage, pconfig) }, false)
                         } else {
                             build_docker_on_k8(image, config)
                         }
@@ -945,7 +945,7 @@ def main() {
                 if (config.pipeline_stop) {
                     def cmd = config.pipeline_stop.run
                     if (cmd) {
-                        logger.debug("running pipeline_stop")
+                        logger.debug("Running pipeline_stop")
                         stage("Stop ${config.job}") {
                             run_shell("${cmd}", "stop")
                         }
