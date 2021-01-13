@@ -161,18 +161,13 @@ def getArchConf(config, arch) {
             k8sArchConfTable[arch] = aTable[arch]
         }
     }
-    
-    def varsMap = [
-        registry_path:  config.registry_path,
-        registry_jnlp_path: config.registry_jnlp_path,
-        registry_host: config.registry_host
-    ]
 
+    def vars = ['arch':arch]
     k8sArchConfTable[arch].each { key, val ->
-        key = resolveTemplate(varsMap, val, config)
+        k8sArchConfTable[arch][key] = resolveTemplate(vars, val, config)
     }
 
-    config.logger.trace(7, "getArchConf[${arch}] " + k8sArchConfTable[arch])
+    config.logger.trace(2, "getArchConf[${arch}] " + k8sArchConfTable[arch])
     return k8sArchConfTable[arch]
 }
 
@@ -224,13 +219,11 @@ def gen_image_map(config) {
 
             
             def vars = [:]
-            vars += env.getEnvironment()
-            vars += config
 
             dfile.uri = resolveTemplate(vars + dfile, dfile.uri, config)
             dfile.url = dfile.url ?: "${config.registry_host}${config.registry_path}/${dfile.uri}:${dfile.tag}"
 
-            dfile.url = resolveTemplate(vars+dfile, dfile.url, config)
+            dfile.url = resolveTemplate(vars + dfile, dfile.url, config)
 
             config.logger.debug("Adding docker to image_map for " + dfile.arch + ' name: ' + dfile.name)
             images.add(dfile)
@@ -528,13 +521,24 @@ def runK8(image, branchName, config, axis) {
 }
 
 @NonCPS
-def resolveTemplate(varsMap, str, config=null) {
-    GroovyShell shell = new GroovyShell(new Binding(varsMap))
+def resolveTemplate(vars, str, config) {
     def res = str
-    if (config && config.defaults) {
-        res = resolveTemplate(config.defaults, res, null)
+    def varsMap = vars
+
+    if (config.defaults) {
+        res = res.replaceAll(/\$\{(\w+)\}/) { m, k -> config.defaults[k] }
+        res = res.replaceAll(/\$(\w+)/) { m, k -> config.defaults[k] }
     }
-    res = shell.evaluate('"' + res +'"')
+
+    if (config.env) {
+        varsMap += config.env
+    }
+
+    varsMap += config
+    varsMap += env.getEnvironment()
+
+    res = res.replaceAll(/\$\{(\w+)\}/) { m, k -> varsMap[k] }
+    res = res.replaceAll(/\$(\w+)/) { m, k -> varsMap[k] }
     return res
 }
 
