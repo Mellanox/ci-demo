@@ -496,12 +496,16 @@ def runK8(image, branchName, config, axis) {
             nodeSelector = axis.nodeSelector
         }
     }
+    def hostNetwork = image.hostNetwork ?: getConfigVal(config, ['kubernetes', 'hostNetwork'], true)
+    def runAsUser = image.runAsUser ?: getConfigVal(config, ['kubernetes', 'runAsUser'], "0")
+    def runAsGroup = image.runAsGroup ?: getConfigVal(config, ['kubernetes', 'runAsGroup'], "0")
 
     podTemplate(
         cloud: cloudName,
-        runAsUser: "0",
-        runAsGroup: "0",
+        runAsUser: runAsUser,
+        runAsGroup: runAsGroup,
         nodeSelector: nodeSelector,
+        hostNetwork: hostNetwork,
         containers: [
             containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
             containerTemplate(name: cname, image: image.url, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
