@@ -507,10 +507,9 @@ def runK8(image, branchName, config, axis) {
         runAsGroup: runAsGroup,
         nodeSelector: nodeSelector,
         hostNetwork: hostNetwork,
-        privileged: privileged,
         containers: [
             containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
-            containerTemplate(name: cname, image: image.url, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
+            containerTemplate(privileged: privileged, name: cname, image: image.url, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
         ],
         volumes: listV
     )
