@@ -499,7 +499,7 @@ def runK8(image, branchName, config, axis) {
     def hostNetwork = image.hostNetwork ?: getConfigVal(config, ['kubernetes', 'hostNetwork'], true)
     def runAsUser = image.runAsUser ?: getConfigVal(config, ['kubernetes', 'runAsUser'], "0")
     def runAsGroup = image.runAsGroup ?: getConfigVal(config, ['kubernetes', 'runAsGroup'], "0")
-    def securityContext = image.securityContext ?: getConfigVal(config, ['kubernetes', 'securityContext'], false)
+    def privileged = image.privileged ?: getConfigVal(config, ['kubernetes', 'privileged'], false)
 
     podTemplate(
         cloud: cloudName,
@@ -507,7 +507,7 @@ def runK8(image, branchName, config, axis) {
         runAsGroup: runAsGroup,
         nodeSelector: nodeSelector,
         hostNetwork: hostNetwork,
-        securityContext: securityContext,
+        privileged: privileged,
         containers: [
             containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
             containerTemplate(name: cname, image: image.url, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
