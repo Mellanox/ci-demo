@@ -216,14 +216,9 @@ def gen_image_map(config) {
             dfile.build_args = dfile.build_args ?: ''
             dfile.uri = dfile.uri ?: "${arch}/${dfile.name}"
             dfile.filename = dfile.file
-
-            
-            def vars = [:]
-
-            dfile.uri = resolveTemplate(vars + dfile, dfile.uri, config)
+            dfile.uri = resolveTemplate(dfile, dfile.uri, config)
             dfile.url = dfile.url ?: "${config.registry_host}${config.registry_path}/${dfile.uri}:${dfile.tag}"
-
-            dfile.url = resolveTemplate(vars + dfile, dfile.url, config)
+            dfile.url = resolveTemplate(dfile, dfile.url, config)
 
             config.logger.debug("Adding docker to image_map for " + dfile.arch + ' name: ' + dfile.name)
             images.add(dfile)
@@ -526,13 +521,35 @@ def runK8(image, branchName, config, axis) {
 }
 
 @NonCPS
+def replaceVars(vars, str) {
+    def res = str
+
+    for (def entry in entrySet(vars)) {
+
+        if (!res.contains('$')) {
+            return res
+        }
+        if (entry.value == null) {
+            continue;
+        }
+        def opts = ['$' + entry.key, '${' + entry.key + '}']
+        for (int i=0; i<opts.size(); i++) {
+            if (res.contains(opts[i])) {
+                res = res.replace(opts[i], entry.value)
+                break
+            }
+        }
+    }
+    return res
+}
+
+@NonCPS
 def resolveTemplate(vars, str, config) {
     def res = str
     def varsMap = vars
 
     if (config.defaults) {
-        res = res.replaceAll(/\$\{(\w+)\}/) { m, k -> config.defaults[k] }
-        res = res.replaceAll(/\$(\w+)/) { m, k -> config.defaults[k] }
+        res = replaceVars(config.defaults, res)
     }
 
     if (config.env) {
@@ -542,8 +559,8 @@ def resolveTemplate(vars, str, config) {
     varsMap += config
     varsMap += env.getEnvironment()
 
-    res = res.replaceAll(/\$\{(\w+)\}/) { m, k -> varsMap[k] }
-    res = res.replaceAll(/\$(\w+)/) { m, k -> varsMap[k] }
+    res = replaceVars(varsMap, res)
+
     return res
 }
 
