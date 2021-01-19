@@ -214,6 +214,7 @@ def gen_image_map(config) {
             dfile.file = dfile.file ?: ''
             dfile.tag = dfile.tag ?: 'latest'
             dfile.build_args = dfile.build_args ?: ''
+            dfile.build_args = resolveTemplate(dfile, dfile.build_args, config)
             dfile.uri = dfile.uri ?: "${arch}/${dfile.name}"
             dfile.filename = dfile.file
             dfile.uri = resolveTemplate(dfile, dfile.uri, config)
