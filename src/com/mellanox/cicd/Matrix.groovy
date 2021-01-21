@@ -630,7 +630,9 @@ Map getTasks(axes, image, config, include, exclude) {
             continue
         }
 
-
+        if (!config.steps) {
+            continue
+        }
 
         axis.put("variant", serialNum)
         axis.put("axis_index", serialNum)
@@ -969,8 +971,19 @@ def main() {
                     def cmd = config.pipeline_stop.run
                     if (cmd) {
                         logger.debug("Running pipeline_stop")
+
+                        def axisEnv = []
+
+                        if (config.env) {
+                            config.env.each { k, v ->
+                                axisEnv.add("${k}=${v}")
+                            }
+                        }
+
                         stage("Stop ${config.job}") {
-                            run_shell("${cmd}", "stop")
+                            withEnv(axisEnv) {
+                                run_shell("${cmd}", "stop")
+                            }
                         }
                         attachArtifacts(config, config.pipeline_stop.archiveArtifacts)
                     }
