@@ -972,6 +972,7 @@ def main() {
                         stage("Stop ${config.job}") {
                             run_shell("${cmd}", "stop")
                         }
+                        attachArtifacts(config, config.pipeline_stop.archiveArtifacts)
                     }
                 }
             }
