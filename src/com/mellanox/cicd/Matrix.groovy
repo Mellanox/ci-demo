@@ -346,7 +346,7 @@ void reportFail(String stage, String msg) {
 
 def run_step(image, config, title, oneStep, axis) {
 
-    if (check_skip_stage(image, config, title, oneStep, axis)) {
+    if ((image != null) && (axis != null) && check_skip_stage(image, config, title, oneStep, axis)) {
         return
     }
     env.WORKSPACE = pwd()
@@ -357,6 +357,9 @@ def run_step(image, config, title, oneStep, axis) {
 
         if (oneStep.env) {
             for (def entry in entrySet(oneStep.env)) {
+                env[entry.key] = entry.value
+            }
+            for (def entry in entrySet(config.env)) {
                 env[entry.key] = entry.value
             }
         }
@@ -918,12 +921,8 @@ def main() {
             config.put("cFiles", getChangedFilesList(config))
 
             if (config.pipeline_start) {
-                def cmd = config.pipeline_start.run
-                if (cmd) {
-                    logger.debug("Running pipeline_start")
-                    stage("Start ${config.job}") {
-                        run_shell("${cmd}", "start")
-                    }
+                if (config.pipeline_start.run) {
+                    run_step(null, config, "pipeline start", config.pipeline_start, null)
                 }
             }
 
@@ -968,24 +967,8 @@ def main() {
 
             } finally {
                 if (config.pipeline_stop) {
-                    def cmd = config.pipeline_stop.run
-                    if (cmd) {
-                        logger.debug("Running pipeline_stop")
-
-                        def axisEnv = []
-
-                        if (config.env) {
-                            config.env.each { k, v ->
-                                axisEnv.add("${k}=${v}")
-                            }
-                        }
-
-                        stage("Stop ${config.job}") {
-                            withEnv(axisEnv) {
-                                run_shell("${cmd}", "stop")
-                            }
-                        }
-                        attachArtifacts(config, config.pipeline_stop.archiveArtifacts)
+                    if (config.pipeline_stop.run) {
+                        run_step(null, config, "pipeline stop", config.pipeline_stop, null)
                     }
                 }
             }
