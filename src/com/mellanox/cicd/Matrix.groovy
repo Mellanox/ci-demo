@@ -362,6 +362,10 @@ def run_step(image, config, title, oneStep, axis) {
             for (def entry in entrySet(config.env)) {
                 env[entry.key] = entry.value
             }
+            def names = ['registry_host', 'registry_path', 'job']
+            for (int i=0; i<names.size(); i++) {
+                env[names[i]] = config.get(names[i])
+            }
         }
 
         if (shell == "action") {
@@ -552,8 +556,8 @@ def resolveTemplate(vars, str, config) {
     def res = str
     def varsMap = vars
 
-    if (config.defaults) {
-        res = replaceVars(config.defaults, res)
+    if (config.env) {
+        res = replaceVars(config.env, res)
     }
 
     if (config.env) {
