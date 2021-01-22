@@ -84,25 +84,37 @@ def run_shell(cmd, title, retOut=false) {
 
 def run_step_shell(cmd, title, oneStep, config) {
 
-    def ret = run_shell(cmd, title)
-    if (ret.rc != 0) {
-        if (oneStep["onfail"] != null) {
-            run_shell(oneStep.onfail, "onfail command for ${title}")
-        }
+    def vars = []
+    vars += toEnvVars(config.env)
+    vars += toEnvVars(oneStep.env)
+
+    def names = ['registry_host', 'registry_path', 'job']
+    for (int i=0; i<names.size(); i++) {
+        vars.add(names[i] + "=" + config.get(names[i]) ?: '')
     }
 
-    if (oneStep["always"] != null) {
-        run_shell(oneStep.always, "always command for ${title}")
-    }
+    withEnv(vars) {
+        def ret = run_shell(cmd, title)
 
-    attachArtifacts(config, oneStep.archiveArtifacts)
-
-    if (ret.rc != 0) {
-        def msg = "Step ${title} failed with exit code=${ret.rc}"
-        if (ret.exception != null) {
-            msg += " exception=${ret.exception}"
+        if (ret.rc != 0) {
+            if (oneStep["onfail"] != null) {
+                run_shell(oneStep.onfail, "onfail command for ${title}")
+            }
         }
-        reportFail(title, msg)
+
+        if (oneStep["always"] != null) {
+            run_shell(oneStep.always, "always command for ${title}")
+        }
+
+        attachArtifacts(config, oneStep.archiveArtifacts)
+
+        if (ret.rc != 0) {
+            def msg = "Step ${title} failed with exit code=${ret.rc}"
+            if (ret.exception != null) {
+                msg += " exception=${ret.exception}"
+            }
+            reportFail(title, msg)
+        }
     }
 }
 
@@ -344,6 +356,16 @@ void reportFail(String stage, String msg) {
     error(stage + " failed with msg: " + msg)
 }
 
+def toEnvVars(vars) {
+    def map = []
+    if (vars) {
+        for (def entry in entrySet(vars)) {
+            map.add("${entry.key}=${entry.value}")
+        }
+    }
+    return map
+}
+
 def run_step(image, config, title, oneStep, axis) {
 
     if ((image != null) && (axis != null) && check_skip_stage(image, config, title, oneStep, axis)) {
@@ -355,18 +377,6 @@ def run_step(image, config, title, oneStep, axis) {
     stage("${title}") {
         def shell = getDefaultShell(config, oneStep)
 
-        if (oneStep.env) {
-            for (def entry in entrySet(oneStep.env)) {
-                env[entry.key] = entry.value
-            }
-            for (def entry in entrySet(config.env)) {
-                env[entry.key] = entry.value
-            }
-            def names = ['registry_host', 'registry_path', 'job']
-            for (int i=0; i<names.size(); i++) {
-                env[names[i]] = config.get(names[i])
-            }
-        }
 
         if (shell == "action") {
             if (oneStep.module == null) {
@@ -543,7 +553,7 @@ def replaceVars(vars, str) {
         def opts = ['$' + entry.key, '${' + entry.key + '}']
         for (int i=0; i<opts.size(); i++) {
             if (res.contains(opts[i])) {
-                res = res.replace(opts[i], entry.value)
+                res = res.replace(opts[i], entry.value + '')
                 break
             }
         }
