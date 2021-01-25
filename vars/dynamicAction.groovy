@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-int call(ctx, oneStep) {
+int call(ctx, oneStep, config) {
     args = oneStep.args
 
     println("==>DynamicAction(" + args + ")")
@@ -12,7 +12,7 @@ int call(ctx, oneStep) {
     if (args != null) {
         for (int i=0; i<args.size(); i++) {
             arg = args[i]
-            arg = ctx.resolveTemplate(vars, arg)
+            arg = ctx.resolveTemplate(vars, arg, config)
             argList.add(arg)
         }
     }

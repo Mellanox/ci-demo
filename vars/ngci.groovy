@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-int call(ctx, oneStep) {
+int call(ctx, oneStep, config) {
     def args = oneStep.args
 
     library(identifier: 'ngci@ci_version-3.1',
@@ -11,13 +11,19 @@ int call(ctx, oneStep) {
         ctx.reportFail(oneStep.name, 'fatal: DynamicAction() expects at least 1 parameter')
     }
 
-    Map vars = [env: env]
     for (def entry in ctx.entrySet(args)) {
-        args[entry.key] = ctx.resolveTemplate(vars, entry.value)
+        args[entry.key] = ctx.resolveTemplate(['env':env], entry.value.toString(), config)
     }
     println("Calling ${oneStep.run} with args=" + args)
 
-    def ret =  "${oneStep.run}"(args)
+    def vars = []
+    def ret
+
+    vars += ctx.toEnvVars(config.env)
+    vars += ctx.toEnvVars(oneStep.env)
+    withEnv(vars) {
+        ret =  "${oneStep.run}"(args)
+    }
     if (ret) {
         return 0
     }

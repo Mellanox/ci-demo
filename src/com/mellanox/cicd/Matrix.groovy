@@ -384,7 +384,7 @@ def run_step(image, config, title, oneStep, axis) {
             }
 
             config.logger.trace(4, "Running step action module=" + oneStep.module + " args=" + oneStep.args + " run=" + oneStep.run)
-            int rc = this."${oneStep.module}"(this, oneStep)
+            int rc = this."${oneStep.module}"(this, oneStep, config)
             if (rc != 0) {
                 reportFail(oneStep.name, "exit with error code=${rc}")
             }
