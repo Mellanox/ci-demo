@@ -853,14 +853,20 @@ def build_docker_on_k8(image, config) {
 
     config.logger.trace(2, "build_docker_on_k8 for image ${image.name} | nodeSelector: ${nodeSelector}")
 
+    def hostNetwork = image.hostNetwork ?: getConfigVal(config, ['kubernetes', 'hostNetwork'], true)
+    def runAsUser = image.runAsUser ?: getConfigVal(config, ['kubernetes', 'runAsUser'], "0")
+    def runAsGroup = image.runAsGroup ?: getConfigVal(config, ['kubernetes', 'runAsGroup'], "0")
+    def privileged = image.privileged ?: getConfigVal(config, ['kubernetes', 'privileged'], false)
+
     podTemplate(
         cloud: cloudName,
-        runAsUser: "0",
-        runAsGroup: "0",
+        runAsUser: runAsUser,
+        runAsGroup: runAsGroup,
         nodeSelector: nodeSelector,
+        hostNetwork: hostNetwork,
         containers: [
             containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
-            containerTemplate(name: 'docker', image: k8sArchConf.dockerImage, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
+            containerTemplate(privileged: privileged, name: 'docker', image: k8sArchConf.dockerImage, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
         ],
         volumes: listV
     )
