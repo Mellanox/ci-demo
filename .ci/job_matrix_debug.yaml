@@ -11,7 +11,7 @@ credentials:
 
 
 kubernetes:
-  cloud: swx-k8s
+  cloud: swx-k8s-spray
   arch_table:
     x86_64:
       nodeSelector: 'kubernetes.io/arch=amd64'
@@ -32,13 +32,20 @@ volumes:
 env:
   mofed_installer_exe: /.autodirect/sw/release/mlnx_ofed/MLNX_OFED/mlnx_ofed_install
   mofed_installer_opt: --user-space-only --without-fw-update --all -q --skip-unsupported-devices-check
+  blackduck_url: 'harbor.mellanox.com/toolbox/ngci-centos:7.9.2009'
+  var1: 12
+  var2: '${var1}-1'
 
 runs_on_dockers:
 #  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest', arch: 'x86_64', nodeLabel: '(dockerserver || docker) && x86_64'}
-  - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest', category: 'tool'}
-  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
-  - {name: 'blackduck', url: 'harbor.mellanox.com/toolbox/ngci-centos:7.9.2009', category: 'tool'}
+  - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest', arch: 'x86_64', category: 'tool'}
+  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest', arch: 'x86_64'}
+  - {name: 'blackduck', url: '$blackduck_url', category: 'tool', arch: 'x86_64', build_args: 'bobo=$var2'}
+  - {url: '$registry_host/swx-storage/$arch/centos75-nvme-snap-3.0', name: 'snap', arch: 'aarch64'}
 
+
+pipeline_on_image_build:
+  run: echo Building image
 
 matrix:
   axes:
@@ -55,7 +62,13 @@ matrix:
 
 steps:
   - name: Run on all containers
-    run: touch aaa
+    run: touch once
+
+  - name: Run twice
+    run: touch twice
+    containerSelector:
+      - "{name:'centos7-7', variant:1}"
+      - "{name:'centos7-7', variant:3}"
 
   - name: once
     containerSelector: "{name:'ubuntu16-4',variant:1}"
@@ -66,7 +79,9 @@ steps:
     shell: action
     module: dynamicAction
     run: coverity.sh 
-    containerSelector: "{name:'centos7-7', variant:1}"
+    containerSelector: 
+      - "{name:'centos7-7', variant:1}"
+      - "{name:'centos7-7', variant:3}"
     args:
       - "--pre_script './autogen.sh;./configure;make -j 3 clean'"
       - "--build_script 'make -j 3'"
@@ -75,6 +90,7 @@ steps:
 
   - name: Blackduck scan source
     containerSelector: "{category:'tool', name: 'blackduck', variant:1}"
+    enable: false
     shell: action
     module: ngci
     run: NGCIBlackDuckScan
@@ -82,15 +98,13 @@ steps:
       projectName: "NGCIBlackDuckScan"
       projectVersion: "ci-demo"
       projectVersion: "1.0"
-      projectSrcPath: "${env.WORKSPACE}/src"
+      projectSrcPath: "${WORKSPACE}/src"
       attachArtifact: true
       reportName: "BlackDuck report"
       scanMode: "source"
     env:
       SPRING_APPLICATION_JSON: '{"blackduck.url":"https://blackduck.mellanox.com/","blackduck.api.token":"ODMwOWYwMzEtODA2ZC00MzBjLWI1ZDEtNmFiMjBkYzQzMzkwOjNmNjExN2M1LWE2ZmEtNDZlYS1hZjRiLTZlNDgwNjAwOTVjNw=="}'
-
-steps_disabled:
-
+disable:
   - name: Test failure
     run: |
       echo going to fail no
