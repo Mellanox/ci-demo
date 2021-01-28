@@ -535,7 +535,7 @@ def runK8(image, branchName, config, axis) {
         nodeSelector: nodeSelector,
         hostNetwork: hostNetwork,
         containers: [
-            containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
+            containerTemplate(privileged: privileged, name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
             containerTemplate(privileged: privileged, name: cname, image: image.url, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
         ],
         volumes: listV
@@ -865,7 +865,7 @@ def build_docker_on_k8(image, config) {
         nodeSelector: nodeSelector,
         hostNetwork: hostNetwork,
         containers: [
-            containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
+            containerTemplate(privileged: privileged, name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
             containerTemplate(privileged: privileged, name: 'docker', image: k8sArchConf.dockerImage, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
         ],
         volumes: listV
