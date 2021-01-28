@@ -173,6 +173,14 @@ kubernetes:
   cloud: swx-k8s
 # Example how to use k8 node selector to request specific nodes for allocation
   nodeSelector: 'beta.kubernetes.io/os=linux'
+# optional: enforce limits so that the running container is not allowed to use
+# more of that resource than the limit you set. If a Container specifies its own limit,
+# but does not specify a request, Kubernetes automatically assigns a request
+# that matches the limit.
+  limits: "{hugepages-1Gi: 1024Mi, hugepages-2Mi: 1024Mi, memory: 2048Mi}"
+# optional: request additional k8s resources that isn't supported by
+# kubernetes-plugin by default
+  requests: "{hugepages-1Gi: 1024Mi, hugepages-2Mi: 1024Mi, memory: 2048Mi}"
 
 # optional: can specify jenkins defined credentials and refer/request by credentialsId in step that
 # requires it
