@@ -313,6 +313,8 @@ steps:
     always: env > always_env.txt
 # define artifacts to collect for specific step
     archiveArtifacts: 'step_failed.log,always_env.txt'
+# define raw xml results to collect for specific step
+    archiveJunit: 'test-results.xml'
 
 # executed once, before job starts its steps
 pipeline_start:
@@ -331,6 +333,9 @@ pipeline_on_image_build:
 
 # List of artifacts to attach to Jenkins results page for build
 archiveArtifacts: config.log
+
+# List of raw xml results to attach to Jenkins results page for build
+archiveJunit: 'myproject/target/test-reports/*.xml'
 
 # Fail job is one of the steps fails or continue
 failFast: false
