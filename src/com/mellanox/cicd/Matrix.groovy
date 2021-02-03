@@ -107,6 +107,7 @@ def run_step_shell(cmd, title, oneStep, config) {
         }
 
         attachArtifacts(config, oneStep.archiveArtifacts)
+        attachJunit(config, oneStep.archiveJunit)
 
         if (ret.rc != 0) {
             def msg = "Step ${title} failed with exit code=${ret.rc}"
@@ -279,6 +280,17 @@ def attachArtifacts(config, args) {
         }
     }
 }
+
+def attachJunit(config, args) {
+    if (args != null) {
+        try {
+            junit(testResults: args, allowEmptyResults: true)
+        } catch (e) {
+            config.logger.warn("Failed to add junit results: " + args + " reason: " + e)
+        }
+    }
+}
+
 
 @NonCPS
 int getDebugLevel() {
@@ -461,6 +473,7 @@ def runSteps(image, config, branchName, axis) {
         run_step(image, config, one.name, oneStep, axis)
     }
     attachArtifacts(config, config.archiveArtifacts)
+    attachJunit(config, config.archiveJunit)
 }
 
 def getConfigVal(config, list, defaultVal=null, toString=true) {
