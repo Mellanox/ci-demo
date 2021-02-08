@@ -20,16 +20,16 @@ spec:
       requests: {requests}
     securityContext:
       privileged: true
-    hostNetwork: true
     tty: true
     volumeMounts:
     {volumeMounts}
   nodeSelector:
-    {node_selector}
+    {nodeSelector}
   restartPolicy: "Never"
   securityContext:
     runAsGroup: {uid}
     runAsUser: {gid}
+  hostNetwork: true
   volumes:
   {volumes}
 """
@@ -41,10 +41,21 @@ volumes_tmpl = """
 """
 
 mounts_tmpl = """
-  - mountPath: "{mountPath}"
-    name: "volume-{volumeid}"
-    readOnly: false
+    - mountPath: "{mountPath}"
+      name: "volume-{volumeid}"
+      readOnly: false
 """
+
+nodeSelector_tmpl = """
+    beta.kubernetes.io/os: "{os}"
+    beta.kubernetes.io/arch: "{arch}"
+"""
+
+arch_to_k8s_arch = {
+    "x86_64": "amd64",
+    "aarch64": "arm64",
+    "ppc64le": "ppc64le",
+}
 
 
 def usage():
@@ -103,9 +114,9 @@ def generate_pod_yaml(args):
     image['uri'] = resolve_template(uri, job_yaml, image)
     image['url'] = resolve_template(url, job_yaml, image)
 
-    limits = job_yaml['kubernetes'].get('limits', '')
-    requests = job_yaml['kubernetes'].get('requests', '')
-    nodeSelector = job_yaml['kubernetes'].get('nodeSelector', '')
+    limits = '{' + job_yaml['kubernetes'].get('limits', '') + '}'
+    requests = '{' + job_yaml['kubernetes'].get('requests', '') + '}'
+    nodeSelector = job_yaml['kubernetes'].get('nodeSelector', nodeSelector_tmpl.format(os='linux', arch=arch_to_k8s_arch[image['arch']]))
     uid = image.get('uid', '0')
     gid = image.get('gid', '0')
     volumes = ''
@@ -115,7 +126,7 @@ def generate_pod_yaml(args):
             hostPath=volume['hostPath'],
             volumeid=vid,
         )
-        volumeMounts += volumeMounts.format(
+        volumeMounts += mounts_tmpl.format(
             mountPath=volume['mountPath'],
             volumeid=vid
         )
@@ -123,12 +134,12 @@ def generate_pod_yaml(args):
     pod_yaml = template.format(
         podname=job_yaml['job'],
         imageurl=image['url'],
-        imagename=image['name'],
+        imagename=image['name'].replace('.', ''),
         uid=uid,
         gid=gid,
         limits=limits,
         requests=requests,
-        node_selector=nodeSelector,
+        nodeSelector=nodeSelector,
         volumes=volumes,
         volumeMounts=volumeMounts
     )
