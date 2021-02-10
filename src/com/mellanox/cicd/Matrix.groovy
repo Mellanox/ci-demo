@@ -337,6 +337,26 @@ Map toStringMap(String param) {
     return ret
 }
 
+def stringToList(selector) {
+
+    def customSel = [];
+
+    if (selector && selector.size() > 0) {
+
+        if (selector.getClass() == String) {
+            customSel.add(toStringMap(selector))
+        } else {
+            // groovy casts yaml Map definition to LinkedHashMap type
+            // which is not serializable and causes Jenkins pipeline to fail
+            // on non-serializable error, this is a reason for ugle hack to
+            // convert LinkedHashMap to Map which is serializable
+            for (int i=0; i<selector.size(); i++) {
+                customSel.add(toStringMap(selector[i].toString()))
+            }
+        }
+    }
+    return customSel
+}
 
 def check_skip_stage(image, config, title, oneStep, axis) {
 
@@ -349,19 +369,7 @@ def check_skip_stage(image, config, title, oneStep, axis) {
 
     if (selector && selector.size() > 0) {
 
-        def customSel = [];
-        if (selector.getClass() == String) {
-            customSel.add(toStringMap(selector))
-        } else {
-            // groovy casts yaml Map definition to LinkedHashMap type
-            // which is not serializable and causes Jenkins pipeline to fail
-            // on non-serializable error, this is a reason for ugle hack to
-            // convert LinkedHashMap to Map which is serializable
-            for (int i=0; i<selector.size(); i++) {
-                customSel.add(toStringMap(selector[i].toString()))
-            }
-        }
-
+        def customSel = stringToList(selector)
         // no match - skip
         if (!matchMapEntry(customSel, axis)) {
             config.logger.trace(2, "Step '" + title + "' skipped as no match by containerSelector=" + customSel + " for image with axis=" + axis)
@@ -441,15 +449,15 @@ def run_step(image, config, title, oneStep, axis) {
     }
 }
 
-def runSteps(image, config, branchName, axis) {
+def runSteps(image, config, branchName, axis, steps=config.steps) {
     forceCleanupWS()
     // fetch .git from server and unpack
     unstash "${env.JOB_NAME}"
     onUnstash()
 
     def parallelNestedSteps = [:]
-    for (int i = 0; i < config.steps.size(); i++) {
-        def one = config.steps[i]
+    for (int i = 0; i < steps.size(); i++) {
+        def one = steps[i]
         def par = one["parallel"]
         def oneStep = one
         // collect parallel steps (if any) and run it when non-parallel step discovered or last element.
@@ -457,7 +465,7 @@ def runSteps(image, config, branchName, axis) {
             def stepName = branchName + "->" + one.name
             parallelNestedSteps[stepName] = { run_step(image, config, stepName, oneStep, axis) }
             // last element - run and flush
-            if (i == config.steps.size() - 1) {
+            if (i == steps.size() - 1) {
                 parallel(parallelNestedSteps)
                 parallelNestedSteps = [:]
             }
@@ -509,7 +517,7 @@ def parseListV(volumes) {
     return listV
 }
 
-def runK8(image, branchName, config, axis) {
+def runK8(image, branchName, config, axis, steps=config.steps) {
 
     def cloudName = image.cloud ?: getConfigVal(config, ['kubernetes', 'cloud'], "")
 
@@ -569,7 +577,7 @@ spec:
         node(POD_LABEL) {
             stage (branchName) {
                 container(cname) {
-                    runSteps(image, config, branchName, axis)
+                    runSteps(image, config, branchName, axis, steps)
                 }
             }
         }
@@ -979,11 +987,6 @@ def main() {
             config.put("logger", logger)
             config.put("cFiles", getChangedFilesList(config))
 
-            if (config.pipeline_start) {
-                if (config.pipeline_start.run) {
-                    run_step(null, config, "pipeline start", config.pipeline_start, null)
-                }
-            }
 
 // prepare MAP in format:
 // $arch -> List[$docker, $docker, $docker]
@@ -1000,6 +1003,22 @@ def main() {
                     def imgName = "${image.arch}/${image.name}/${j}"
                     def tmpl = getConfigVal(config, ['taskNameSetupImage'], "Setup Image ${imgName}")
                     def branchName = resolveTemplate(image, tmpl, config)
+
+                    if (config.pipeline_start && !config.pipeline_start.image) {
+                        if (config.pipeline_start.containerSelector) {
+                            if (matchMapEntry(stringToList(config.pipeline_start.containerSelector), image)) {
+                                config.pipeline_start.image = image
+                            }
+                        }
+                    }
+
+                    if (config.pipeline_stop && !config.pipeline_stop.image) {
+                        if (config.pipeline_stop.containerSelector) {
+                            if (matchMapEntry(stringToList(config.pipeline_stop.containerSelector), image)) {
+                                config.pipeline_stop.image = image
+                            }
+                        }
+                    }
 
                     parallelBuildDockers[branchName] = {
                         if (image.nodeLabel) {
@@ -1018,6 +1037,14 @@ def main() {
                 timeout(time: timeout_min, unit: 'MINUTES') {
                     timestamps {
                         run_parallel_in_chunks(config, parallelBuildDockers, bSize)
+                        if (config.pipeline_start) {
+                            if (config.pipeline_start.image) {
+                                image = config.pipeline_start.image
+                                runK8(image, "pipline start on ${image.name}", config, image, [config.pipeline_start])
+                            } else {
+                                run_step(null, config, "pipeline start", config.pipeline_start, null)
+                            }
+                        }
                         run_parallel_in_chunks(config, branches, bSize)
                     }
                 }
@@ -1026,7 +1053,10 @@ def main() {
 
             } finally {
                 if (config.pipeline_stop) {
-                    if (config.pipeline_stop.run) {
+                    if (config.pipeline_stop.image) {
+                        image = config.pipeline_stop.image
+                        runK8(image, "pipline stop on ${image.name}", config, image, [config.pipeline_stop])
+                    } else {
                         run_step(null, config, "pipeline stop", config.pipeline_stop, null)
                     }
                 }
