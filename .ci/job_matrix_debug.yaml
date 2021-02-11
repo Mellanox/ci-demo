@@ -39,7 +39,7 @@ runs_on_dockers:
   - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest', arch: 'x86_64'}
   - {name: 'blackduck', url: '$blackduck_url', category: 'tool', arch: 'x86_64', build_args: 'bobo=$var2'}
   - {url: '$registry_host/swx-storage/$arch/centos75-nvme-snap-3.0', name: 'snap', arch: 'aarch64'}
-
+  - {name: 'ubuntu20.10.buildah', url: 'ubuntu:20.10', tag: '20.10', arch: 'x86_64', category: 'tool'}
 
 pipeline_on_image_build:
   run: echo Building image
@@ -139,7 +139,7 @@ disable:
 #shell: '#!/bin/bash -eEx'
 
 pipeline_start:
-  containerSelector: "{name: 'blackduck'}"
+  containerSelector: "{name: 'ubuntu20.10.buildah'}"
   run: echo Starting new job
 
 pipeline_stop:

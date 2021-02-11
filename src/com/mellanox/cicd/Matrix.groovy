@@ -816,40 +816,47 @@ String getChangedFilesList(config) {
     return cFiles
 }
 
-def buildDocker(image, config) {
+def buildImage(config, image) {
 
-    def img = image.url
     // Vasily Ryabov: we need .toString() to make changed_files.contains(filename) work correctly
     // See https://stackoverflow.com/q/56829842/3648361
     def filename = image.filename.toString().trim()
     def extra_args = image.build_args
     def changed_files = config.get("cFiles")
-
-    config.logger.trace(3, "Going to fetch docker image: ${img} from ${config.registry_host}")
     def need_build = 0
+    def img = image.url
 
-    docker.withRegistry("https://${config.registry_host}", config.registry_auth) {
-        try {
-            config.logger.info("Pulling image - ${img}")
-            docker.image(img).pull()
-        } catch (exception) {
-            config.logger.info("Image NOT found - ${img} - will build ${filename} ...")
-            need_build++
-        }
+    try {
+        config.logger.info("Pulling image - ${img}")
+        docker.image(img).pull()
+    } catch (exception) {
+        config.logger.info("Image NOT found - ${img} - will build ${filename} ...")
+        need_build++
+    }
 
-        if ("${env.build_dockers}" == "true") {
-            config.logger.info("Forcing building file per user request: ${filename} ... ")
-            need_build++
+    if ("${env.build_dockers}" == "true") {
+        config.logger.info("Forcing building file per user request: ${filename} ... ")
+        need_build++
+    }
+    config.logger.debug("Changed files: ${changed_files}")
+    if (changed_files.contains(filename)) {
+        config.logger.info("Forcing building, file modified by commit: ${filename} ... ")
+        need_build++
+    }
+    if (need_build) {
+        config.logger.info("Building - ${img} - ${filename}")
+        buildImage(img, filename, extra_args, config, image)
+    }
+    return need_build
+}
+
+def buildDocker(image, config) {
+    if (image.url.contains(config.registry_host)) {
+        docker.withRegistry("https://${config.registry_host}", config.registry_auth) {
+            buildImage(config, image)
         }
-        config.logger.debug("Changed files: ${changed_files}")
-        if (changed_files.contains(filename)) {
-            config.logger.info("Forcing building, file modified by commit: ${filename} ... ")
-            need_build++
-        }
-        if (need_build) {
-            config.logger.info("Building - ${img} - ${filename}")
-            buildImage(img, filename, extra_args, config, image)
-        }
+    } else {
+        buildImage(config, image)
     }
 }
 
