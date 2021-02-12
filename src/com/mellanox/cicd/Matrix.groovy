@@ -1043,6 +1043,7 @@ def main() {
                         if (config.pipeline_start) {
                             if (config.pipeline_start.image) {
                                 image = config.pipeline_start.image
+                                config.pipeline_start.name = "pipeline_start"
                                 runK8(image, "pipline start on ${image.name}", config, image, [config.pipeline_start])
                             } else {
                                 run_step(null, config, "pipeline start", config.pipeline_start, null)
@@ -1058,6 +1059,7 @@ def main() {
                 if (config.pipeline_stop) {
                     if (config.pipeline_stop.image) {
                         image = config.pipeline_stop.image
+                        config.pipeline_stop.name = "pipeline_stop"
                         runK8(image, "pipline stop on ${image.name}", config, image, [config.pipeline_stop])
                     } else {
                         run_step(null, config, "pipeline stop", config.pipeline_stop, null)
