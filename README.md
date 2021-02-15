@@ -47,7 +47,12 @@ pipeline_start:
   run: echo Starting new job
 
 pipeline_stop:
-  run: echo All done
+  on_success:
+    run: echo Build success
+  on_fail:
+    run: echo Build failed
+  always:
+    run: echo Run always
 
 steps:
   - name: Install mofed
@@ -320,9 +325,17 @@ steps:
 pipeline_start:
   run: echo Starting new job
 
-# executed once, after steps are done
+# optional: executed once, after steps are done
 pipeline_stop:
-  run: echo All done
+# optional: execute on successful build
+  on_success:
+    run: echo Build success
+# optional: execute on build fail
+  on_fail:
+    run: echo Build failed
+# optional: execute always
+  always:
+    run: echo Run always
 
 # executed before each container image build phase
 # user can run any script to modify container image content

@@ -1050,19 +1050,45 @@ def main() {
                             }
                         }
                         run_parallel_in_chunks(config, branches, bSize)
+                        if (config.pipeline_stop && config.pipeline_stop.on_success) {
+                            if (config.pipeline_stop.image) {
+                                image = config.pipeline_stop.image
+                                config.pipeline_stop.name = "pipeline_stop_on_success"
+                                runK8(image, "pipline stop on ${image.name}", config, image, [config.pipeline_stop.on_success])
+                            } else {
+                                run_step(null, config, "pipeline stop on success", config.pipeline_stop.on_success, null)
+                            }
+                        }
                     }
                 }
             } catch (e) {
+                if (config.pipeline_stop && config.pipeline_stop.on_fail) {
+                    if (config.pipeline_stop.image) {
+                        image = config.pipeline_stop.image
+                        config.pipeline_stop.name = "pipeline_stop_on_fail"
+                        runK8(image, "pipline stop on ${image.name}", config, image, [config.pipeline_stop.on_fail])
+                    } else {
+                        run_step(null, config, "pipeline stop on fail", config.pipeline_stop.on_fail, null)
+                    }
+                }
                 reportFail('parallel task', e.toString())
 
             } finally {
                 if (config.pipeline_stop) {
+                    // Add backward compatability for pipeline_stop
+                    // without always option
+                    if (!config.pipeline_stop.always && !config.pipeline_stop.on_success && !config.pipeline_stop.on_fail) {
+                       always = config.pipeline_stop
+                    }
+                    if (config.pipeline_stop.always) {
+                        always = config.pipeline_stop.always
+                    }
                     if (config.pipeline_stop.image) {
                         image = config.pipeline_stop.image
-                        config.pipeline_stop.name = "pipeline_stop"
-                        runK8(image, "pipline stop on ${image.name}", config, image, [config.pipeline_stop])
+                        config.pipeline_stop.name = "pipeline_stop_always"
+                        runK8(image, "pipline stop on ${image.name}", config, image, [always])
                     } else {
-                        run_step(null, config, "pipeline stop", config.pipeline_stop, null)
+                        run_step(null, config, "pipeline stop always", always, null)
                     }
                 }
             }
