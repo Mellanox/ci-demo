@@ -189,6 +189,10 @@ def gen_image_map(config) {
 
     def arch_list = getConfigVal(config, ['matrix', 'axes', 'arch'], null, false)
 
+    if (!config.runs_on_dockers) {
+        config.runs_on_dockers = []
+    }
+
     if (arch_list) {
         for (int i=0; i<arch_list.size(); i++) {
             def arch = arch_list[i]
@@ -637,10 +641,10 @@ def getDockerOpt(config) {
     return opts
 }
 
-def runDocker(image, config, branchName=null, axis=null, Closure func, runInDocker=true) {
+def runAgent(image, config, branchName=null, axis=null, Closure func, runInDocker=true) {
     def nodeName = image.nodeLabel
 
-    config.logger.debug("Running docker on node: ${nodeName} branch: ${branchName}")
+    config.logger.debug("Running on agent with label: ${nodeName} branch: ${branchName} - docker: " + runInDocker)
 
     node(nodeName) {
         forceCleanupWS()
@@ -650,10 +654,10 @@ def runDocker(image, config, branchName=null, axis=null, Closure func, runInDock
             if (runInDocker) {
                 def opts = getDockerOpt(config)
                 docker.image(image.url).inside(opts) {
-                    func(image, config)
+                    func(image, config, branchName, axis)
                 }
             } else {
-                func(image, config)
+                func(image, config, branchName, axis)
             }
         }
     }
@@ -735,7 +739,14 @@ Map getTasks(axes, image, config, include, exclude) {
                     reportFail('config', "Please define kubernetes cloud name in yaml config file or define nodeLabel for docker")
                 }
                 if (image.nodeLabel) {
-                    runDocker(image, config, branchName, axis, { pimage, pconfig -> runSteps(pimage, pconfig, branchName, axis) })
+                    runBareMetal = true
+                    if (image.url == null) {
+                        runBareMetal = false
+                    }
+                    def callback = {pimage, pconfig, pname, paxis ->
+                        runSteps(pimage, pconfig, pname, paxis)
+                    }
+                    runAgent(image, config, branchName, axis, callback, runBareMetal)
                 } else {
                     runK8(image, branchName, config, axis)
                 }
@@ -762,7 +773,7 @@ def getMatrixTasks(image, config) {
         axes.add(image)
     }
 
-    config.logger.debug("Filters include size: " + include.size() + " exclude size: " + exclude.size())
+    config.logger.trace(2, "Filters include size: " + include.size() + " exclude size: " + exclude.size())
     return getTasks(axes, image, config, include, exclude)
 }
 
@@ -922,6 +933,10 @@ def build_docker_on_k8(image, config) {
 
 def run_parallel_in_chunks(config, myTasks, depth) {
 
+    if (myTasks.size() == 0) {
+        return
+    }
+
     int bSize = depth
 
     if (bSize <= 0) {
@@ -1025,7 +1040,10 @@ def main() {
 
                     parallelBuildDockers[branchName] = {
                         if (image.nodeLabel) {
-                            runDocker(image, config, "Preparing image ${imgName}", null, { pimage, pconfig -> buildDocker(pimage, pconfig) }, false)
+                            def callback = { pimage, pconfig, pname=null, paxis=null ->
+                                buildDocker(pimage, pconfig)
+                            }
+                            runAgent(image, config, "Preparing image ${imgName}", null, callback, false)
                         } else {
                             build_docker_on_k8(image, config)
                         }
@@ -1034,6 +1052,15 @@ def main() {
                 }
             }
         
+            if (config.runs_on_agents) {
+                for (int a=0; a<config.runs_on_agents.size();a++) {
+                    image = config.runs_on_agents[a]
+                    image.name = image.nodeLabel
+                    image.arch = 'x86_64'
+                    branches += getMatrixTasks(image, config)
+                }
+            }
+
             try {
                 def bSize = getConfigVal(config, ['batchSize'], 0)
                 def timeout_min = getConfigVal(config, ['timeout_minutes'], "90")
