@@ -748,8 +748,11 @@ Map getTasks(axes, image, config, include, exclude) {
         config.logger.trace(5, "task name " + branchName)
         tasks[branchName] = { ->
             withEnv(axisEnv) {
-                if ((config.get("kubernetes") == null) && (image.nodeLabel == null)) {
-                    reportFail('config', "Please define kubernetes cloud name in yaml config file or define nodeLabel for docker")
+                if ((config.get("kubernetes") == null) &&
+                    (image.nodeLabel == null) &&
+                    (image.cloud == null) 
+                    ) {
+                    reportFail('config', "Please define cloud or nodeLabel in yaml config file or define nodeLabel for docker")
                 }
                 if (image.nodeLabel) {
                     runBareMetal = true
