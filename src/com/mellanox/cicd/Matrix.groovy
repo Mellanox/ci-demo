@@ -85,8 +85,8 @@ def run_shell(cmd, title, retOut=false) {
 def run_step_shell(cmd, title, oneStep, config) {
 
     def vars = []
-    vars += toEnvVars(config.env)
-    vars += toEnvVars(oneStep.env)
+    vars += toEnvVars(config, config.env)
+    vars += toEnvVars(config, oneStep.env)
 
     def names = ['registry_host', 'registry_path', 'job']
     for (int i=0; i<names.size(); i++) {
@@ -404,11 +404,11 @@ void reportFail(String stage, String msg) {
     error(stage + " failed with msg: " + msg)
 }
 
-def toEnvVars(vars) {
+def toEnvVars(config, vars) {
     def map = []
     if (vars) {
         for (def entry in entrySet(vars)) {
-            map.add("${entry.key}=${entry.value}")
+            map.add(entry.key + "=" + resolveTemplate(vars, entry.value, config))
         }
     }
     return map
