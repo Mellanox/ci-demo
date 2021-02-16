@@ -362,6 +362,20 @@ def stringToList(selector) {
     return customSel
 }
 
+def checkSelector(image, config, title, oneStep, axis, sName) {
+    def selector = oneStep.get(sName)
+
+    if (selector && selector.size() > 0) {
+        def customSel = stringToList(selector)
+        // no match - skip
+        if (!matchMapEntry(customSel, axis)) {
+            config.logger.trace(2, "Step '" + title + "' skipped as no match by ${sName}=" + customSel + " for image with axis=" + axis)
+            return true
+        }
+    }
+    return false
+}
+
 def check_skip_stage(image, config, title, oneStep, axis) {
 
     if (oneStep.get("enable") != null && !oneStep.enable) {
@@ -369,23 +383,19 @@ def check_skip_stage(image, config, title, oneStep, axis) {
         return true
     }
 
-    def selector = oneStep.get("containerSelector")
-
-    if (selector && selector.size() > 0) {
-
-        def customSel = stringToList(selector)
-        // no match - skip
-        if (!matchMapEntry(customSel, axis)) {
-            config.logger.trace(2, "Step '" + title + "' skipped as no match by containerSelector=" + customSel + " for image with axis=" + axis)
-            return true
-        }
-
-        config.logger.trace(2, "Step '" + title + "' will use axis=" + axis)
-
-    } else if (axis['category'] == 'tool') {
-            config.logger.trace(2, "Step '" + title + "' skipped for image category=tool")
-            return true
+    if (checkSelector(image, config, title, oneStep, axis, 'containerSelector')) {
+        return true
     }
+
+    if (checkSelector(image, config, title, oneStep, axis, 'agentSelector')) {
+        return true
+    }
+
+    if (axis['category'] == 'tool') {
+        config.logger.trace(2, "Step '" + title + "' skipped for image category=tool")
+        return true
+    }
+
     return false
 }
 

@@ -1,10 +1,6 @@
 ---
 job: baremetal
 
-registry_host: harbor.mellanox.com
-registry_path: /swx-storage/nvmx
-registry_auth: swx-storage
-
 runs_on_agents:
   - nodeLabel: '(dockerserver || docker) && x86_64'
   - nodeLabel: 'hpc-test-node-inbox'
@@ -18,3 +14,8 @@ steps:
 - name: step2
   run: |
     env
+
+- name: run once
+  agentSelector: "{nodeLabel: 'hpc-test-node-inbox'}"
+  run: |
+    ls
