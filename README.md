@@ -231,6 +231,12 @@ runs_on_dockers:
   - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest', category: 'tool'}
   - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
 
+# list of jenkins agents labels to run on (optional)
+
+runs_on_agents:
+  - nodeLabel: '(dockerserver || docker) && x86_64'
+  - nodeLabel: 'hpc-test-node-inbox'
+
 
 # user-defined matrix to run tests, "steps" will be executed for every dimension of matrix.
 # Can contain any use-defined dimensions
