@@ -1111,7 +1111,10 @@ def main() {
                         run_parallel_in_chunks(config, branches, bSize)
                     }
                 }
+                config.env.pipeline_status = 'SUCCESS'
+
             } catch (e) {
+                config.env.pipeline_status = 'FAILURE'
                 reportFail('parallel task', e.toString())
 
             } finally {

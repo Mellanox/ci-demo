@@ -1,0 +1,35 @@
+---
+job: baremetal
+
+runs_on_dockers:
+  - {name: 'blackduck', url: 'harbor.mellanox.com/toolbox/ngci-centos:7.9.2009', cloud: 'swx-k8s-spray', arch: 'x86_64'}
+
+runs_on_agents:
+  - nodeLabel: '(dockerserver || docker) && x86_64'
+  - nodeLabel: 'hpc-test-node-inbox'
+
+steps:
+
+- name: step1
+  run: |
+    hostname
+
+- name: step2
+  run: |
+    env
+
+- name: run once
+  agentSelector: "{nodeLabel: 'hpc-test-node-inbox'}"
+  run: |
+    ls
+
+pipeline_start:
+  run: |
+    echo Starting pipeline
+    env
+
+pipeline_stop:
+  run: 
+    echo pipeline_status=$pipeline_status
+    echo all done
+
