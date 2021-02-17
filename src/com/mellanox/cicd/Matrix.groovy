@@ -236,10 +236,9 @@ def gen_image_map(config) {
                     tag_size = dfile.tag.size() + 1
                     len = dfile.url.size() - tag_size
                     dfile.uri = dfile.url.substring(0,len)
-                } else {
-                    dfile.tag = 'latest'
                 }
             }
+            dfile.tag = dfile.tag ?: 'latest'
             dfile.build_args = dfile.build_args ?: ''
             dfile.build_args = resolveTemplate(dfile, dfile.build_args, config)
             dfile.uri = dfile.uri ?: "${arch}/${dfile.name}"
