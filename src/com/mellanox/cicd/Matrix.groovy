@@ -272,10 +272,10 @@ def matchMapEntry(filters, entry) {
 
 def onUnstash() {
 
-    env.PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     env.WORKSPACE = pwd()
 
     def cmd = """#!/bin/bash
+    export PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
     hash -r
     tar xf scm-repo.tar
     rm -f scm-repo.tar
