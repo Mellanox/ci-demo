@@ -52,6 +52,7 @@
             org-list: ["Mellanox"]
             white-list: ["swx-jenkins","swx-jenkins2","swx-jenkins3","mike-dubman","mellanox-github"]
             allow-whitelist-orgs-as-admins: true
+            cancel-builds-on-update: true
     pipeline-scm:
         scm:
             - git:
