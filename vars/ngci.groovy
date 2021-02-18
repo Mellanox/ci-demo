@@ -19,8 +19,8 @@ int call(ctx, oneStep, config) {
     def vars = []
     def ret
 
-    vars += ctx.toEnvVars(config.env)
-    vars += ctx.toEnvVars(oneStep.env)
+    vars += ctx.toEnvVars(config, config.env)
+    vars += ctx.toEnvVars(config, oneStep.env)
     withEnv(vars) {
         ret =  "${oneStep.run}"(args)
     }
