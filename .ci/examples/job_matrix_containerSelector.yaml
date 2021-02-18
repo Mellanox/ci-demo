@@ -1,0 +1,47 @@
+---
+job: baremetal
+
+kubernetes:
+  cloud: 'swx-k8s-spray'
+
+runs_on_dockers:
+  - {name: 'blackduck', url: 'harbor.mellanox.com/toolbox/ngci-centos:7.9.2009', category: 'tool', arch: 'x86_64'}
+  - {name: 'momo', url: 'harbor.mellanox.com/toolbox/ngci-centos:7.9.2009', arch: 'x86_64'}
+  - {name: 'koko', url: 'harbor.mellanox.com/toolbox/ngci-centos:7.9.2009', arch: 'x86_64'}
+
+runs_on_agents:
+  - nodeLabel: '(dockerserver || docker) && x86_64'
+  - nodeLabel: 'hpc-test-node-inbox'
+
+steps:
+
+- name: step1
+  run: |
+    hostname
+
+- name: run once on blackduck
+  containerSelector: "{name: 'blackduck'}"
+  run: |
+    env
+
+- name: run once on hpc-test-node-inbox
+  agentSelector: "{nodeLabel: 'hpc-test-node-inbox'}"
+  run: |
+    ls
+
+- name: run once on blackduck and hpc-test-node-inbox
+  containerSelector: "{name: 'blackduck'}"
+  agentSelector: "{nodeLabel: 'hpc-test-node-inbox'}"
+  run: |
+    ls
+
+pipeline_start:
+  run: |
+    echo Starting pipeline
+    env
+
+pipeline_stop:
+  run: 
+    echo pipeline_status=$pipeline_status
+    echo all done
+

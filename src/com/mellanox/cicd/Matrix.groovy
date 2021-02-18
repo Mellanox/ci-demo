@@ -352,7 +352,7 @@ Map toStringMap(String param) {
 
 def stringToList(selector) {
 
-    def customSel = [];
+    def customSel = []
 
     if (selector && selector.size() > 0) {
 
@@ -371,20 +371,6 @@ def stringToList(selector) {
     return customSel
 }
 
-def checkSelector(image, config, title, oneStep, axis, sName) {
-    def selector = oneStep.get(sName)
-
-    if (selector && selector.size() > 0) {
-        def customSel = stringToList(selector)
-        // no match - skip
-        if (!matchMapEntry(customSel, axis)) {
-            config.logger.trace(2, "Step '" + title + "' skipped as no match by ${sName}=" + customSel + " for image with axis=" + axis)
-            return true
-        }
-    }
-    return false
-}
-
 def check_skip_stage(image, config, title, oneStep, axis) {
 
     if (oneStep.get("enable") != null && !oneStep.enable) {
@@ -392,20 +378,29 @@ def check_skip_stage(image, config, title, oneStep, axis) {
         return true
     }
 
-    if (checkSelector(image, config, title, oneStep, axis, 'containerSelector')) {
-        return true
+    def selectors = [oneStep.containerSelector, oneStep.agentSelector]
+    def skip = false
+
+    if (image['category'] == 'tool') {
+        skip = true
     }
 
-    if (checkSelector(image, config, title, oneStep, axis, 'agentSelector')) {
-        return true
+    for (int i=0; i<selectors.size(); i++) {
+        selector = selectors[i]
+        if (selector && selector.size() > 0) {
+            def customSel = stringToList(selector)
+            if (matchMapEntry(customSel, axis)) {
+                config.logger.trace(2, "Step '" + oneStep.name + " matched with axis=" + axis + " selector=" + selector)
+                skip = false
+                break
+            } else {
+                skip = true
+            }
+        }
     }
 
-    if (axis['category'] == 'tool') {
-        config.logger.trace(2, "Step '" + title + "' skipped for image category=tool")
-        return true
-    }
-
-    return false
+    config.logger.trace(2, "$title - Step '" + oneStep.name + "' skip=" + skip)
+    return skip
 }
 
 void reportFail(String stage, String msg) {
