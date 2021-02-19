@@ -412,7 +412,7 @@ def toEnvVars(config, vars) {
     def map = []
     if (vars) {
         for (def entry in entrySet(vars)) {
-            map.add(entry.key + "=" + resolveTemplate(vars, entry.value, config))
+            map.add(entry.key + "=" + resolveTemplate(vars, '' + entry.value, config))
         }
     }
     return map

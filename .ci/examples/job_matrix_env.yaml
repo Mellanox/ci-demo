@@ -8,15 +8,22 @@ registry_host: harbor.mellanox.com
 registry_path: /swx-storage/ci-demo
 registry_auth: swx-storage
 
+runs_on_dockers:
+  - {name: 'blackduck', url: 'harbor.mellanox.com/toolbox/ngci-centos:7.9.2009', arch: 'x86_64'}
+
 env:
   cidemo_var1: '777'
   cidemo_var2: '${cidemo_var1}-888'
   cidemo_var3: '${cidemo_var2}-999'
   cidemo_mydir: '$WORKSPACE'
   blackduck_url: 'harbor.mellanox.com/toolbox/ngci-centos:7.9.2009'
+  cidemo_var4: false
+  cidemo_var5: 'false'
+  cidemo_var6: enabled
+  cidemo_var7: 'enabled'
+  cidemo_var8: 5
+  cidemo_var9: '5'
 
-#runs_on_dockers:
-#  - {name: 'blackduck', url: '$blackduck_url', arch: 'x86_64'}
 
 runs_on_agents:
   - nodeLabel: '(dockerserver || docker) && x86_64'
