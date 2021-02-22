@@ -1011,6 +1011,7 @@ def main() {
             // create git tarball on server, agents will copy it and unpack
             run_shell("tar -c --exclude scm-repo.tar -f scm-repo.tar .", 'Creating workspace copy')
             stash includes: "scm-repo.tar", name: "${env.JOB_NAME}"
+            run_shell("[ -x .ci/cidemo-init.sh ] && .ci/cidemo-init.sh", 'Run cidemo init hook')
         }
 
         files = findFiles(glob: "${env.conf_file}")
