@@ -2,11 +2,10 @@
 job: baremetal
 
 kubernetes:
-  cloud: swx-k8s-spray
+  cloud: 'swx-k8s-spray'
 
-registry_host: harbor.mellanox.com
-registry_path: /swx-storage/ci-demo
-registry_auth: swx-storage
+runs_on_dockers:
+  - {name: 'blackduck', url: 'harbor.mellanox.com/toolbox/ngci-centos:7.9.2009', arch: 'x86_64'}
 
 runs_on_dockers:
   - {name: 'blackduck', url: 'harbor.mellanox.com/toolbox/ngci-centos:7.9.2009', arch: 'x86_64'}

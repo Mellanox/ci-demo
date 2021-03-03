@@ -1,0 +1,45 @@
+---
+job: actions
+
+kubernetes:
+  cloud: swx-k8s-spray
+
+volumes:
+  - {mountPath: /hpc/local, hostPath: /hpc/local}
+  - {mountPath: /auto/sw_tools, hostPath: /auto/sw_tools}
+  - {mountPath: /.autodirect/mtrswgwork, hostPath: /.autodirect/mtrswgwork}
+  - {mountPath: /.autodirect/sw/release, hostPath: /.autodirect/sw/release}
+
+runs_on_dockers:
+  - {name: 'blackduck', url: 'harbor.mellanox.com/toolbox/ngci-centos:7.9.2009.2', category: 'tool', arch: 'x86_64'}
+  - {name: 'coverity', url: 'harbor.mellanox.com/swx-storage/ci-demo/x86_64/centos7-7:latest', category: 'tool', arch: 'x86_64'}
+
+
+steps:
+  
+  - name: Coverity scan
+    shell: action
+    module: dynamicAction
+    run: coverity.sh 
+    containerSelector: "{name: 'coverity'}"
+    args:
+      - "--pre_script './autogen.sh;./configure;make -j 3 clean'"
+      - "--build_script 'make -j 3'"
+      - "--ignore_files 'devx googletest tests'"
+    archiveArtifacts: 'cov.log'
+
+  - name: Blackduck scan source
+    containerSelector: "{name: 'blackduck'}"
+    shell: action
+    module: ngci
+    run: NGCIBlackDuckScan
+    args:
+      projectName: "NGCIBlackDuckScan"
+      projectVersion: "ci-demo"
+      projectVersion: "1.0"
+      projectSrcPath: "${WORKSPACE}/src"
+      attachArtifact: true
+      reportName: "BlackDuck report"
+      scanMode: "source"
+    env:
+      SPRING_APPLICATION_JSON: '{"blackduck.url":"https://blackduck.mellanox.com/","blackduck.api.token":"ODMwOWYwMzEtODA2ZC00MzBjLWI1ZDEtNmFiMjBkYzQzMzkwOjNmNjExN2M1LWE2ZmEtNDZlYS1hZjRiLTZlNDgwNjAwOTVjNw=="}'

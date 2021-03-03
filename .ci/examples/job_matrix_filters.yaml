@@ -1,0 +1,58 @@
+---
+job: baremetal
+
+kubernetes:
+  cloud: 'swx-k8s-spray'
+
+registry_host: harbor.mellanox.com
+registry_path: /swx-storage/clusterkit
+registry_auth: swx-storage
+
+volumes:
+  - {mountPath: /hpc/local, hostPath: /hpc/local}
+  - {mountPath: /auto/sw_tools, hostPath: /auto/sw_tools}
+  - {mountPath: /auto/mtrswgwork, hostPath: /auto/mtrswgwork}
+  - {mountPath: /auto/sw/release/mlnx_ofed, hostPath: /.autodirect/sw/release/mlnx_ofed}
+  - {mountPath: /auto/sw/release/sw_acceleration, hostPath: /auto/sw/release/sw_acceleration}
+
+
+runs_on_dockers:
+  - {name: 'centos7-3'}
+  - {name: 'centos7-2'}
+  - {name: 'centos7-4'}
+  - {name: 'centos7-5'}
+  - {name: 'centos7-6'}
+  - {name: 'ubuntu18-4'}
+  - {name: 'centos7-7'}
+  - {name: 'ubuntu18-4'}
+  - {name: 'ubuntu16-4'}
+  - {name: 'ubuntu20-4'}
+  - {name: 'sles12-sp4'}
+  - {name: 'sles12-sp5'}
+  - {name: 'sles15-sp1'}
+  - {name: 'sles15-sp2'}
+
+
+matrix:
+  axes:
+    driver:
+      - MLNX_OFED_LINUX-4.9-2.2.4.0
+      - MLNX_OFED_LINUX-5.1-0.6.6.0
+      - MLNX_OFED_LINUX-5.1-2.5.8.0
+    cuda:
+      - dev/cuda9.2
+      - dev/cuda10.2
+      - dev/cuda11.0
+    arch:
+      - x86_64
+      - aarch64
+  include:
+    - {arch: x86_64, name: 'ubuntu18-4', driver: 'MLNX_OFED_LINUX-5.1-2.5.8.0', cuda: 'dev/cuda9.2'}
+    - {arch: aarch64, name: 'ubuntu18-4', driver: 'MLNX_OFED_LINUX-5.1-2.5.8.0', cuda: 'dev/cuda11.0'}
+
+
+steps:
+
+- name: step1
+  run: |
+    env
