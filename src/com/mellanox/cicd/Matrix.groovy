@@ -824,7 +824,7 @@ String getChangedFilesList(config) {
 
     try {
         def dcmd
-        if (env.GIT_COMMIT && env.GIT_PREV_COMMIT) {
+        if (env.GIT_COMMIT != null && env.GIT_PREV_COMMIT != null) {
             dcmd = "git diff --name-only ${env.GIT_PREV_COMMIT} ${env.GIT_COMMIT}"
         } else {
             def br  = env.ghprbTargetBranch? env.ghprbTargetBranch : "master"
