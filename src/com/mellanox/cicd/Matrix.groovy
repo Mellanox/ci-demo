@@ -670,6 +670,9 @@ def runAgent(image, config, branchName=null, axis=null, Closure func, runInDocke
         stage(branchName) {
             if (runInDocker) {
                 def opts = getDockerOpt(config)
+                if (image.privileged && image.privileged == 'true') {
+                    opts += " --privileged "
+                }
                 docker.image(image.url).inside(opts) {
                     func(image, config, branchName, axis)
                 }
