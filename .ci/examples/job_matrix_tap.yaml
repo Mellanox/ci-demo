@@ -1,0 +1,20 @@
+---
+job: baremetal
+
+kubernetes:
+  cloud: 'swx-k8s-spray'
+
+runs_on_dockers:
+  - {name: 'blackduck', url: 'harbor.mellanox.com/toolbox/ngci-centos:7.9.2009', arch: 'x86_64'}
+
+steps:
+
+- name: create tap file
+  archiveTap: '**/*.tap'
+  run: |
+    echo 1..2 > test.tap
+    echo ok 1 - this is test1 >> test.tap
+    echo ok 2 - this is test2 >> test.tap
+
+    echo ok 1 - this is test-A > test-A.tap
+
