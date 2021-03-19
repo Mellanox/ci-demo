@@ -529,6 +529,7 @@ def getConfigVal(config, list, defaultVal=null, toString=true) {
 
     def ret
     if (toString && (val instanceof ArrayList) && (val.size() == 1)) {
+        config.logger.trace(5, "getConfigVal: arraylist hack "+ val[0])
         ret = val[0]
     } else {
         ret = val
@@ -803,13 +804,18 @@ def getMatrixTasks(image, config) {
 
     if (config.get("matrix")) {
         axes = getMatrixAxes(config.matrix.axes).findAll()
-        exclude = getConfigVal(config, ['matrix', 'exclude'], [])
-        include = getConfigVal(config, ['matrix', 'include'], [])
+        exclude = getConfigVal(config, ['matrix', 'exclude'], [], false)
+        include = getConfigVal(config, ['matrix', 'include'], [], false)
     } else {
         axes.add(image)
     }
 
-    config.logger.trace(2, "Filters include size: " + include.size() + " exclude size: " + exclude.size())
+    config.logger.trace(2, "Filters: include[" +
+                            include.size() + "] = " +
+                            include + " exclude[" +
+                            exclude.size() +
+                            "] = " + exclude
+                            )
     return getTasks(axes, image, config, include, exclude)
 }
 
