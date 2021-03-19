@@ -106,9 +106,7 @@ def run_step_shell(cmd, title, oneStep, config) {
             run_shell(oneStep.always, "always command for ${title}")
         }
 
-        attachArtifacts(config, oneStep.archiveArtifacts)
-        attachJunit(config, oneStep.archiveJunit)
-        attachTap(config, oneStep.archiveTap)
+        attachResults(config, oneStep)
 
         if (ret.rc != 0) {
             def msg = "Step ${title} failed with exit code=${ret.rc}"
@@ -315,6 +313,12 @@ def attachTap(config, args) {
     }
 }
 
+def attachResults(config, oneStep=null) {
+    attachArtifacts(config, oneStep? oneStep.archiveArtifacts : config.archiveArtifacts )
+    attachJunit(config, oneStep? oneStep.archiveJunit : config.archiveJunit)
+    attachTap(config, oneStep? oneStep.archiveTap : config.archiveTap)
+}
+
 @NonCPS
 int getDebugLevel() {
     def val = env.DEBUG
@@ -508,9 +512,7 @@ def runSteps(image, config, branchName, axis, steps=config.steps) {
         }
         run_step(image, config, one.name, oneStep, axis)
     }
-    attachArtifacts(config, config.archiveArtifacts)
-    attachJunit(config, config.archiveJunit)
-    attachTap(config, config.archiveTap)
+    attachResults(config)
 }
 
 def getConfigVal(config, list, defaultVal=null, toString=true) {
