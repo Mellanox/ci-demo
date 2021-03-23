@@ -1,0 +1,32 @@
+---
+job: ci-demo - onfail
+
+registry_host: harbor.mellanox.com
+registry_path: /swx-storage/clusterkit
+registry_auth: swx-storage
+
+kubernetes:
+  cloud: swx-k8s-spray
+
+volumes:
+  - {mountPath: /hpc/local, hostPath: /hpc/local}
+  - {mountPath: /auto/sw_tools, hostPath: /auto/sw_tools}
+  - {mountPath: /.autodirect/mtrswgwork, hostPath: /.autodirect/mtrswgwork}
+  - {mountPath: /.autodirect/sw/release, hostPath: /.autodirect/sw/release}
+
+runs_on_dockers:
+  - {name: 'centos7-6', arch: 'x86_64'}
+
+steps:
+  - name: Success
+    run: |
+      env
+  - name: Failure
+    run: |
+      echo ok 1 - this is test > test.tap
+      echo Failing here
+      exit 1
+    onfail: 'env > onfail_myenv.log'
+    always: env > always_myenv.log
+    archiveArtifacts-onfail: 'onfail_myenv.log'
+    archiveTap-onfail: '**/*.tap'

@@ -106,7 +106,7 @@ def run_step_shell(cmd, title, oneStep, config) {
             run_shell(oneStep.always, "always command for ${title}")
         }
 
-        attachResults(config, oneStep)
+        attachResults(config, oneStep, ret)
 
         if (ret.rc != 0) {
             def msg = "Step ${title} failed with exit code=${ret.rc}"
@@ -313,10 +313,18 @@ def attachTap(config, args) {
     }
 }
 
-def attachResults(config, oneStep=null) {
-    attachArtifacts(config, oneStep? oneStep.archiveArtifacts : config.archiveArtifacts )
-    attachJunit(config, oneStep? oneStep.archiveJunit : config.archiveJunit)
-    attachTap(config, oneStep? oneStep.archiveTap : config.archiveTap)
+def attachResults(config, oneStep=null, res=null) {
+
+    def obj = oneStep? oneStep : config
+
+    if (res && res.rc != 0) {
+        attachArtifacts(config, obj["archiveArtifacts-onfail"])
+        attachJunit(config, obj["archiveJunit-onfail"])
+        attachTap(config, obj["archiveTap-onfail"])
+    }
+    attachArtifacts(config, obj["archiveArtifacts"])
+    attachJunit(config, obj["archiveJunit"])
+    attachTap(config, obj["archiveTap"])
 }
 
 @NonCPS
