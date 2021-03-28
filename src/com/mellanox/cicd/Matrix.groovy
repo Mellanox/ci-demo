@@ -445,12 +445,23 @@ def run_step(image, config, title, oneStep, axis) {
     if ((image != null) && (axis != null) && check_skip_stage(image, config, title, oneStep, axis)) {
         return
     }
+
     env.WORKSPACE = pwd()
 
 
     stage("${title}") {
         def shell = getDefaultShell(config, oneStep)
 
+        if (oneStep.resource) {
+            def actionScript = libraryResource "${oneStep.resource}"
+            def idx = oneStep.resource.lastIndexOf('/')
+            def dirname = '.ci/' + oneStep.resource.substring(0, idx)
+            def filename = oneStep.resource.substring(idx+1)
+            def toFile = "${dirname}/${filename}"
+            sh(script: "mkdir -p $dirname", label: "Create action dir $dirname", returnStatus: true)
+            writeFile(file: toFile, text: actionScript)
+            sh(script: "chmod +x " + toFile, label: "Set script $toFile permissions", returnStatus: true)
+        }
 
         if (shell == "action") {
             if (oneStep.module == null) {
@@ -854,7 +865,7 @@ String getChangedFilesList(config) {
 
     try {
         def dcmd
-        if (env.GIT_COMMIT != null && env.GIT_PREV_COMMIT != null) {
+        if (env.GIT_COMMIT != "" && env.GIT_PREV_COMMIT != "") {
             dcmd = "git diff --name-only ${env.GIT_PREV_COMMIT} ${env.GIT_COMMIT}"
         } else {
             def br  = env.ghprbTargetBranch? env.ghprbTargetBranch : "master"
@@ -1001,7 +1012,7 @@ def run_parallel_in_chunks(config, myTasks, depth) {
         bSize = myTasks.size()
     }
 
-    def val = getConfigVal(config, ['failFast'], true)
+    def val = getConfigVal(config, ['failFast'], false)
 
     config.logger.trace(3, "run_parallel_in_chunks: batch size is ${bSize}")
     (myTasks.keySet() as List).collate(bSize).each {

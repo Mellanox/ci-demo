@@ -11,12 +11,22 @@ volumes:
   - {mountPath: /.autodirect/sw/release, hostPath: /.autodirect/sw/release}
 
 runs_on_dockers:
-  - {name: 'blackduck', url: 'harbor.mellanox.com/toolbox/ngci-centos:7.9.2009.2', category: 'tool', arch: 'x86_64'}
+  - {name: 'blackduck', url: 'harbor.mellanox.com/toolbox/ngci-centos:latest', category: 'tool', arch: 'x86_64'}
   - {name: 'coverity', url: 'harbor.mellanox.com/swx-storage/ci-demo/x86_64/centos7-7:latest', category: 'tool', arch: 'x86_64'}
 
 
 steps:
-  
+
+  - name: Coverity embed
+    resource: actions/coverity.sh
+    containerSelector: "{name: 'coverity'}"
+    run: |
+      echo Running action script:
+      ./autogen.sh
+      ./configure
+      make -j 3 clean ||:
+      .ci/actions/coverity.sh --build_script 'make -j 3' --ignore_files 'devx googletest tests'
+
   - name: Coverity scan
     shell: action
     module: dynamicAction
