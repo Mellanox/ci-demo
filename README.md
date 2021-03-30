@@ -314,13 +314,22 @@ steps:
 # define shell command(s) to run if step fails
     onfail: |
       echo step execution step failed
+      touch myfile.html
       touch step_failed.log
 # define shell command to run always, regardless if "run" step passed or failed
     always: env > always_env.txt
 # define artifacts to collect for specific step
-    archiveArtifacts: 'step_failed.log,always_env.txt'
+    archiveArtifacts-onfail: 'step_failed.log'
+    archiveArtifacts: 'always_env.txt'
+# Publish HTML on jenkins page for given run
+    publisHTML
+      reportDir: '.'
+      reportFiles: 'myfile.html'
+      reportName: 'Test'
 # define raw xml results to collect for specific step
     archiveJunit: 'test-results.xml'
+# define TAP results to collect for specific step (see jenkins TAP plugin)
+    archiveTap: '**/*.tap'
 
 # executed once, before job starts its steps
 pipeline_start:
