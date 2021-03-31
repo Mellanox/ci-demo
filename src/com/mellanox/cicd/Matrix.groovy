@@ -922,6 +922,7 @@ def buildImage(config, image) {
     // See https://stackoverflow.com/q/56829842/3648361
     def filename = image.filename.toString().trim()
     def extra_args = image.build_args
+    extra_args += getConfigVal(config, ['build_args'], ' --network=host')
     def changed_files = config.get("cFiles")
     def need_build = 0
     def img = image.url
