@@ -427,7 +427,9 @@ def stringToList(selector) {
 
 def check_skip_stage(image, config, title, oneStep, axis) {
 
-    if (oneStep.get("enable") != null && !oneStep.enable) {
+    def stepEnabled = getConfigVal(config, ['enable'], true, true, oneStep, true)
+
+    if (!stepEnabled) {
         config.logger.trace(2, "Step '${oneStep.name}' is disabled in project yaml file, skipping")
         return true
     }
@@ -478,11 +480,11 @@ def run_step(image, config, title, oneStep, axis) {
         return
     }
 
-    env.WORKSPACE = pwd()
 
 
     stage("${title}") {
         def shell = getDefaultShell(config, oneStep)
+        env.WORKSPACE = pwd()
 
         if (oneStep.resource) {
             def actionScript = libraryResource "${oneStep.resource}"
@@ -566,8 +568,8 @@ def runSteps(image, config, branchName, axis, steps=config.steps) {
     attachResults(config)
 }
 
-def getConfigVal(config, list, defaultVal=null, toString=true) {
-    def val = config
+def getConfigVal(config, list, defaultVal=null, toString=true, oneStep=null, useTemplate=false) {
+    def val = oneStep ?: config
     for (int i=0; i<list.size(); i++) {
         item = list[i]
         config.logger.trace(5, "getConfigVal: Checking $item in config file")
@@ -585,6 +587,11 @@ def getConfigVal(config, list, defaultVal=null, toString=true) {
     } else {
         ret = val
     }
+
+    if (useTemplate) {
+        ret = resolveTemplate([:], ret, config)
+    }
+
     config.logger.trace(5, "getConfigVal: Found " + list + " = " + ret)
     return ret
 }
