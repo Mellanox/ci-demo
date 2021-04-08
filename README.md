@@ -146,6 +146,92 @@ docker%% ./autogen.sh && ./configure && make
 ```
 
 
+### Job Actions
+
+Scripts located in `resources/actions` folder can be invoked
+on runtime without needing to store them in project's CI folder.
+Please check examples - [job_matrix_actions.yaml](https://github.com/Mellanox/ci-demo/blob/master/.ci/examples/job_matrix_actions.yaml)
+
+#### nexus.py
+
+Use this action to manage [Nexus Repository Manager](https://help.sonatype.com/repomanager3).
+This action allows to create/delete/show nexus hosted repositories and also upload and remove packages.
+Examples:
+
+```
+# show YUM based repository information
+nexus.py yum --url http://swx-repos.mtr.labs.mlnx:8081/ --name test_yum_repo --user user --password password --action show
+{
+  "name": "test_yum_repo",
+  "url": "http://swx-repos.mtr.labs.mlnx:8081/repository/test_yum_repo",
+  "online": true,
+  "storage": {
+    "blobStoreName": "default",
+    "strictContentTypeValidation": true,
+    "writePolicy": "allow_once"
+  },
+  "cleanup": {
+    "policyNames": [
+      "string"
+    ]
+  },
+  "yum": {
+    "repodataDepth": 1,
+    "deployPolicy": "STRICT"
+  },
+  "component": {
+    "proprietaryComponents": false
+  },
+  "format": "yum",
+  "type": "hosted"
+}
+
+# Create YUM repository
+nexus.py yum --url http://swx-repos.mtr.labs.mlnx:8081/ --name test_yum_repo --user user --password password --action create
+[08/Apr/2021 18:32:11] INFO [root.create_yum_repo:141] Creating hosted yum repository: test_yum_repo
+[08/Apr/2021 18:32:11] INFO [root.create_yum_repo:146] Done
+
+# Remove YUM repository
+nexus.py yum --url http://swx-repos.mtr.labs.mlnx:8081/ --name test_yum_repo --user user --password password --action delete
+[08/Apr/2021 18:31:29] INFO [root.delete_repository:89] Repository has been deleted: test_yum_repo
+
+# Show APT Repository
+nexus.py apt --url http://swx-repos.mtr.labs.mlnx:8081/ --name test_apt_repo --user user --password password --action show
+{
+  "name": "test_apt_repo",
+  "url": "http://swx-repos.mtr.labs.mlnx:8081/repository/test_apt_repo",
+  "online": true,
+  "storage": {
+    "blobStoreName": "default",
+    "strictContentTypeValidation": true,
+    "writePolicy": "allow"
+  },
+  "cleanup": {
+    "policyNames": [
+      "string"
+    ]
+  },
+  "apt": {
+    "distribution": "focal"
+  },
+  "aptSigning": null,
+  "component": {
+    "proprietaryComponents": true
+  },
+  "format": "apt",
+  "type": "hosted"
+}
+
+# Remove APT repository
+nexus.py apt --url http://swx-repos.mtr.labs.mlnx:8081/ --name test_apt_repo --user user --password password --action delete
+[08/Apr/2021 18:34:09] INFO [root.delete_repository:89] Repository has been deleted: test_apt_repo
+
+# Create APT repository
+./nexus.py apt --url http://swx-repos.mtr.labs.mlnx:8081/ --name test_apt_repo --user user --password password --action create --keypair-file /tmp/debs-keyring.priv --distro focal
+[08/Apr/2021 18:34:52] INFO [root.create_apt_repo:208] Creating hosted APT repository: test_apt_repo
+[08/Apr/2021 18:34:52] INFO [root.create_apt_repo:213] Done
+```
+
 ### Job Matrix yaml - Advanced configuration
 
 ``` yaml

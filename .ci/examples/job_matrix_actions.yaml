@@ -13,9 +13,22 @@ volumes:
 runs_on_dockers:
   - {name: 'blackduck', url: 'harbor.mellanox.com/toolbox/ngci-centos:latest', category: 'tool', arch: 'x86_64'}
   - {name: 'coverity', url: 'harbor.mellanox.com/swx-storage/ci-demo/x86_64/centos7-7:latest', category: 'tool', arch: 'x86_64'}
+  - {name: 'builder', url: 'harbor.mellanox.com/swx-storage/ci-demo/x86_64/centos7-7:latest', arch: 'x86_64'}
 
+credentials:
+  - {credentialsId: '311997c9-cc1c-4d5d-8ba2-6eb43ba0a06d', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS'}
+
+env:
+  NEXUS_URL: http://swx-repos.mtr.labs.mlnx:8081/
 
 steps:
+
+  - name: Nexus upload rpm
+    resource: actions/nexus.py
+    containerSelector: "{name: 'builder'}"
+    run: |
+      echo "./build_package.sh"
+      echo ".ci/actions/nexus.py yum -u $NEXUS_URL -U $NEXUS_USER -P $NEXUS_PASS -a upload -n test_yum_repo --file /tmp/mlnx-libsnap-1.0.1-16.mlnx.x86_64.rpm --upload_path 7/x86_64/"
 
   - name: Coverity embed
     resource: actions/coverity.sh
