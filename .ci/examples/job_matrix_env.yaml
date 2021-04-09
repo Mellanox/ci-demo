@@ -43,4 +43,15 @@ steps:
   run: |
     hostname
     env
-    
+
+- name: step4-disabled
+  enable: false
+  run: |
+    hostname
+    env
+
+- name: step5-enabled
+  enable: true
+  run: |
+    hostname
+    env
