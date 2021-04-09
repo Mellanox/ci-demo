@@ -427,7 +427,7 @@ def stringToList(selector) {
 
 def check_skip_stage(image, config, title, oneStep, axis) {
 
-    def stepEnabled = getConfigVal(config, ['enable'], 'true', true, oneStep, true)
+    def stepEnabled = getConfigVal(config, ['enable'], true, true, oneStep, true) + ''
 
     if (stepEnabled == 'false') {
         config.logger.trace(2, "Step '${oneStep.name}' is disabled in project yaml file, skipping")
