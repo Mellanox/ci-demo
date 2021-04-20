@@ -111,7 +111,7 @@ def forceCleanup(prefix="") {
 
     def cmd = """
     set -eE
-    $prefix bash -c 'shopt -s dotglob; rm -rf ${env.WORKSPACE}/*'
+    $prefix bash -c 'shopt -s dotglob; sudo rm -rf ${env.WORKSPACE}/*'
     """
     return run_shell(cmd, "Clean workspace $prefix")
 }
