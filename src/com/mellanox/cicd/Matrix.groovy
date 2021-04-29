@@ -119,21 +119,21 @@ def run_step_shell(cmd, title, oneStep, config) {
     }
 }
 
-def forceCleanup(prefix="") {
+def forceCleanup(prefix='', redirect='') {
     env.WORKSPACE = pwd()
 
     def cmd = """
     set -eE
-    $prefix bash -c 'shopt -s dotglob; rm -rf ${env.WORKSPACE}/*'
+    $prefix bash -c 'shopt -s dotglob; rm -rf ${env.WORKSPACE}/*' ${redirect}
     """
     return run_shell(cmd, "Clean workspace $prefix")
 }
 
 def forceCleanupWS() {
 
-    def res = forceCleanup("")
+    def res = forceCleanup('','&>/dev/null')
     if (res.rc != 0) {
-        res = forceCleanup("sudo")
+        res = forceCleanup('sudo','')
         if (res.rc != 0) {
             reportFail('clean workspace', "Unable to cleanup workspace rc=" + res)
         }
@@ -904,10 +904,21 @@ String getChangedFilesList(config) {
 
     try {
         def dcmd
-        if (env.GIT_COMMIT != "" && env.GIT_PREV_COMMIT != "") {
+        if ((env.GIT_COMMIT != null) && (env.GIT_PREV_COMMIT != null)) {
             dcmd = "git diff --name-only ${env.GIT_PREV_COMMIT} ${env.GIT_COMMIT}"
         } else {
-            def br  = env.ghprbTargetBranch? env.ghprbTargetBranch : "master"
+            def br
+            if (env.ghprbTargetBranch) {
+                br = env.ghprbTargetBranch
+            } else {
+                def ret = run_shell('git ls-remote -q | grep -q refs/heads/master', 'detecting branch name')
+                // master or main?
+                if (ret.rc == 0) {
+                    br = 'master'
+                } else {
+                    br = 'main'
+                }
+            }
             def sha = env.ghprbActualCommit? env.ghprbActualCommit : "HEAD"
             dcmd = "git diff --name-only origin/${br}..${sha}"
         }
