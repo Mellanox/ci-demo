@@ -49,8 +49,7 @@
             trigger-phrase: '.*\bbot:retest\b.*'
             status-add-test-results: true
             auth-id: '549927eb-7f38-4a8f-997a-81dd63605782'
-            org-list: ["Mellanox"]
-            white-list: ["swx-jenkins","swx-jenkins2","swx-jenkins3","mike-dubman","mellanox-github"]
+            org-list: ["Mellanox", "Mellanox-lab", "Nvidia"]
             allow-whitelist-orgs-as-admins: true
             cancel-builds-on-update: true
     pipeline-scm:
