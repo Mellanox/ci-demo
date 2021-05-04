@@ -321,21 +321,23 @@ def attachTap(config, args) {
 
 def attachHTML(image, config, oneStep) {
 
-    def reportDir,reportFiles,reportName
+    def reportDir, reportFiles, reportName, allowMissing
 
     if (oneStep.publishHTML) {
         reportDir = resolveTemplate(image, oneStep.publishHTML.reportDir, config)
         reportFiles = resolveTemplate(image, oneStep.publishHTML.reportFiles, config)
         reportName = resolveTemplate(image, oneStep.publishHTML.reportName, config)
+        allowMissing = oneStep.publishHTML.allowMissing
     } else if (oneStep.run == 'coverity.sh' || oneStep.resource == 'actions/coverity.sh') {
         reportDir = 'cov_build/output/errors/'
         reportFiles = 'index.html'
         reportName = 'Coverity Report'
+        allowMissing = false
     } else {
         return
     }
 
-    publishHTML (target : [allowMissing: false,
+    publishHTML (target : [allowMissing: allowMissing,
     alwaysLinkToLastBuild: true,
     keepAll: true,
     reportDir: reportDir,
