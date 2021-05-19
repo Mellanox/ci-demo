@@ -1159,18 +1159,29 @@ def main() {
                             }
                         }
                     }
-                    parallelBuildDockers[branchName] = {
 
-                        def cloudName = image.cloud ?: getConfigVal(config, ['kubernetes', 'cloud'], null)
-                        if (cloudName) {
-                            build_docker_on_k8(image, config)
-                        } else if (image.nodeLabel) {
-                            def callback = { pimage, pconfig, pname=null, paxis=null ->
-                                buildDocker(pimage, pconfig)
+                    def needSetupContainers = false
+                    // prepare containers only if thery have assotiated dockerfile
+                    for (int ii=0; ii<config.runs_on_dockers.size(); ii++) {
+                        if (config.runs_on_dockers[ii].file) {
+                            needSetupContainers = true
+                        }
+                    }
+
+                    if (needSetupContainers) {
+                        parallelBuildDockers[branchName] = {
+
+                            def cloudName = image.cloud ?: getConfigVal(config, ['kubernetes', 'cloud'], null)
+                            if (cloudName) {
+                                build_docker_on_k8(image, config)
+                            } else if (image.nodeLabel) {
+                                def callback = { pimage, pconfig, pname=null, paxis=null ->
+                                    buildDocker(pimage, pconfig)
+                                }
+                                runAgent(image, config, "Preparing image ${imgName}", null, callback, false)
+                            } else {
+                                reportFail('init', 'No cloud or Agent defined in project file')
                             }
-                            runAgent(image, config, "Preparing image ${imgName}", null, callback, false)
-                        } else {
-                            reportFail('init', 'No cloud or Agent defined in project file')
                         }
                     }
                     branches += getMatrixTasks(image, config)
