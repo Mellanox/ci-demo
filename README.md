@@ -263,10 +263,13 @@ kubernetes:
 # more of that resource than the limit you set. If a Container specifies its own limit,
 # but does not specify a request, Kubernetes automatically assigns a request
 # that matches the limit.
-  limits: "{hugepages-1Gi: 1024Mi, hugepages-2Mi: 1024Mi, memory: 2048Mi}"
+  limits: "{rdma/bw_port_a: 1, hugepages-1Gi: 1024Mi, hugepages-2Mi: 1024Mi, memory: 2048Mi}"
 # optional: request additional k8s resources that isn't supported by
 # kubernetes-plugin by default
   requests: "{hugepages-1Gi: 1024Mi, hugepages-2Mi: 1024Mi, memory: 2048Mi}"
+# optional: annotations can be used to attach arbitrary non-identifying metadata to objects
+  annotations:
+    - {key: 'k8s.v1.cni.cncf.io/networks', value: 'roce-bw-port1@roce0'}
 
 # optional: can specify jenkins defined credentials and refer/request by credentialsId in step that
 # requires it

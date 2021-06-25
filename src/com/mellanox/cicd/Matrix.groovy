@@ -621,6 +621,17 @@ def parseListV(volumes) {
     return listV
 }
 
+def parseListA(annotations) {
+    def listA = []
+    annotations.each { an ->
+        key = an.get("key")
+        value = an.get("value")
+        pan = podAnnotation(key: key, value: value)
+        listA.add(pan)
+    }
+    return listA
+}
+
 def runK8(image, branchName, config, axis, steps=config.steps) {
 
     def cloudName = image.cloud ?: getConfigVal(config, ['kubernetes', 'cloud'], null)
@@ -657,6 +668,7 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     def privileged = image.privileged ?: getConfigVal(config, ['kubernetes', 'privileged'], false)
     def limits = image.yaml ?: getConfigVal(config, ['kubernetes', 'limits'], "")
     def requests = image.yaml ?: getConfigVal(config, ['kubernetes', 'requests'], "")
+    def annotations = image.yaml ?: getConfigVal(config, ['kubernetes', 'annotations'], [], false)
     def yaml = """
 spec:
   containers:
@@ -665,13 +677,13 @@ spec:
         limits: ${limits}
         requests: ${requests}
 """
-
     podTemplate(
         cloud: cloudName,
         runAsUser: runAsUser,
         runAsGroup: runAsGroup,
         nodeSelector: nodeSelector,
         hostNetwork: hostNetwork,
+        annotations: parseListA(annotations),
         yamlMergeStrategy: merge(),
         yaml: yaml,
         containers: [
