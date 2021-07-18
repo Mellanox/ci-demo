@@ -1076,7 +1076,7 @@ def build_docker_on_k8(image, config) {
     )
     {
         node(POD_LABEL) {
-            unstash "${env.JOB_NAME}"
+            unstash getStashName()
             onUnstash()
 
             container('docker') {
