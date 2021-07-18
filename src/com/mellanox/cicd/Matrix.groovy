@@ -1148,7 +1148,7 @@ def main() {
             logger.debug("Git commit: ${env.GIT_COMMIT} prev commit: ${env.GIT_PREV_COMMIT}")
             // create git tarball on server, agents will copy it and unpack
             run_shell("tar -c --exclude scm-repo.tar -f scm-repo.tar .", 'Creating workspace copy')
-            stash includes: "scm-repo.tar", name: getShashName()
+            stash includes: "scm-repo.tar", name: getStashName()
             run_shell("[ -x .ci/cidemo-init.sh ] && .ci/cidemo-init.sh", 'Run cidemo init hook')
         }
 
