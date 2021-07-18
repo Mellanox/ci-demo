@@ -551,7 +551,7 @@ def run_step(image, config, title, oneStep, axis) {
 def runSteps(image, config, branchName, axis, steps=config.steps) {
     forceCleanupWS()
     // fetch .git from server and unpack
-    unstash "${env.JOB_NAME}"
+    unstash getStashName()
     onUnstash()
 
     def parallelNestedSteps = [:]
@@ -763,7 +763,7 @@ def runAgent(image, config, branchName=null, axis=null, Closure func, runInDocke
 
     node(nodeName) {
         forceCleanupWS()
-        unstash "${env.JOB_NAME}"
+        unstash getStashName()
         onUnstash()
         stage(branchName) {
             if (runInDocker) {
@@ -1129,6 +1129,10 @@ def loadConfigFile(filepath, logger) {
     return config
 }
 
+def String getStashName() {
+	return "${env.BUILD_NUMBER}"
+}
+
 def main() {
     node("master") {
 
@@ -1144,7 +1148,7 @@ def main() {
             logger.debug("Git commit: ${env.GIT_COMMIT} prev commit: ${env.GIT_PREV_COMMIT}")
             // create git tarball on server, agents will copy it and unpack
             run_shell("tar -c --exclude scm-repo.tar -f scm-repo.tar .", 'Creating workspace copy')
-            stash includes: "scm-repo.tar", name: "${env.JOB_NAME}"
+            stash includes: "scm-repo.tar", name: getShashName()
             run_shell("[ -x .ci/cidemo-init.sh ] && .ci/cidemo-init.sh", 'Run cidemo init hook')
         }
 
