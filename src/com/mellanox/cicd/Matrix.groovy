@@ -686,6 +686,12 @@ spec:
         annotations: parseListA(annotations),
         yamlMergeStrategy: merge(),
         yaml: yaml,
+        envVars: [
+            valueFrom(
+                fieldRef:
+                    fieldPath: spec.nodeName
+            )
+        ],
         containers: [
             containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
             containerTemplate(privileged: privileged, name: cname, image: image.url, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
@@ -1068,6 +1074,12 @@ def build_docker_on_k8(image, config) {
         cloud: cloudName,
         nodeSelector: nodeSelector,
         hostNetwork: hostNetwork,
+        envVars: [
+            valueFrom(
+                fieldRef:
+                    fieldPath: spec.nodeName
+            )
+        ],
         containers: [
             containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
             containerTemplate(privileged: privileged, name: 'docker', image: k8sArchConf.dockerImage, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
