@@ -29,7 +29,8 @@ env:
 runs_on_dockers:
   - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest'}
   - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
-  - {file: '.ci/Dockerfile.ubuntu18-4', name: 'ubuntu18-4', tag: 'latest'}
+  # disable networkhost. The are issues with privileged mode true and default network=host
+  - {file: '.ci/Dockerfile.ubuntu18-4', name: 'ubuntu18-4', tag: 'latest', build_args: '--network=""', privileged: 'true',}
 
 matrix:
   axes:
