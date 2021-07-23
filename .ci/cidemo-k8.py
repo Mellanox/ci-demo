@@ -29,7 +29,7 @@ spec:
   securityContext:
     runAsGroup: {uid}
     runAsUser: {gid}
-  hostNetwork: true
+  hostNetwork: false
   volumes:
   {volumes}
 """
