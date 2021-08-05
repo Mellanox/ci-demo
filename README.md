@@ -70,7 +70,9 @@ steps:
      
 ```
 
-4. Copy ```.ci/proj_jjb.yaml``` to ```.ci``` folder in your project  and change github URL to point to your own github project as [here](.ci/proj_jjb.yaml#L67)
+4. Copy ```.ci/proj_jjb.yaml``` to ```.ci``` folder in your project  and change github URL to point to your own github project as [here](.ci/proj_jjb.yaml#L67).
+Also change the value of the ```jjb_proj: 'ci-demo'``` to the name you want to give to your job.
+
 
 5. Register new Jenkins project via jenkins-job cli (or create new with UI)
 
