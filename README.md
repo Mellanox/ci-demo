@@ -299,7 +299,9 @@ volumes:
   - {mountPath: /.autodirect/sw/release, hostPath: /.autodirect/sw/release}
 
 # environment varibles to insert into Job shell environment, can be referenced from steps 
-# or user-scripts or shell commands
+# or user-scripts or shell commands.
+# If you want more detailed output in logs, add the following environment variable:
+# `DEBUG: true`
 env:
   mofed_installer_exe: /.autodirect/sw/release/mlnx_ofed/MLNX_OFED/mlnx_ofed_install
   mofed_installer_opt: --user-space-only --without-fw-update --all -q --skip-unsupported-devices-check
@@ -312,6 +314,7 @@ defaults:
 
 # list of dockers to use for the job, `file` key is optional, if defined but docker image 
 # does not exist in registry.
+# `arch` key is optional, it defaults to `x86_64` unless specified otherwise.
 # image will be created during 1st invocation or if file was modified
 # runs_on_dockers list can contain use-defined keys as well
 # category:tools has special meaning - it will run for steps, that explicitly request it in the
@@ -342,6 +345,8 @@ runs_on_agents:
 #   done
 # done
 #
+# Note that the matrix should ALWAYS include the `arch` axis.
+# Other variables are optional and should be set as per your needs.
 matrix:
   axes:
     driver:
@@ -381,10 +386,11 @@ steps:
 # dynamicAction is pre-defined action defined at https://github.com/Mellanox/ci-demo/blob/master/vars/dynamicAction.groovy 
 # dynamicAction will execute ci-demo/vars/actions/$args[0] and will pass $args[1..] to it as command line arguments
     run: dynamicAction
-# step can specify containerSelector filter to apply on `runs_on_dockers` section
+# step can specify containerSelector filter to apply on `runs_on_dockers` section.
+# make sure to quote the category.
 # `variant` is built-in variable, available for every axis of the run and represents serial number for 
 # execution of matrix dimension
-    containerSelector: '{category:tool, variant:1}'
+    containerSelector: '{category:"tool", variant:1}'
     args:
       - "--pre_script './autogen.sh;./configure;make -j 3 clean'"
       - "--build_script 'make -j 3'"
