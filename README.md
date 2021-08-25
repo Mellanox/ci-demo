@@ -272,6 +272,8 @@ kubernetes:
 # optional: annotations can be used to attach arbitrary non-identifying metadata to objects
   annotations:
     - {key: 'k8s.v1.cni.cncf.io/networks', value: 'roce-bw-port1@roce0'}
+# optional: container capabilities to add
+  caps_add: "[ IPC_LOCK, SYS_RESOURCE ]"
 
 # optional: can specify jenkins defined credentials and refer/request by credentialsId in step that
 # requires it

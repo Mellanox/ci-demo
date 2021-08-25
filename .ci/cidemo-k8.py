@@ -19,7 +19,9 @@ spec:
       limits: {limits}
       requests: {requests}
     securityContext:
-      privileged: true
+      privileged: false
+      capabilities:
+        add: {caps_add}
     tty: true
     volumeMounts:
     {volumeMounts}
@@ -116,6 +118,7 @@ def generate_pod_yaml(args):
 
     limits = '{' + job_yaml['kubernetes'].get('limits', '') + '}'
     requests = '{' + job_yaml['kubernetes'].get('requests', '') + '}'
+    caps_add = job_yaml['kubernetes'].get('caps_add', '[]')
     nodeSelector = job_yaml['kubernetes'].get('nodeSelector', nodeSelector_tmpl.format(os='linux', arch=arch_to_k8s_arch[image['arch']]))
     uid = image.get('uid', '0')
     gid = image.get('gid', '0')
@@ -139,6 +142,7 @@ def generate_pod_yaml(args):
         gid=gid,
         limits=limits,
         requests=requests,
+        caps_add=caps_add,
         nodeSelector=nodeSelector,
         volumes=volumes,
         volumeMounts=volumeMounts
