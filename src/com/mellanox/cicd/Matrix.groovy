@@ -669,6 +669,7 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     def limits = image.limits ?: getConfigVal(config, ['kubernetes', 'limits'], "")
     def requests = image.requests ?: getConfigVal(config, ['kubernetes', 'requests'], "")
     def annotations = image.annotations ?: getConfigVal(config, ['kubernetes', 'annotations'], [], false)
+    def caps_add = image.caps_add ?: getConfigVal(config, ['kubernetes', 'caps_add'], "[]")
     def yaml = """
 spec:
   containers:
@@ -676,6 +677,8 @@ spec:
       resources:
         limits: ${limits}
         requests: ${requests}
+        capabilities:
+          add: ${caps_add}
 """
     podTemplate(
         cloud: cloudName,
