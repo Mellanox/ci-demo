@@ -1,0 +1,13 @@
+- job-template:
+    name: cidemo-trigger-test
+    node: master
+    project-type: freestyle
+
+    builders:
+       - shell: |
+           echo hello here
+
+- project:
+    name: cidemo
+    jobs:
+      - 'cidemo-trigger-test'
