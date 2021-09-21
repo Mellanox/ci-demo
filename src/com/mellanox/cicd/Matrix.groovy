@@ -1003,9 +1003,21 @@ def buildImage(config, image) {
     }
     config.logger.debug("Changed files: ${changed_files}")
     if (changed_files.contains(filename)) {
-        config.logger.info("Forcing building, file modified by commit: ${filename} ... ")
+        config.logger.info("Forcing building, by modified file: ${filename} ... ")
         need_build++
     }
+
+    if (image.deps) {
+        for (int i=0; i<image.deps.size(); i++) {
+            def oneDep = image.deps[i]
+            config.logger.debug("Checking " + oneDep)
+            if (changed_files.contains(oneDep)) {
+                config.logger.info("Forcing building by dependancy on changed file: ${oneDep} ... ")
+                need_build++
+            }
+        }
+    }
+
     if (need_build) {
         config.logger.info("Building - ${img} - ${filename}")
         buildImage(img, filename, extra_args, config, image)
