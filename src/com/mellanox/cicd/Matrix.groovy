@@ -123,8 +123,7 @@ def forceCleanup(prefix='', redirect='') {
     env.WORKSPACE = pwd()
 
     def cmd = """
-    set -eE
-    $prefix bash -c 'shopt -s dotglob; rm -rf ${env.WORKSPACE}/*' ${redirect}
+    $prefix bash -eE -c 'shopt -s dotglob; rm -rf ${env.WORKSPACE}/*' ${redirect}
     """
     return run_shell(cmd, "Clean workspace $prefix")
 }
