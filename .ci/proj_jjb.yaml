@@ -48,7 +48,7 @@
             cron: 'H/5 * * * *'
             trigger-phrase: '.*\bbot:retest\b.*'
             status-add-test-results: true
-            auth-id: '8dd5412b-9b3e-4110-9e0c-4363b3dfcf66'
+            auth-id: '84fb9093-445b-4897-b41b-bcdabc36b12c'
             org-list: ["Mellanox", "Mellanox-lab", "Nvidia"]
             allow-whitelist-orgs-as-admins: true
             cancel-builds-on-update: true
