@@ -936,10 +936,28 @@ Boolean isEnvVarSet(var) {
     return false
 }
 
+int tryFindChangedList(config, dcmd) {
+    def cFiles = null
+    def logger = config.get("logger")
+    def ret = run_shell(dcmd, 'Calculating changed files list')
+
+    if (ret.rc == 0)  {
+        cFiles = run_shell(dcmd, 'Calculating changed files list', true).text.trim().tokenize()
+
+        cFiles.each { oneFile ->
+            logger.debug("Tracking Changed File: " + oneFile)
+        }
+    } else {
+        logger.warn("Unable to find changed file list by " + dcmd)
+        cFiles = null
+    }
+
+    return cFiles
+}
+
 String getChangedFilesList(config) {
 
     def cFiles = []
-
     def logger = config.get("logger")
     logger.debug("Calculating changes for git commit: ${env.GIT_COMMIT} prev commit: ${env.GIT_PREV_COMMIT}")
 
@@ -947,35 +965,39 @@ String getChangedFilesList(config) {
         def dcmd
         if (isEnvVarSet(env.GIT_COMMIT) && isEnvVarSet(env.GIT_PREV_COMMIT)) {
             dcmd = "git diff --name-only ${env.GIT_PREV_COMMIT} ${env.GIT_COMMIT}"
-        } else {
-            def br
-            if (isEnvVarSet(env.ghprbTargetBranch)) {
-                br = env.ghprbTargetBranch
-            } else {
-                def ret = run_shell('git ls-remote -q | grep -q refs/heads/master', 'detecting branch name')
-                // master or main?
-                if (ret.rc == 0) {
-                    br = 'master'
-                } else {
-                    br = 'main'
-                }
+            cFiles = tryFindChangedList(config, dcmd);
+            if (cFiles != null ) {
+                return cFiles
             }
-            def sha = "HEAD"
-            if (isEnvVarSet(env.ghprbActualCommit)) {
-                sha = env.ghprbActualCommit
-            }
-            dcmd = "git diff --name-only origin/${br}..${sha}"
         }
-        cFiles = run_shell(dcmd, 'Calculating changed files list', true).text.trim().tokenize()
 
-        cFiles.each { oneFile ->
-            logger.debug("Tracking Changed File: " + oneFile)
+        def br
+        if (isEnvVarSet(env.ghprbTargetBranch)) {
+            br = env.ghprbTargetBranch
+        } else {
+            def ret = run_shell('git ls-remote -q | grep -q refs/heads/master', 'detecting branch name')
+            // master or main?
+            if (ret.rc == 0) {
+                br = 'master'
+            } else {
+                br = 'main'
+            }
+        }
+        def sha = "HEAD"
+        if (isEnvVarSet(env.ghprbActualCommit)) {
+            sha = env.ghprbActualCommit
+        }
+
+        dcmd = "git diff --name-only origin/${br}..${sha}"
+        cFiles = tryFindChangedList(config, dcmd);
+        if (cFiles != null ) {
+            return cFiles
         }
     } catch (e) {
         logger.warn("Unable to calc changed file list - make sure shallow clone depth is configured in Jenkins, reason: " + e)
     }
 
-    return cFiles
+    return []
 }
 
 def buildImage(config, image) {
