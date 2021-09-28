@@ -939,7 +939,7 @@ Boolean isEnvVarSet(var) {
 int tryFindChangedList(config, dcmd) {
     def cFiles = null
     def logger = config.get("logger")
-    def ret = run_shell(dcmd, 'Calculating changed files list')
+    def ret = run_shell(dcmd, 'Checking changed files list')
 
     if (ret.rc == 0)  {
         cFiles = run_shell(dcmd, 'Calculating changed files list', true).text.trim().tokenize()
@@ -959,17 +959,9 @@ String getChangedFilesList(config) {
 
     def cFiles = []
     def logger = config.get("logger")
-    logger.debug("Calculating changes for git commit: ${env.GIT_COMMIT} prev commit: ${env.GIT_PREV_COMMIT}")
+    def dcmd
 
     try {
-        def dcmd
-        if (isEnvVarSet(env.GIT_COMMIT) && isEnvVarSet(env.GIT_PREV_COMMIT)) {
-            dcmd = "git diff --name-only ${env.GIT_PREV_COMMIT} ${env.GIT_COMMIT}"
-            cFiles = tryFindChangedList(config, dcmd);
-            if (cFiles != null ) {
-                return cFiles
-            }
-        }
 
         def br
         if (isEnvVarSet(env.ghprbTargetBranch)) {
@@ -990,9 +982,20 @@ String getChangedFilesList(config) {
 
         dcmd = "git diff --name-only origin/${br}..${sha}"
         cFiles = tryFindChangedList(config, dcmd);
-        if (cFiles != null ) {
+        if (cFiles != null && cFiles.size() > 0) {
             return cFiles
         }
+
+       if (isEnvVarSet(env.GIT_COMMIT) && isEnvVarSet(env.GIT_PREV_COMMIT)) {
+            logger.debug("Checking changes for git commit: ${env.GIT_COMMIT} prev commit: ${env.GIT_PREV_COMMIT}")
+            dcmd = "git diff --name-only ${env.GIT_PREV_COMMIT} ${env.GIT_COMMIT}"
+            cFiles = tryFindChangedList(config, dcmd);
+            if (cFiles != null && cFiles.size() > 0) {
+                return cFiles
+            }
+        }
+
+
     } catch (e) {
         logger.warn("Unable to calc changed file list - make sure shallow clone depth is configured in Jenkins, reason: " + e)
     }
