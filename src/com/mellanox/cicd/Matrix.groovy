@@ -1033,7 +1033,7 @@ def buildImage(config, image) {
             def oneDep = image.deps[i]
             config.logger.debug("Checking " + oneDep)
             if (changed_files.contains(oneDep)) {
-                config.logger.info("Forcing building by dependancy on changed file: ${oneDep} ... ")
+                config.logger.info("Forcing building by dependency on changed file: ${oneDep} ... ")
                 need_build++
             }
         }
