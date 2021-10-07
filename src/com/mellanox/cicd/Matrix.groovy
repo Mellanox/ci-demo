@@ -391,6 +391,9 @@ def getDefaultShell(config=null, step=null, shell='#!/bin/bash -eEl') {
         ret += 'x'
     }
 
+    if (ret != "action" && ret.substring(0,1) == '/') {
+        ret = '#!' + ret
+    }
     return ret
 }
 
