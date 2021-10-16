@@ -241,6 +241,10 @@ nexus.py apt --url http://swx-repos.mtr.labs.mlnx:8081/ --name test_apt_repo --u
 # Job name
 job: ci-demo
 
+# Specify if containerSelector and agentSelector options per step are mutually
+# exclusive (default: true)
+step_allow_single_selector: false
+
 # URI to docker registry
 registry_host: harbor.mellanox.com
 
@@ -392,6 +396,7 @@ steps:
 # make sure to quote the category.
 # `variant` is built-in variable, available for every axis of the run and represents serial number for 
 # execution of matrix dimension
+# selector can be regex
     containerSelector: '{category:"tool", variant:1}'
     args:
       - "--pre_script './autogen.sh;./configure;make -j 3 clean'"
