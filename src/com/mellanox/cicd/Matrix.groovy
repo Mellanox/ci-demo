@@ -433,9 +433,10 @@ def stringToList(selector) {
     return customSel
 }
 
-def check_skip_stage(image, config, title, oneStep, axis) {
+def check_skip_stage(image, config, title, oneStep, axis, runtime=null) {
 
     def stepEnabled = getConfigVal(config, ['enable'], true, true, oneStep, true).toString()
+
 
     if (!stepEnabled.toBoolean()) {
         config.logger.trace(2, "Step '${oneStep.name}' is disabled in project yaml file, skipping")
@@ -444,38 +445,53 @@ def check_skip_stage(image, config, title, oneStep, axis) {
 
 
     def selectors = [oneStep.containerSelector, oneStep.agentSelector]
+
+    // check if two selectors configured and only one allowed
+    def singleSelector = getConfigVal(config, ['step_allow_single_selector'], true)
+    if (singleSelector && oneStep.containerSelector != null && oneStep.agentSelector != null) {
+        reportFail('config', "Step='${oneStep.name}' has both containerSelector and agentSelector configured, while it is mutual exclusive, setup global `step_allow_single_selector: false` to disable")
+    }
+
     def skip = false
 
+    if (runtime) {
+        if(runtime == 'k8') {
+            if (singleSelector && oneStep.agentSelector) { // skip if wrong selector
+                return true
+            }
+            selectors = [oneStep.containerSelector]
+        } else {
+            if (singleSelector && oneStep.containerSelector) { // skip if wrong selector
+                return true
+            }
+            selectors = [oneStep.agentSelector]
+        }
+    }
+
+    config.logger.trace(2, "xxx check_skip_stage step='${oneStep.name}' runtime=${runtime} selectors=${selectors}")
+
+
+    // tools by default should be skipped, unless explicitly requested by selectors below
     if (image['category'] == 'tool') {
         skip = true
     }
 
-    found = true
-    activeSelector = "NA"
     for (int i=0; i<selectors.size(); i++) {
         selector = selectors[i]
         if (selector && selector.size() > 0) {
             def customSel = stringToList(selector)
-            config.logger.trace(2, "xxx Selector=" + selector + " custom=" + customSel + " name=" + image.name)
+            config.logger.trace(2, "Selector=" + selector + " custom=" + customSel + " name=" + image.name)
             if (matchMapEntry(customSel, axis)) {
                 config.logger.trace(2, "Step '" + oneStep.name + " matched with axis=" + axis + " selector=" + selector)
                 skip = false
-                found = true
                 break
             } else {
                 skip = true
-                found = false
-                activeSelector = customSel
             }
         }
     }
 
-    if (!found) {
-        //reportFail(oneStep.name, "Non existent selector=${activeSelector} found in step=`${oneStep.name}`")
-        config.logger.trace(2, "Non existent selector=${activeSelector} found in step=`${oneStep.name}`")
-    }
-
-    config.logger.trace(2, "$title - Step '" + oneStep.name + "' skip=" + skip)
+    config.logger.trace(2, "${oneStep.name} - Step '" + oneStep.name + "' skip=" + skip)
     return skip
 }
 
@@ -494,9 +510,11 @@ def toEnvVars(config, vars) {
     return map
 }
 
-def run_step(image, config, title, oneStep, axis) {
+def run_step(image, config, title, oneStep, axis, runtime=null) {
 
-    if ((image != null) && (axis != null) && check_skip_stage(image, config, title, oneStep, axis)) {
+    if ((image != null) && 
+        (axis != null) && 
+        check_skip_stage(image, config, title, oneStep, axis, runtime)) {
         return
     }
 
@@ -554,7 +572,7 @@ def run_step(image, config, title, oneStep, axis) {
     }
 }
 
-def runSteps(image, config, branchName, axis, steps=config.steps) {
+def runSteps(image, config, branchName, axis, steps=config.steps, runtime) {
     forceCleanupWS()
     // fetch .git from server and unpack
     unstash getStashName()
@@ -568,7 +586,7 @@ def runSteps(image, config, branchName, axis, steps=config.steps) {
         // collect parallel steps (if any) and run it when non-parallel step discovered or last element.
         if ( par != null && par == true) {
             def stepName = branchName + "->" + one.name
-            parallelNestedSteps[stepName] = { run_step(image, config, stepName, oneStep, axis) }
+            parallelNestedSteps[stepName] = { run_step(image, config, stepName, oneStep, axis, runtime) }
             // last element - run and flush
             if (i == steps.size() - 1) {
                 parallel(parallelNestedSteps)
@@ -583,7 +601,7 @@ def runSteps(image, config, branchName, axis, steps=config.steps) {
             parallel(parallelNestedSteps)
             parallelNestedSteps = [:]
         }
-        run_step(image, config, one.name, oneStep, axis)
+        run_step(image, config, one.name, oneStep, axis, runtime)
     }
     attachResults(config)
 }
@@ -705,7 +723,7 @@ spec:
         node(POD_LABEL) {
             stage (branchName) {
                 container(cname) {
-                    runSteps(image, config, branchName, axis, steps)
+                    runSteps(image, config, branchName, axis, steps, 'k8')
                 }
             }
         }
@@ -781,10 +799,10 @@ def runAgent(image, config, branchName=null, axis=null, Closure func, runInDocke
                     opts += " --privileged "
                 }
                 docker.image(image.url).inside(opts) {
-                    func(image, config, branchName, axis)
+                    func(image, config, branchName, axis, "docker")
                 }
             } else {
-                func(image, config, branchName, axis)
+                func(image, config, branchName, axis, "baremetal")
             }
         }
     }
@@ -873,8 +891,8 @@ Map getTasks(axes, image, config, include, exclude) {
                     if (image.url == null) {
                         runBareMetal = false
                     }
-                    def callback = {pimage, pconfig, pname, paxis ->
-                        runSteps(pimage, pconfig, pname, paxis)
+                    def callback = {pimage, pconfig, pname, paxis, pruntime ->
+                        runSteps(pimage, pconfig, pname, paxis, pruntime)
                     }
                     runAgent(image, config, branchName, axis, callback, runBareMetal)
                 } else {
