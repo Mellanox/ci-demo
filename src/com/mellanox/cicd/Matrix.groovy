@@ -391,8 +391,12 @@ def getDefaultShell(config=null, step=null, shell='#!/bin/bash -eEl') {
         ret += 'x'
     }
 
-    if (ret != "action" && ret.substring(0,1) == '/') {
-        ret = '#!' + ret
+    if (ret != "action") {
+        if (ret.substring(0,1) == '/') {
+            ret = '#!' + ret
+        } else if (ret.substring(0,2) != '#!') {
+            reportFail("config", "Unsupported value for shell parameter: " + ret + " should be '#!/path/to/shell'")
+        }
     }
     return ret
 }
