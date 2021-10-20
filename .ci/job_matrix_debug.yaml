@@ -39,6 +39,7 @@ runs_on_dockers:
   - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest', arch: 'x86_64'}
   - {name: 'blackduck', url: '$blackduck_url', category: 'tool', arch: 'x86_64', build_args: 'bobo=$var2'}
   - {url: '$registry_host/swx-storage/$arch/centos75-nvme-snap-3.0', name: 'snap', arch: 'aarch64'}
+  - {url: 'harbor.mellanox.com/toolbox/header_check:latest', name: 'header-check', tag: 'latest', category: 'header-check', arch: 'x86_64'}
   - {name: 'ubuntu20.10.buildah', url: 'ubuntu:20.10', tag: '20.10', arch: 'x86_64', category: 'tool'}
 
 pipeline_on_image_build:
@@ -90,6 +91,31 @@ steps:
       - "--build_script 'make -j 3'"
       - "--ignore_files 'devx googletest tests'"
     archiveArtifacts: 'cov.log'
+
+
+  - name: Run copyright check    
+    run: |
+        changed_files=changed_files_$$
+        mkdir $changed_files
+        cp --parent $(git diff --name-status remotes/origin/${ghprbTargetBranch} | grep -v ^D | awk '{print $NF}') $changed_files
+        echo "Checking files below"
+        ls $changed_files
+        ln -s ${PWD} /git-repo
+        /opt/nvidia/header-check.py \
+          --config .ci/copyright-check-map.yaml \
+          --path $changed_files \
+          --git-repo ${PWD} \
+          --ignore .ci/copyright-check-ignore.txt | tee copyrights.log
+        # Correct error code is not returned by the script
+        grep -rn ERROR copyrights.log        
+        if [ $? -eq 0 ]; then    
+            echo "Please refer to https://confluence.nvidia.com/pages/viewpage.action?pageId=788418816"      
+            exit 1
+        fi
+    containerSelector: '{category:"header-check"}'
+    archiveArtifacts: '*.log'
+    parallel: true    
+    enable: true  
 
   - name: Blackduck scan source
     containerSelector: "{category:'tool', name: 'blackduck', variant:1}"
