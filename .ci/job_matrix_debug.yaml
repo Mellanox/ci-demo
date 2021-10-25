@@ -39,7 +39,7 @@ runs_on_dockers:
   - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest', arch: 'x86_64'}
   - {name: 'blackduck', url: '$blackduck_url', category: 'tool', arch: 'x86_64', build_args: 'bobo=$var2'}
   - {url: '$registry_host/swx-storage/$arch/centos75-nvme-snap-3.0', name: 'snap', arch: 'aarch64'}
-  - {url: 'harbor.mellanox.com/toolbox/header_check:latest', name: 'header-check', tag: 'latest', arch: 'x86_64'}
+  - {url: 'harbor.mellanox.com/toolbox/header_check:latest', name: 'header-check', tag: 'latest', category: 'header-check', arch: 'x86_64'}
   - {name: 'ubuntu20.10.buildah', url: 'ubuntu:20.10', tag: '20.10', arch: 'x86_64', category: 'tool'}
 
 pipeline_on_image_build:
@@ -107,9 +107,18 @@ steps:
           --git-repo ${PWD} \
           --ignore .ci/copyright-check-ignore.txt | tee copyrights.log
         # Correct error code is not returned by the script
-        grep -rn ERROR copyrights.log        
-        if [ $? -eq 0 ]; then    
-            echo "Please refer to https://confluence.nvidia.com/pages/viewpage.action?pageId=788418816"      
+        # grep -rn ERROR copyrights.log        
+        if [ $? -eq 0 ]; then
+            echo "Please refer to https://confluence.nvidia.com/pages/viewpage.action?pageId=788418816"  
+            /opt/nvidia/header-check.py \
+          --config .ci/copyright-check-map.yaml \
+          --path $changed_files \
+          --git-repo ${PWD} \
+          --ignore .ci/copyright-check-ignore.txt | tee copyrights.log
+          --repair    
+            files=$(git status | grep 'modified:' | awk '{print $NF}'  ) .... #create list of modified file
+            mkdir $WORKSPACE/repaired_files
+            cp --parent $files $WORKSPACE/repaired_files/
             exit 1
         fi
     containerSelector: '{category:"header-check"}'

@@ -1,0 +1,39 @@
+general:
+     exclude:
+         - "\\.git.*"
+ 
+# nbu-proprietary:
+#     include:
+#         - ".*"
+#     exclude:
+#         - ".*(open|source).*"
+
+# apache-2.0:
+#     include:
+#         - ".*"
+#     exclude:
+#         - ".*(open|source).*"
+
+# bsd:
+#     include:
+#         - ".*"
+#     exclude:
+#         - ".*(open|source).*"
+
+# mit:
+#     include:
+#         - ".*"
+#     exclude:
+#         - ".*(open|source).*"
+
+
+nbu-proprietary:
+    include:
+        - ".*"
+        - ".ci/*"
+
+# nvidia-proprietary:
+#     include:
+#         - ".*"
+#     exclude:
+#         - ".*(open|source).*"
