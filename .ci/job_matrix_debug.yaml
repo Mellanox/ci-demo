@@ -114,7 +114,7 @@ steps:
           --config .ci/copyright-check-map.yaml \
           --path $changed_files \
           --git-repo ${PWD} \
-          --ignore .ci/copyright-check-ignore.txt | tee copyrights.log
+          --ignore .ci/copyright-check-ignore.txt | tee copyrights.log \
           --repair    
             files=$(git status | grep 'modified:' | awk '{print $NF}'  ) .... #create list of modified file
             mkdir $WORKSPACE/repaired_files
