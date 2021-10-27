@@ -258,7 +258,8 @@ def matchMapEntry(filters, entry) {
     for (int i=0; i<filters.size(); i++) {
         match = true
         filters[i].each { k, v ->
-            if (entry[k] == null || !entry[k].matches(v + "")) {
+            String ek = entry[k] + ''
+            if (entry[k] == null || !ek.matches(v + "")) {
                 match = false
             }
         }
