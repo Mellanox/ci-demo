@@ -448,7 +448,7 @@ def check_skip_stage(image, config, title, oneStep, axis, runtime=null) {
     def selectors = [oneStep.containerSelector, oneStep.agentSelector]
 
     // check if two selectors configured and only one allowed
-    def singleSelector = getConfigVal(config, ['step_allow_single_selector'], true)
+    def singleSelector = getConfigVal(config, ['step_allow_single_selector'], false)
     if (singleSelector && oneStep.containerSelector != null && oneStep.agentSelector != null) {
         reportFail('config', "Step='${oneStep.name}' has both containerSelector and agentSelector configured, while it is mutual exclusive, setup global `step_allow_single_selector: false` to disable")
     }
