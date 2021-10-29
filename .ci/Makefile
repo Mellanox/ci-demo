@@ -64,6 +64,7 @@ shell:
 		-v /auto/sw_tools:/auto/sw_tools \
 		-v /auto/sw/release/mlnx_ofed/MLNX_OFED:/auto/sw/release/mlnx_ofed/MLNX_OFED \
 		-v /.autodirect/sw/release/mlnx_ofed/MLNX_OFED:/.autodirect/sw/release/mlnx_ofed/MLNX_OFED \
+		-v /auto/sw_tools/Commercial:/auto/sw_tools/Commercial \
 		-v $(shell pwd)/..:/scratch \
 		--rm -it --pid=host ${NAME} $(DOCKER_CMD)
 
