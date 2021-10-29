@@ -4,6 +4,7 @@
 /* groovylint-disable LineLength, NoDef, UnnecessarySemicolon, VariableName */
 package com.mellanox.cicd;
 
+import jenkins.model.Jenkins
 
 class Logger {
     def ctx
@@ -449,8 +450,9 @@ def check_skip_stage(image, config, title, oneStep, axis, runtime=null) {
 
     // check if two selectors configured and only one allowed
     def singleSelector = getConfigVal(config, ['step_allow_single_selector'], false)
-    if (singleSelector && oneStep.containerSelector != null && oneStep.agentSelector != null) {
-        reportFail('config', "Step='${oneStep.name}' has both containerSelector and agentSelector configured, while it is mutual exclusive, setup global `step_allow_single_selector: false` to disable")
+
+    if ((singleSelector == true) && (oneStep.containerSelector != null) && (oneStep.agentSelector != null)) {
+        reportFail('config', "Step='${oneStep.name}' has both containerSelector and agentSelector configured, step_allow_single_selector=${singleSelector}, set `step_allow_single_selector: false` to disable")
     }
 
     def skip = false
@@ -1198,15 +1200,17 @@ def String getStashName() {
 	return "${env.BUILD_NUMBER}"
 }
 
-def main() {
-    node("master") {
+
+
+def startPipeline(String label) {
+    node(label) {
 
         logger = new Logger(this)
 
         stage("Checkout source code") {
             forceCleanupWS()
             def scmVars = checkout scm
-            
+
             env.GIT_COMMIT      = scmVars.GIT_COMMIT
             env.GIT_PREV_COMMIT = scmVars.GIT_PREVIOUS_COMMIT
 
@@ -1343,5 +1347,53 @@ def main() {
         }
     }
 }
+
+@NonCPS
+def launchMethod(label=null) {
+
+    if (label) {
+        def labelObj = Jenkins.instance.getLabel(label)
+        if (labelObj && (labelObj.nodes.size() + labelObj.clouds.size() > 0)) {
+            return true
+        }
+        return false
+    }
+
+    def cloudList = Jenkins.instance.clouds
+
+
+    if (cloudList.size() > 0) {
+        return true
+    }
+    return false
+
+}
+
+def main() {
+
+    def label = 'master'
+
+    // legacy launch via agent with label 'master'
+    if (launchMethod(label)) {
+        println("Legacy launch on ${label}")
+        startPipeline(label)
+        return
+    }
+
+    // try launch via Jenkins cloud definition
+    if (launchMethod()) {
+        label = "worker-${UUID.randomUUID().toString()}"
+        println("Cloud launch on ${label}")
+
+        podTemplate(
+            label: label,
+        ) {
+            startPipeline(label)
+        }
+        return
+    }
+
+    reportFail("init", "No launch method detected - define clouds or agents in Jenkins")
+  }
 
 return this
