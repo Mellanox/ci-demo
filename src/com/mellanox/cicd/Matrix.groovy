@@ -471,7 +471,7 @@ def check_skip_stage(image, config, title, oneStep, axis, runtime=null) {
         }
     }
 
-    config.logger.trace(2, "xxx check_skip_stage step='${oneStep.name}' runtime=${runtime} selectors=${selectors}")
+    config.logger.trace(2, "check_skip_stage step='${oneStep.name}' runtime=${runtime} selectors=${selectors}")
 
 
     // tools by default should be skipped, unless explicitly requested by selectors below
