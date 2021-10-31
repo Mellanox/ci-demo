@@ -124,7 +124,11 @@ def forceCleanup(prefix='', redirect='') {
     env.WORKSPACE = pwd()
 
     def cmd = """
-    $prefix bash -eE -c 'shopt -s dotglob; rm -rf ${env.WORKSPACE}/*' ${redirect}
+    if [ -x /bin/bash ]; then
+        $prefix bash -eE -c 'shopt -s dotglob; rm -rf ${env.WORKSPACE}/*' ${redirect}
+    else
+        $prefix find ${env.WORKSPACE} -depth ! -path . ! -path .. ! -path ${env.WORKSPACE} -exec rm -rf {} \\; ${redirect}
+    fi
     """
     return run_shell(cmd, "Clean workspace $prefix")
 }
@@ -275,7 +279,7 @@ def onUnstash() {
 
     env.WORKSPACE = pwd()
 
-    def cmd = """#!/bin/bash
+    def cmd = """#!/bin/sh
     export PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
     hash -r
     tar xf scm-repo.tar
@@ -382,16 +386,29 @@ def isDebugMode() {
     return mode
 }
 
-def getDefaultShell(config=null, step=null, shell='#!/bin/bash -eEl') {
+def getDefaultShell(config=null, step=null, shell=null) {
+
+    def cmd = """#!/bin/sh
+    if [ -x /bin/bash ]; then
+        echo '#!/bin/bash -elE'
+    else
+        echo '#!/bin/sh -el'
+    fi
+    """
+    def res = run_shell(cmd, "Detect shell", true)
+    shell = res.text.trim()
+    
+    if (isDebugMode()) {
+        shell += 'x'
+    }
 
     def ret = shell
     if ((step != null) && (step.shell != null)) {
         ret = step.shell
     } else if ((config != null) && (config.shell != null)) {
         ret = config.shell
-    } else if (isDebugMode()) {
-        ret += 'x'
     }
+
 
     if (ret != "action") {
         if (ret.substring(0,1) == '/') {
