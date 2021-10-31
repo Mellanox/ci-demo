@@ -1,0 +1,39 @@
+---
+job: str()
+kubernetes:
+  cloud: str()
+  nodeSelector: str()
+
+registry_host: str(required=False)
+registry_path: str(required=False)
+registry_auth: str(required=False)
+
+volumes: list(include('single_volume'), required=False)
+
+env: map(str(), int(), bool())
+step_allow_single_selector: bool(required=False)
+
+runs_on_dockers: list(required=False)
+runs_on_agents: list(required=False)
+
+steps: list(include('single_step'), min=1)
+pipeline_start: map(required=False)
+pipeline_stop: map(required=False)
+failFast: bool(required=False)
+
+---
+single_volume:
+  mountPath: str()
+  hostPath: str(required=False)
+
+single_step:
+  name: str()
+  run: str()
+  agentSelector: str(required=False)
+  containerSelector: str(required=False)
+  shell: str(required=False)
+  module: str(required=False)
+  archiveArtifacts: str(required=False)
+  parallel: bool(required=False)
+  always: str(required=False)
+
