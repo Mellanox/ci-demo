@@ -710,8 +710,8 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     def runAsUser = image.runAsUser ?: getConfigVal(config, ['kubernetes', 'runAsUser'], "0")
     def runAsGroup = image.runAsGroup ?: getConfigVal(config, ['kubernetes', 'runAsGroup'], "0")
     def privileged = image.privileged ?: getConfigVal(config, ['kubernetes', 'privileged'], false)
-    def limits = image.limits ?: getConfigVal(config, ['kubernetes', 'limits'], "{memory: 16Gi, cpu: 16000m}")
-    def requests = image.requests ?: getConfigVal(config, ['kubernetes', 'requests'], "{memory: 16Gi, cpu: 16000m}")
+    def limits = image.limits ?: getConfigVal(config, ['kubernetes', 'limits'], "{memory: 8Gi, cpu: 4000m}")
+    def requests = image.requests ?: getConfigVal(config, ['kubernetes', 'requests'], "{memory: 8Gi, cpu: 4000m}")
     def annotations = image.annotations ?: getConfigVal(config, ['kubernetes', 'annotations'], [], false)
     def caps_add = image.caps_add ?: getConfigVal(config, ['kubernetes', 'caps_add'], "[]")
     def yaml = """
@@ -1147,8 +1147,8 @@ def build_docker_on_k8(image, config) {
 
     def hostNetwork = image.hostNetwork ?: getConfigVal(config, ['kubernetes', 'hostNetwork'], false)
     def privileged = image.privileged ?: getConfigVal(config, ['kubernetes', 'privileged'], false)
-    def limits = image.limits ?: getConfigVal(config, ['kubernetes', 'limits'], "{memory: 16Gi, cpu: 16000m}")
-    def requests = image.requests ?: getConfigVal(config, ['kubernetes', 'requests'], "{memory: 16Gi, cpu: 16000m}")
+    def limits = image.limits ?: getConfigVal(config, ['kubernetes', 'limits'], "{memory: 8Gi, cpu: 4000m}")
+    def requests = image.requests ?: getConfigVal(config, ['kubernetes', 'requests'], "{memory: 8Gi, cpu: 4000m}")
     def yaml = """
 spec:
   containers:
