@@ -24,6 +24,7 @@ env:
 steps:
 
   - name: Nexus upload rpm
+    credentialsId: '311997c9-cc1c-4d5d-8ba2-6eb43ba0a06d'
     resource: actions/nexus.py
     containerSelector: "{name: 'builder'}"
     run: |
