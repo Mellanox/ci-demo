@@ -1069,6 +1069,7 @@ def buildImage(config, image) {
     if ("${env.build_dockers}" == "true") {
         config.logger.info("Forcing building file per user request: ${filename} ... ")
         need_build++
+        extra_args += ' --no-cache'
     }
     config.logger.debug("Changed files: ${changed_files}")
     if (changed_files.contains(filename)) {
