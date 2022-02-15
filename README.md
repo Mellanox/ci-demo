@@ -426,7 +426,7 @@ steps:
     archiveArtifacts-onfail: 'step_failed.log'
     archiveArtifacts: 'always_env.txt'
 # Publish HTML on jenkins page for given run
-    publisHTML
+    publishHTML:
       reportDir: '.'
       reportFiles: 'myfile.html'
       reportName: 'Test'
