@@ -1249,17 +1249,26 @@ def startPipeline(String label) {
             run_shell("[ -x .ci/cidemo-init.sh ] && .ci/cidemo-init.sh", 'Run cidemo init hook')
         }
 
-        files = findFiles(glob: "${env.conf_file}")
-        if (!files.size()) {
-            reportFail('config', "No conf_file found by ${env.conf_file}")
+        if (fileExists("${env.conf_file}")) {
+            files = [ "${env.conf_file}".toString() ]
+        } else {
+            files = findFiles(glob: "${env.conf_file}")
+            if (!files.size()) {
+                reportFail('config', "No conf_file found by ${env.conf_file}")
+            }
         }
-
 
         for (int i=0; i < files.size(); i++) {
             def file = files[i]
+            def file_path = ""
+            if (file in String) {
+                file_path = file
+            } else {
+                file_path = file.path
+            }
             def branches = [:]
-            def config = loadConfigFile(file.path, logger)
-            logger.info("New Job: '" + config.job + "'' file: " + file.path)
+            def config = loadConfigFile(file_path, logger)
+            logger.info("New Job: '" + config.job + "'' file: " + file_path)
 
             config.put("logger", logger)
             config.put("cFiles", getChangedFilesList(config))
