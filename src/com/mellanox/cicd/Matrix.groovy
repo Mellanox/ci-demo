@@ -189,6 +189,7 @@ def getArchConf(config, arch) {
 }
 
 def gen_image_map(config) {
+
     def image_map = [:]
 
     def arch_list = getConfigVal(config, ['matrix', 'axes', 'arch'], null, false)
@@ -213,7 +214,6 @@ def gen_image_map(config) {
         }
     }
 
-
     image_map.each { arch, images ->
 
         def k8sArchConf = getArchConf(config, arch)
@@ -225,34 +225,54 @@ def gen_image_map(config) {
         config.runs_on_dockers.each { item ->
 
             def dfile = item.clone()
-            dfile.arch = dfile.arch ?: arch
+            config.logger.debug("run on dockers item: " + dfile)
 
-            if (dfile.arch && dfile.arch != arch) {
-                config.logger.trace(3, "skipped conf: " + arch + " name: " + dfile.name)
-                return
+            if (dfile.enable == null) {
+                dfile.enable = "true"
+                config.logger.debug("run on dockers item.enable: " + dfile.enable)
             }
 
-            dfile.file = dfile.file ?: ''
-            if (dfile.url) {
-                parts = dfile.url.tokenize('/').last().tokenize(':')
-                if (parts.size() == 2) {
-                    dfile.tag = parts[1]
-                    tag_size = dfile.tag.size() + 1
-                    len = dfile.url.size() - tag_size
-                    dfile.uri = dfile.url.substring(0,len)
+            if (dfile.enable == "auto") {
+                dfile.enable = '${' + dfile.name + '}'
+                config.logger.debug("run on dockers item.enable: " + dfile.enable)
+            }
+
+            def enable = resolveTemplate(dfile, dfile.enable, config)
+
+            config.logger.debug("run on dockers enable: " + enable)
+
+            if (enable.toBoolean()) {
+                dfile.arch = dfile.arch ?: arch
+
+                if (dfile.arch && dfile.arch != arch) {
+                    config.logger.trace(3, "skipped conf: " + arch + " name: " + dfile.name)
+                    return
                 }
-            }
-            dfile.tag = dfile.tag ?: 'latest'
-            dfile.build_args = dfile.build_args ?: ''
-            dfile.build_args = resolveTemplate(dfile, dfile.build_args, config)
-            dfile.uri = dfile.uri ?: "${arch}/${dfile.name}"
-            dfile.filename = dfile.file
-            dfile.uri = resolveTemplate(dfile, dfile.uri, config)
-            dfile.url = dfile.url ?: "${config.registry_host}${config.registry_path}/${dfile.uri}:${dfile.tag}"
-            dfile.url = resolveTemplate(dfile, dfile.url, config)
 
-            config.logger.debug("Adding docker to image_map for " + dfile.arch + ' name: ' + dfile.name)
-            images.add(dfile)
+                dfile.file = dfile.file ?: ''
+                if (dfile.url) {
+                    parts = dfile.url.tokenize('/').last().tokenize(':')
+                    if (parts.size() == 2) {
+                        dfile.tag = parts[1]
+                        tag_size = dfile.tag.size() + 1
+                        len = dfile.url.size() - tag_size
+                        dfile.uri = dfile.url.substring(0,len)
+                    }
+                }
+
+                dfile.tag = dfile.tag ?: 'latest'
+                dfile.build_args = dfile.build_args ?: ''
+                dfile.build_args = resolveTemplate(dfile, dfile.build_args, config)
+                dfile.uri = dfile.uri ?: "${arch}/${dfile.name}"
+                dfile.filename = dfile.file
+                dfile.uri = resolveTemplate(dfile, dfile.uri, config)
+                dfile.url = dfile.url ?: "${config.registry_host}${config.registry_path}/${dfile.uri}:${dfile.tag}"
+                dfile.url = resolveTemplate(dfile, dfile.url, config)
+
+                config.logger.debug("Adding docker to image_map for " + dfile.arch + ' name: ' + dfile.name)
+                images.add(dfile)
+            }
+
         }
     }
     return image_map
