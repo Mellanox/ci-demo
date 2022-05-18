@@ -741,6 +741,7 @@ spec:
       resources:
         limits: ${limits}
         requests: ${requests}
+      securityContext:
         capabilities:
           add: ${caps_add}
 """
