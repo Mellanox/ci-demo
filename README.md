@@ -28,6 +28,10 @@ volumes:
   - {mountPath: /.autodirect/mtrswgwork, hostPath: /.autodirect/mtrswgwork}
   - {mountPath: /.autodirect/sw/release, hostPath: /.autodirect/sw/release}
 
+nfs_volumes:
+  - {serverAddress: r1, serverPath: /vol/mtrswgwork, mountPath: /.autodirect/mtrswgwork}
+  - {serverAddress: r3, serverPath: /vol/mlnx_ofed_release_flexcache, mountPath: /auto/sw/release/mlnx_ofed, readOnly: true}
+
 kubernetes:
   cloud: swx-k8s
 
@@ -303,6 +307,11 @@ volumes:
   - {mountPath: /auto/sw_tools, hostPath: /auto/sw_tools}
   - {mountPath: /.autodirect/mtrswgwork, hostPath: /.autodirect/mtrswgwork}
   - {mountPath: /.autodirect/sw/release, hostPath: /.autodirect/sw/release}
+
+# NFS volumes to map into dockers
+nfs_volumes:
+  - {serverAddress: r1, serverPath: /vol/mtrswgwork, mountPath: /.autodirect/mtrswgwork}
+  - {serverAddress: r3, serverPath: /vol/mlnx_ofed_release_flexcache, mountPath: /auto/sw/release/mlnx_ofed, readOnly: true}
 
 # environment varibles to insert into Job shell environment, can be referenced from steps 
 # or user-scripts or shell commands.

@@ -683,6 +683,23 @@ def parseListV(volumes) {
     return listV
 }
 
+def parseListNfsV(volumes) {
+    def listV = []
+    volumes.each { vol ->
+        serverAddress = vol.get("serverAddress")
+        serverPath = vol.get("serverPath")
+        mountPath = vol.get("mountPath")
+        readOnly = vol.get("readOnly", false)
+        nfsv = nfsVolume(serverAddress: serverAddress,
+                         serverPath: serverPath,
+                         mountPath: mountPath,
+                         readOnly: readOnly)
+        listV.add(nfsv)
+    }
+    return listV
+}
+        
+
 def parseListA(annotations) {
     def listA = []
     annotations.each { an ->
@@ -704,6 +721,7 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     config.logger.trace(2, "Using kubernetes ${cloudName}, axis=" + axis)
 
     def listV = parseListV(config.volumes)
+    listV.addAll(parseListNfsV(config.nfs_volumes))
     def cname = image.get("name").replaceAll("[\\.:/_]", "")
 
     def k8sArchConf = getArchConf(config, axis.arch)
@@ -1134,9 +1152,13 @@ def build_docker_on_k8(image, config) {
     if (config.get("volumes") == null) {
         config.put("volumes", [])
     }
+    if (config.get("nfs_volumes") == null) {
+        config.put("nfs_volumes", [])
+    }
     config.volumes.add([mountPath: '/var/run/docker.sock', hostPath: '/var/run/docker.sock'])
 
     def listV = parseListV(config.volumes)
+    listV.addAll(parseListNfsV(config.nfs_volumes))
 
     def cloudName = image.cloud ?: getConfigVal(config, ['kubernetes', 'cloud'], null)
     if (!cloudName) {

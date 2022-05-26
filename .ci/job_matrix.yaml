@@ -11,11 +11,11 @@ kubernetes:
 volumes:
   - {mountPath: /hpc/local, hostPath: /hpc/local}
   - {mountPath: /auto/sw_tools, hostPath: /auto/sw_tools}
-  - {mountPath: /.autodirect/mtrswgwork, hostPath: /.autodirect/mtrswgwork}
-  - {mountPath: /.autodirect/sw/release, hostPath: /.autodirect/sw/release}
+  - {mountPath: /auto/mtrswgwork, hostPath: /auto/mtrswgwork}
+  - {mountPath: /auto/sw/release, hostPath: /auto/sw/release}
 
 env:
-  mofed_installer_exe: /.autodirect/sw/release/mlnx_ofed/MLNX_OFED/mlnx_ofed_install
+  mofed_installer_exe: /auto/sw/release/mlnx_ofed/MLNX_OFED/mlnx_ofed_install
   mofed_installer_opt: --user-space-only --without-fw-update --all -q --skip-unsupported-devices-check
 
 runs_on_dockers:
