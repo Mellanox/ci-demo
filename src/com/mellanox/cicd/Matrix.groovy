@@ -297,8 +297,6 @@ def matchMapEntry(filters, entry) {
 
 def onUnstash() {
 
-    env.WORKSPACE = pwd()
-
     def cmd = """#!/bin/sh
     export PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
     hash -r
@@ -834,6 +832,7 @@ def runAgent(image, config, branchName=null, axis=null, Closure func, runInDocke
         unstash getStashName()
         onUnstash()
         stage(branchName) {
+            env.WORKSPACE = pwd()
             if (runInDocker) {
                 def opts = getDockerOpt(config)
                 if (image.privileged && image.privileged == 'true') {
