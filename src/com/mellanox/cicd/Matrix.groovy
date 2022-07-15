@@ -160,7 +160,7 @@ def getArchConf(config, arch) {
 
     k8sArchConfTable['aarch64'] = [
         nodeSelector: 'kubernetes.io/arch=arm64',
-        jnlpImage: "${config.registry_host}/${config.registry_jnlp_path}/jenkins-arm-agent-jnlp:latest",
+        jnlpImage: "jenkins/inbound-agent:latest",
         dockerImage: 'docker:19.03'
     ]
 
