@@ -65,7 +65,7 @@ steps:
     run: cuda=$cuda .ci/runtests.sh
 
   - name: Check kubectl
-    run: /hpc/local/bin/kubectl cluster-info ||:
+    run: "/hpc/local/bin/kubectl cluster-info || true"
     # ignore errors, just capture output of kubectl command
 
 pipeline_start:
