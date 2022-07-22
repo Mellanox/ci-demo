@@ -750,6 +750,8 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     def requests = image.requests ?: getConfigVal(config, ['kubernetes', 'requests'], "{memory: 8Gi, cpu: 4000m}")
     def annotations = image.annotations ?: getConfigVal(config, ['kubernetes', 'annotations'], [], false)
     def caps_add = image.caps_add ?: getConfigVal(config, ['kubernetes', 'caps_add'], "[]")
+    def service_account =  getConfigVal(config, ['kubernetes', 'serviceAccount'], "default")
+    def namespace =  getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def yaml = """
 spec:
   containers:
@@ -769,6 +771,8 @@ spec:
         hostNetwork: hostNetwork,
         annotations: parseListA(annotations),
         yamlMergeStrategy: merge(),
+        serviceAccount: service_account,
+        namespace: namespace,
         yaml: yaml,
         containers: [
             containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
