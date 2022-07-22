@@ -8,7 +8,7 @@ AM_INIT_AUTOMAKE([1.11 subdir-objects -Wno-portability no-define no-dist-gzip di
 AC_CONFIG_MACRO_DIR([config/m4])
 AC_PROG_CC
 
-PKG_PROG_PKG_CONFIG(0.16)
+PKG_PROG_PKG_CONFIG
 LT_INIT
 
 
