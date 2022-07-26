@@ -1436,7 +1436,7 @@ def launchMethod(label=null) {
 
     if (label) {
         def labelObj = Jenkins.instance.getLabel(label)
-        if (labelObj && (labelObj.nodes.size() + labelObj.clouds.size() > 0)) {
+        if (labelObj && (labelObj.nodes.size() + labelObj.clouds.size() > 0) && (labelObj.nodes[0].numExecutors > 0)) {
             return true
         }
         return false
