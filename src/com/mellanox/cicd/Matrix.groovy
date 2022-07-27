@@ -723,6 +723,7 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     def listV = parseListV(config.volumes)
     listV.addAll(parseListNfsV(config.nfs_volumes))
     def cname = image.get("name").replaceAll("[\\.:/_]", "")
+    def pod_name = config.job + "-" + cname + "-" + env.BUILD_NUMBER
 
     def k8sArchConf = getArchConf(config, axis.arch)
     def nodeSelector = ''
@@ -773,6 +774,7 @@ spec:
         yamlMergeStrategy: merge(),
         serviceAccount: service_account,
         namespace: namespace,
+        name: pod_name,
         yaml: yaml,
         containers: [
             containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
@@ -1163,6 +1165,8 @@ def build_docker_on_k8(image, config) {
 
     def listV = parseListV(config.volumes)
     listV.addAll(parseListNfsV(config.nfs_volumes))
+    def cname = image.get("name").replaceAll("[\\.:/_]", "")
+    def pod_name = config.job + "-build-" + cname + "-" + env.BUILD_NUMBER
 
     def cloudName = image.cloud ?: getConfigVal(config, ['kubernetes', 'cloud'], null)
     if (!cloudName) {
@@ -1207,6 +1211,7 @@ spec:
         cloud: cloudName,
         nodeSelector: nodeSelector,
         hostNetwork: hostNetwork,
+        name: pod_name,
         yamlMergeStrategy: merge(),
         yaml: yaml,
         containers: [
