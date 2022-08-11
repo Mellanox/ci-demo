@@ -1199,6 +1199,8 @@ def build_docker_on_k8(image, config) {
     def privileged = image.privileged ?: getConfigVal(config, ['kubernetes', 'privileged'], false)
     def limits = image.limits ?: getConfigVal(config, ['kubernetes', 'limits'], "{memory: 8Gi, cpu: 4000m}")
     def requests = image.requests ?: getConfigVal(config, ['kubernetes', 'requests'], "{memory: 8Gi, cpu: 4000m}")
+    def service_account = getConfigVal(config, ['kubernetes', 'serviceAccount'], "default")
+    def namespace = getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def yaml = """
 spec:
   containers:
@@ -1212,6 +1214,8 @@ spec:
         nodeSelector: nodeSelector,
         hostNetwork: hostNetwork,
         name: pod_name,
+        serviceAccount: service_account,
+        namespace: namespace,
         yamlMergeStrategy: merge(),
         yaml: yaml,
         containers: [
