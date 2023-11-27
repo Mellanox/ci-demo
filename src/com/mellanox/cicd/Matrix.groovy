@@ -622,7 +622,8 @@ def runSteps(image, config, branchName, axis, steps=config.steps, runtime) {
         def par = one["parallel"]
         def oneStep = one
         // collect parallel steps (if any) and run it when non-parallel step discovered or last element.
-        if ( par != null && par == true) {
+        // Skip parallel stages if not used. Fix for Blueocean UI.
+        if ( par != null && par == true && !check_skip_stage(image, config, branchName, oneStep, axis)) {
             def stepName = branchName + "->" + one.name
             parallelNestedSteps[stepName] = { run_step(image, config, stepName, oneStep, axis, runtime) }
             // last element - run and flush
