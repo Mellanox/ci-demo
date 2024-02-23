@@ -282,6 +282,8 @@ kubernetes:
     - {key: 'k8s.v1.cni.cncf.io/networks', value: 'roce-bw-port1@roce0'}
 # optional: container capabilities to add
   caps_add: "[ IPC_LOCK, SYS_RESOURCE ]"
+# optional: tolerations. Tolerations allow the scheduler to schedule pods with matching taints.
+  tolerations: "[{key: 'feature.node.kubernetes.io/project', operator: 'Equal', value: 'SPDK', effect: 'NoSchedule'}]"
 
 # optional: can specify jenkins defined credentials and refer/request by credentialsId in step that
 # requires it
