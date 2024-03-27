@@ -41,7 +41,7 @@ class Logger {
     }
 
 }
- 
+
 @NonCPS
 List getMatrixAxes(matrix_axes) {
     List axes = []
@@ -58,7 +58,7 @@ List getMatrixAxes(matrix_axes) {
 
 // hack to avoid Serializble errors as intermediate access to entrySet returns non-serializable objects
 
-@NonCPS 
+@NonCPS
 def entrySet(m) {
     m.collect { k, v -> [key: k, value: v] }
 }
@@ -415,7 +415,7 @@ def getDefaultShell(config=null, step=null, shell=null) {
     """
     def res = run_shell(cmd, "Detect shell", true)
     shell = res.text.trim()
-    
+
     if (isDebugMode()) {
         shell += 'x'
     }
@@ -550,8 +550,8 @@ def toEnvVars(config, vars) {
 
 def run_step(image, config, title, oneStep, axis, runtime=null) {
 
-    if ((image != null) && 
-        (axis != null) && 
+    if ((image != null) &&
+        (axis != null) &&
         check_skip_stage(image, config, title, oneStep, axis, runtime)) {
         return
     }
@@ -633,7 +633,7 @@ def runSteps(image, config, branchName, axis, steps=config.steps, runtime) {
             }
             continue
         }
-        // non-parallel step discovered, need to flush all parallel 
+        // non-parallel step discovered, need to flush all parallel
         // steps collected previously to keep ordering.
         // run non-parallel step right after
         if (parallelNestedSteps.size() > 0) {
@@ -699,16 +699,20 @@ def parseListNfsV(volumes) {
     }
     return listV
 }
-        
 
-def parseListA(annotations) {
+
+def parseListA(annotations, config) {
     def listA = []
+    config.logger.trace(2, "annotations: ${annotations}")
     annotations.each { an ->
         key = an.get("key")
         value = an.get("value")
+        config.logger.trace(2, "key: ${key}, value: ${value}")
         pan = podAnnotation(key: key, value: value)
+        config.logger.trace(2, "pan: ${pan}")
         listA.add(pan)
     }
+    config.logger.trace(2, "listA: ${listA}")
     return listA
 }
 
@@ -750,7 +754,12 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     def privileged = image.privileged ?: getConfigVal(config, ['kubernetes', 'privileged'], false)
     def limits = image.limits ?: getConfigVal(config, ['kubernetes', 'limits'], "{memory: 8Gi, cpu: 4000m}")
     def requests = image.requests ?: getConfigVal(config, ['kubernetes', 'requests'], "{memory: 8Gi, cpu: 4000m}")
+    config.logger.trace(2, "DEBUG PRINT TEST")
+    config.logger.trace(2, "image annotation: " + image.annotations)
     def annotations = image.annotations ?: getConfigVal(config, ['kubernetes', 'annotations'], [], false)
+    config.logger.trace(2, "Using annotations: " + annotations)
+    def foo = parseListA(annotations, config)
+    config.logger.trace(2, "foo is: " + foo)
     def caps_add = image.caps_add ?: getConfigVal(config, ['kubernetes', 'caps_add'], "[]")
     def service_account = getConfigVal(config, ['kubernetes', 'serviceAccount'], "default")
     def namespace = getConfigVal(config, ['kubernetes', 'namespace'], "default")
@@ -773,7 +782,7 @@ spec:
         runAsGroup: runAsGroup,
         nodeSelector: nodeSelector,
         hostNetwork: hostNetwork,
-        annotations: parseListA(annotations),
+        annotations: parseListA(annotations, config),
         yamlMergeStrategy: merge(),
         serviceAccount: service_account,
         namespace: namespace,
@@ -949,7 +958,7 @@ Map getTasks(axes, image, config, include, exclude) {
             withEnv(axisEnv) {
                 if ((config.get("kubernetes") == null) &&
                     (image.nodeLabel == null) &&
-                    (image.cloud == null) 
+                    (image.cloud == null)
                     ) {
                     reportFail('config', "Please define cloud or nodeLabel in yaml config file or define nodeLabel for docker")
                 }
@@ -1396,7 +1405,7 @@ def startPipeline(String label) {
                     branches += getMatrixTasks(image, config)
                 }
             }
-        
+
             if (config.runs_on_agents) {
                 for (int a=0; a<config.runs_on_agents.size();a++) {
                     image = config.runs_on_agents[a]
