@@ -32,6 +32,9 @@ nfs_volumes:
   - {serverAddress: r1, serverPath: /vol/mtrswgwork, mountPath: /.autodirect/mtrswgwork}
   - {serverAddress: r3, serverPath: /vol/mlnx_ofed_release_flexcache, mountPath: /auto/sw/release/mlnx_ofed, readOnly: true}
 
+pvc_volumes:
+  - {claimName: nbu-swx-storage-devops-pvc, mountPath: /mnt/pvc, readOnly: false}
+
 kubernetes:
   cloud: swx-k8s
 
@@ -314,6 +317,10 @@ volumes:
 nfs_volumes:
   - {serverAddress: r1, serverPath: /vol/mtrswgwork, mountPath: /.autodirect/mtrswgwork}
   - {serverAddress: r3, serverPath: /vol/mlnx_ofed_release_flexcache, mountPath: /auto/sw/release/mlnx_ofed, readOnly: true}
+
+# PersistentVolumeClaim volumes to map into containers
+pvc_volumes:
+  - {claimName: nbu-swx-storage-devops-pvc, mountPath: /mnt/pvc, readOnly: false}
 
 # environment varibles to insert into Job shell environment, can be referenced from steps 
 # or user-scripts or shell commands.
