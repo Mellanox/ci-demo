@@ -699,7 +699,20 @@ def parseListNfsV(volumes) {
     }
     return listV
 }
-        
+
+def parseListPVC(volumes) {
+    def listV = []
+    volumes.each { vol ->
+        claimName = vol.get("claimName")
+        mountPath = vol.get("mountPath")
+        readOnly = vol.get("readOnly", false)
+        PVCv = persistentVolumeClaim(claimName: claimName,
+                                     mountPath: mountPath,
+                                     readOnly: readOnly)
+        listV.add(PVCv)
+    }
+    return listV
+}
 
 def parseListA(annotations) {
     def listA = []
@@ -723,6 +736,7 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
 
     def listV = parseListV(config.volumes)
     listV.addAll(parseListNfsV(config.nfs_volumes))
+    listV.addAll(parseListPVC(config.pvc_volumes))
     def cname = image.get("name").replaceAll("[\\.:/_]", "")
     def pod_name = config.job + "-" + cname + "-" + env.BUILD_NUMBER
 
@@ -1167,6 +1181,7 @@ def build_docker_on_k8(image, config) {
 
     def listV = parseListV(config.volumes)
     listV.addAll(parseListNfsV(config.nfs_volumes))
+    listV.addAll(parseListPVC(config.pvc_volumes))
     def cname = image.get("name").replaceAll("[\\.:/_]", "")
     def pod_name = config.job + "-build-" + cname + "-" + env.BUILD_NUMBER
 
