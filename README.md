@@ -35,6 +35,9 @@ nfs_volumes:
 pvc_volumes:
   - {claimName: nbu-swx-storage-devops-pvc, mountPath: /mnt/pvc, readOnly: false}
 
+secret_volumes:
+  - {secretName: 'mellanox-debs-keyring', mountPath: '/mnt/secret'}
+
 kubernetes:
   cloud: swx-k8s
 
@@ -321,6 +324,10 @@ nfs_volumes:
 # PersistentVolumeClaim volumes to map into containers
 pvc_volumes:
   - {claimName: nbu-swx-storage-devops-pvc, mountPath: /mnt/pvc, readOnly: false}
+
+# secretVolume volumes to map into containers
+secret_volumes:
+  - {secretName: 'mellanox-debs-keyring', mountPath: '/mnt/secret'}
 
 # environment varibles to insert into Job shell environment, can be referenced from steps 
 # or user-scripts or shell commands.
