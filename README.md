@@ -292,10 +292,12 @@ kubernetes:
   tolerations: "[{key: 'feature.node.kubernetes.io/project', operator: 'Equal', value: 'SPDK', effect: 'NoSchedule'}]"
 
 # optional: can specify jenkins defined credentials and refer/request by credentialsId in step that
-# requires it
+# requires it (it's considered usernamePassword by default if 'type' is not specified)
 credentials:
   - {credentialsId: '311997c9-cc1c-4d5d-8ba2-6eb43ba0a06d', usernameVariable: 'SWX_REPOS_USER', passwordVariable: 'SWX_REPOS_PASS'}
   - {credentialsId: 'jenkins-pulp', usernameVariable: 'pulp_usr', passwordVariable: 'pulp_pwd'}
+  - {credentialsId: 'github-ssh-rsa-key', 'keyFileVariable': 'SSH_KEY_FILE', type: 'sshUserPrivateKey'}
+  - {credentialsId: 'secret-file', 'variable': 'SECRET_FILE', type: 'file'}
 
 
 # optional: for multi-arch k8 support, can define arch-specific nodeSelectors
@@ -433,12 +435,19 @@ steps:
     parallel: true
 
   - name: Check package
+# use 'jenkins-pulp' credentials in this steps
+    credentialsId: 'jenkins-pulp' 
 # can set shell per step or globally
     shell: '!/bin/bash -xeEl'
     run: cuda=$cuda .ci/check_package.sh
     parallel: true
 
   - name: Run tests
+# multiple credentials can be used as a list in one step
+    credentialsId:
+      - 'jenkins-pulp'
+      - 'github-ssh-rsa-key'
+      - 'secret-file'
     run: cuda=$cuda .ci/runtests.sh
 # define shell command(s) to run if step fails
     onfail: |

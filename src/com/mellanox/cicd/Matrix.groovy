@@ -587,22 +587,55 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
             def String cmd = shell + "\n" + oneStep.run
             config.logger.trace(4, "Running step script=" + cmd)
             if (oneStep.credentialsId) {
-                Map found = null
-                for (int i=0; i<config.credentials.size(); i++) {
-                    Map entry = config.credentials[i]
-                    if (entry.credentialsId == oneStep.credentialsId) {
-                        found = entry
-                        break
+                def credentialsIdList = []
+                // credentialsId can be string or list of strings
+                if (oneStep.credentialsId instanceof List) {
+                    credentialsIdList.addAll(oneStep.credentialsId)
+                } else if (oneStep.credentialsId instanceof String) {
+                    credentialsIdList.add(oneStep.credentialsId)
+                } else {
+                    reportFail(title, "credentialsId should be either a List or a String")
+                }
+                def foundList = []
+                for (credentialsId in credentialsIdList) {
+                    def found = false
+                    for (int i=0; i<config.credentials.size(); i++) {
+                        Map entry = config.credentials[i]
+                        if (entry.credentialsId == credentialsId) {
+                            foundList.add(entry)
+                            found = true
+                            break
+                        }
+                    }
+                    if (!found) {
+                        reportFail(title, "credentialsId '${credentialsId}' requested but undefined in yaml file ")
                     }
                 }
-                if (!found || !found.usernameVariable || !found.passwordVariable) {
-                    reportFail(title, "Credentials requested but undefined in yaml file")
-                }
-                withCredentials([usernamePassword(credentialsId: oneStep.credentialsId,
-                                passwordVariable: found.passwordVariable,
-                                usernameVariable: found.usernameVariable)]) {
-                        run_step_shell(image, cmd, title, oneStep, config)
+                def credentials = []
+                for (Map found in foundList) {
+                    if (found.get('type') && found.get('type') != 'usernamePassword') {
+                        if (found.type == 'sshUserPrivateKey') {
+                            credentials.add(sshUserPrivateKey(credentialsId: found.credentialsId,
+                                            keyFileVariable: found.keyFileVariable,
+                                            passphraseVariable: found.get('passphraseVariable'),
+                                            usernameVariable: found.get('usernameVariable')))
+                        }
+                        if (found.type == 'file') {
+                            credentials.add(file(credentialsId: found.credentialsId,
+                                            variable: found.variable))
+                        }
+                    } else {
+                        // usernamePassword by default
+                        if (found.usernameVariable && found.passwordVariable) {
+                            credentials.add(usernamePassword(credentialsId: found.credentialsId,
+                                            passwordVariable: found.passwordVariable,
+                                            usernameVariable: found.usernameVariable))
+                        }
                     }
+                }
+                withCredentials(credentials) {
+                    run_step_shell(image, cmd, title, oneStep, config)
+                }
             } else {
                 run_step_shell(image, cmd, title, oneStep, config)
             }
