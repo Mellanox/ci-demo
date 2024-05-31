@@ -626,11 +626,12 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
                         }
                     } else {
                         // usernamePassword by default
-                        if (found.usernameVariable && found.passwordVariable) {
-                            credentials.add(usernamePassword(credentialsId: found.credentialsId,
-                                            passwordVariable: found.passwordVariable,
-                                            usernameVariable: found.usernameVariable))
+                        if (!found.usernameVariable || !found.passwordVariable) {
+                            reportFail(title, "credentialsId '${found.credentialsId}' has unsupported format (${found})!")
                         }
+                        credentials.add(usernamePassword(credentialsId: found.credentialsId,
+                                        passwordVariable: found.passwordVariable,
+                                        usernameVariable: found.usernameVariable))
                     }
                 }
                 withCredentials(credentials) {
