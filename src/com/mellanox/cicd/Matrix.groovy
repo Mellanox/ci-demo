@@ -1211,8 +1211,12 @@ def buildDocker(image, config) {
     vars += toEnvVars(config, config.env)
 
     withEnv(vars) {
-        if (config.registry_host && config.registry_auth && image.url.contains(config.registry_host)) {
-            docker.withRegistry("https://${config.registry_host}", config.registry_auth) {
+        if (config.registry_host && image.url.contains(config.registry_host)) {
+            def opts = ["https://${config.registry_host}"]
+            if (config.registry_auth) {
+                opts.add(config.registry_auth)
+            }
+            docker.withRegistry(*opts) {
                 buildImage(config, image)
             }
         } else {
