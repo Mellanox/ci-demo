@@ -41,7 +41,7 @@ class Logger {
     }
 
 }
- 
+
 @NonCPS
 List getMatrixAxes(matrix_axes) {
     List axes = []
@@ -58,7 +58,7 @@ List getMatrixAxes(matrix_axes) {
 
 // hack to avoid Serializble errors as intermediate access to entrySet returns non-serializable objects
 
-@NonCPS 
+@NonCPS
 def entrySet(m) {
     m.collect { k, v -> [key: k, value: v] }
 }
@@ -415,7 +415,7 @@ def getDefaultShell(config=null, step=null, shell=null) {
     """
     def res = run_shell(cmd, "Detect shell", true)
     shell = res.text.trim()
-    
+
     if (isDebugMode()) {
         shell += 'x'
     }
@@ -550,8 +550,8 @@ def toEnvVars(config, vars) {
 
 def run_step(image, config, title, oneStep, axis, runtime=null) {
 
-    if ((image != null) && 
-        (axis != null) && 
+    if ((image != null) &&
+        (axis != null) &&
         check_skip_stage(image, config, title, oneStep, axis, runtime)) {
         return
     }
@@ -667,7 +667,7 @@ def runSteps(image, config, branchName, axis, steps=config.steps, runtime) {
             }
             continue
         }
-        // non-parallel step discovered, need to flush all parallel 
+        // non-parallel step discovered, need to flush all parallel
         // steps collected previously to keep ordering.
         // run non-parallel step right after
         if (parallelNestedSteps.size() > 0) {
@@ -682,7 +682,7 @@ def runSteps(image, config, branchName, axis, steps=config.steps, runtime) {
 def getConfigVal(config, list, defaultVal=null, toString=true, oneStep=null, useTemplate=false) {
     def val = oneStep ?: config
     for (int i=0; i<list.size(); i++) {
-        item = list[i]
+        def item = list[i]
         config.logger.trace(5, "getConfigVal: Checking $item in config file")
         val = val[item]
         if (val == null) {
@@ -1014,7 +1014,7 @@ Map getTasks(axes, image, config, include, exclude) {
             withEnv(axisEnv) {
                 if ((config.get("kubernetes") == null) &&
                     (image.nodeLabel == null) &&
-                    (image.cloud == null) 
+                    (image.cloud == null)
                     ) {
                     reportFail('config', "Please define cloud or nodeLabel in yaml config file or define nodeLabel for docker")
                 }
@@ -1213,12 +1213,12 @@ def buildDocker(image, config) {
     withEnv(vars) {
         if (config.registry_host && image.url.contains(config.registry_host)) {
             if (config.registry_auth) {
-                docker.withRegistry("https://${config.registry_host}", config.registry_auth) { 
-                    buildImage(config, image) 
+                docker.withRegistry("https://${config.registry_host}", config.registry_auth) {
+                    buildImage(config, image)
                 }
             } else {
-                docker.withRegistry("https://${config.registry_host}") {  
-                    buildImage(config, image) 
+                docker.withRegistry("https://${config.registry_host}") {
+                    buildImage(config, image)
                 }
             }
         } else {
@@ -1471,7 +1471,7 @@ def startPipeline(String label) {
                     branches += getMatrixTasks(image, config)
                 }
             }
-        
+
             if (config.runs_on_agents) {
                 for (int a=0; a<config.runs_on_agents.size();a++) {
                     image = config.runs_on_agents[a]
