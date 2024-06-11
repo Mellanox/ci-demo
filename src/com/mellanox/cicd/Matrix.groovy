@@ -1378,10 +1378,10 @@ def startPipeline(String label) {
             env.GIT_PREV_COMMIT = scmVars.GIT_PREVIOUS_COMMIT
 
             logger.debug("Git commit: ${env.GIT_COMMIT} prev commit: ${env.GIT_PREV_COMMIT}")
+            run_shell("[ -x .ci/cidemo-init.sh ] && .ci/cidemo-init.sh", 'Run cidemo init hook')
             // create git tarball on server, agents will copy it and unpack
             run_shell("tar -c --exclude scm-repo.tar -f scm-repo.tar .", 'Creating workspace copy')
             stash includes: "scm-repo.tar", name: getStashName()
-            run_shell("[ -x .ci/cidemo-init.sh ] && .ci/cidemo-init.sh", 'Run cidemo init hook')
         }
 
         if (fileExists("${env.conf_file}")) {
