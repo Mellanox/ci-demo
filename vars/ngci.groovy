@@ -3,9 +3,10 @@
 int call(ctx, oneStep, config) {
     def args = oneStep.args
 
-    library(identifier: 'ngci@ci_version-3.1',
+    library(identifier: 'ngci@5.0',
             retriever: modernSCM([$class: 'GitSCMSource',
-            remote: 'http://l-gerrit.mtl.labs.mlnx:8080/DevOps/Jenkins/ci_framework']))
+            remote: 'ssh://git-nbu.nvidia.com:12023/DevOps/Jenkins/ci_framework',
+            credentialsId: 'b7d08ca7-378c-45d6-ac4b-3f30bdf49168' ]))
 
     if (args.size() < 1) {
         ctx.reportFail(oneStep.name, 'fatal: DynamicAction() expects at least 1 parameter')
