@@ -803,11 +803,11 @@ def replaceVars(vars, str) {
 
     for (def entry in entrySet(vars)) {
 
+        if (entry.key == "" ||  entry.key == null || entry.value == "" || entry.value == null) {
+            continue;
+        }
         if (!res.contains('$')) {
             return res
-        }
-        if (entry.value == null) {
-            continue;
         }
         def opts = ['$' + entry.key, '${' + entry.key + '}']
         for (int i=0; i<opts.size(); i++) {
