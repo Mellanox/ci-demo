@@ -764,6 +764,18 @@ def parseSecretV(volumes) {
     return listV
 }
 
+def parseEmptyDirV(volumes) {
+    def listV = []
+    volumes.each { vol ->
+        mountPath = vol.get("mountPath")
+        memoryFlag = vol.get("memory", false)
+        EmptyDirV = emptyDirVolume(  mountPath: mountPath,
+                                     memory: memoryFlag)
+        listV.add(EmptyDirV)
+    }
+    return listV
+}
+
 def parseListA(annotations) {
     def listA = []
     annotations.each { an ->
@@ -788,6 +800,7 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     listV.addAll(parseListNfsV(config.nfs_volumes))
     listV.addAll(parseListPVC(config.pvc_volumes))
     listV.addAll(parseSecretV(config.secret_volumes))
+    listV.addAll(parseEmptyDirV(config.empty_volumes))
     def cname = image.get("name").replaceAll("[\\.:/_]", "")
     def pod_name = config.job + "-" + cname + "-" + env.BUILD_NUMBER
 
@@ -1240,6 +1253,7 @@ def build_docker_on_k8(image, config) {
     listV.addAll(parseListNfsV(config.nfs_volumes))
     listV.addAll(parseListPVC(config.pvc_volumes))
     listV.addAll(parseSecretV(config.secret_volumes))
+    listV.addAll(parseEmptyDirV(config.empty_volumes))
     def cname = image.get("name").replaceAll("[\\.:/_]", "")
     def pod_name = config.job + "-build-" + cname + "-" + env.BUILD_NUMBER
 

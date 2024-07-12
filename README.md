@@ -38,6 +38,9 @@ pvc_volumes:
 secret_volumes:
   - {secretName: 'mellanox-debs-keyring', mountPath: '/mnt/secret'}
 
+empty_volumes:
+  - {mountPath: /var/home/user/.local/share/containers, memory: false}
+
 kubernetes:
   cloud: swx-k8s
 
@@ -330,6 +333,12 @@ pvc_volumes:
 # secretVolume volumes to map into containers
 secret_volumes:
   - {secretName: 'mellanox-debs-keyring', mountPath: '/mnt/secret'}
+
+# emptyDir volumes to map into containers
+# memory flag creates volumes in RAM instead of Disk (size of RAM depends on memory limits/requests)
+empty_volumes:
+  - {mountPath: /var/home/user/.local/share/containers, memory: false}
+
 
 # environment varibles to insert into Job shell environment, can be referenced from steps 
 # or user-scripts or shell commands.
