@@ -556,8 +556,6 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
         return
     }
 
-
-
     stage("${title}") {
         def shell = getDefaultShell(config, oneStep)
         env.WORKSPACE = pwd()
@@ -622,6 +620,10 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
                         }
                         if (found.type == 'file') {
                             credentials.add(file(credentialsId: found.credentialsId,
+                                            variable: found.variable))
+                        }
+                        if (found.type == 'string') {
+                            credentials.add(string(credentialsId: found.credentialsId,
                                             variable: found.variable))
                         }
                     } else {
