@@ -1370,6 +1370,10 @@ def loadConfigFile(filepath, logger) {
             reportFail('config', "matrix.include and matrix.exclude sections in config file=${filepath} are mutually exclusive. Please keep only one.")
         }
     }
+    // for some specific config vars we want to resolve them from env to allow setting at job definition level
+    if (config.get("registry_host")) {
+        config["registry_host"] = replaceVars(env.getEnvironment(), config.get("registry_host"))
+    }
     return config
 }
 
