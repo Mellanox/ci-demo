@@ -831,7 +831,7 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     def annotations = image.annotations ?: getConfigVal(config, ['kubernetes', 'annotations'], [], false)
     def caps_add = image.caps_add ?: getConfigVal(config, ['kubernetes', 'caps_add'], "[]")
     def service_account = getConfigVal(config, ['kubernetes', 'serviceAccount'], "default")
-    def namespace = getConfigVal(config, ['kubernetes', 'namespace'], "default")
+    def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
     def yaml = """
 spec:
@@ -1290,7 +1290,7 @@ def build_docker_on_k8(image, config) {
     def limits = image.limits ?: getConfigVal(config, ['kubernetes', 'limits'], "{memory: 8Gi, cpu: 4000m}")
     def requests = image.requests ?: getConfigVal(config, ['kubernetes', 'requests'], "{memory: 8Gi, cpu: 4000m}")
     def service_account = getConfigVal(config, ['kubernetes', 'serviceAccount'], "default")
-    def namespace = getConfigVal(config, ['kubernetes', 'namespace'], "default")
+    def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
     def yaml = """
 spec:
