@@ -837,6 +837,11 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
 spec:
   containers:
     - name: ${cname}
+      env:
+        - name: K8S_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
       resources:
         limits: ${limits}
         requests: ${requests}
@@ -1296,6 +1301,11 @@ def build_docker_on_k8(image, config) {
 spec:
   containers:
     - name: docker
+      env:
+        - name: K8S_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
       resources:
         limits: ${limits}
         requests: ${requests}
