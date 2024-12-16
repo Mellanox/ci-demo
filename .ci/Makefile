@@ -11,7 +11,7 @@ TOPDIR := $(shell git rev-parse --show-toplevel)
 
 PROJ     := $(shell basename `cd .. && pwd | tr [A-Z] [a-z]`)
 
-REPO_URL := harbor.mellanox.com/swx-storage/${PROJ}
+REPO_URL := nbu-harbor.gtm.nvidia.com/swx-storage/${PROJ}
 REGISTRY := ${REPO_URL}/${ARCH}
 
 TAG    := $(shell git log -1 --pretty=%h)
