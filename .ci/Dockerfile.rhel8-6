@@ -1,0 +1,62 @@
+ARG MOFED_VER
+FROM harbor.mellanox.com/hpcx/x86_64/rhel8.6/builder:mofed-24.10-1.1.4.0
+ARG _UID=2244
+ARG _GID=101
+ARG _LOGIN=jenkins
+ARG _HOME=/var/home/$_LOGIN
+
+RUN rm -rf /etc/yum.repos.d/*
+RUN echo "[webrepo_aapp]" > /etc/yum.repos.d/webrepo.repo
+RUN echo "name=Custom Repository AppStream" >> /etc/yum.repos.d/webrepo.repo
+RUN echo "baseurl=http://webrepo/RH/8.6/x86_64/AppStream/" >> /etc/yum.repos.d/webrepo.repo
+RUN echo "enabled=1" >> /etc/yum.repos.d/webrepo.repo
+RUN echo "gpgcheck=0" >> /etc/yum.repos.d/webrepo.repo
+
+RUN echo "[webrepo_baseos]" >> /etc/yum.repos.d/webrepo.repo
+RUN echo "name=Custom Repository BaseOS" >> /etc/yum.repos.d/webrepo.repo
+RUN echo "baseurl=http://webrepo/RH/8.6/x86_64/BaseOS" >> /etc/yum.repos.d/webrepo.repo
+RUN echo "enabled=1" >> /etc/yum.repos.d/webrepo.repo
+RUN echo "gpgcheck=0" >> /etc/yum.repos.d/webrepo.repo
+
+
+RUN yum install -y \
+    atk \
+    autoconf \
+    automake \
+    cairo \
+    ethtool \
+    gcc-gfortran \
+    gcc-c++ \
+    git \
+    gtk2 \
+    libmnl \
+    libnl3 \
+    libtool \
+    lsof \
+    make \
+    numactl-libs \
+    pciutils \
+    perl \
+    rpm-build \
+    sudo \
+    tcl \
+    tcsh \
+    tk \
+    java-11-openjdk \
+    environment-modules \
+    libusbx fuse-libs \
+    chrpath flex graphviz  tcl bison tk swig \
+    wget python3 \
+    p11-kit kernel-modules-extra
+
+RUN echo "${_LOGIN} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && \
+    mkdir -p $_HOME && \
+    groupadd -f -g "$_GID" "$_LOGIN" && \
+    useradd -u "$_UID" -g "$_GID" -s /bin/bash -m -d ${_HOME} "$_LOGIN" && \
+    chown $_LOGIN $_HOME
+
+ENV MODULEPATH /hpc/local/etc/modulefiles
+SHELL ["/bin/bash"] 
+
+USER "${_LOGIN}"
+ENTRYPOINT [ "/bin/bash", "--login", "--rcfile", "/etc/bashrc", "-c" ]
