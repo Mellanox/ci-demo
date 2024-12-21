@@ -21,8 +21,8 @@ env:
   mofed_installer_opt: --user-space-only --without-fw-update --all -q --skip-unsupported-devices-check
 
 runs_on_dockers:
-  - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest'}
-  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
+  - {file: '.ci/Dockerfile.rhel8-6', name: 'ci-demo-rhel8-6', tag: 'latest'}
+  - {file: '.ci/Dockerfile.ubuntu24-04', name: 'ci-demo-ubuntu.24-04', tag: 'latest'}
 
 
 matrix:

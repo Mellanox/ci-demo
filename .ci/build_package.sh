@@ -1,5 +1,7 @@
 #!/bin/bash -eE
 
+git config --global --add safe.directory /home/jenkins/agent/workspace/ci-demo
+
 release_dir=${release_dir:=/auto/sw/release/sw_acceleration/ci-demo}
 do_release=${do_release:=0}
 
