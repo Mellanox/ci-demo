@@ -1395,11 +1395,17 @@ def startPipeline(String label) {
         logger = new Logger(this)
 
         stage("Checkout source code") {
-            forceCleanupWS()
-            def scmVars = checkout scm
-
-            env.GIT_COMMIT      = scmVars.GIT_COMMIT
-            env.GIT_PREV_COMMIT = scmVars.GIT_PREVIOUS_COMMIT
+            if ( isEnvVarSet(env.SKIP_2ND_GIT_CHECKOUT) ){
+                // get GIT_COMMIT and GIT_PREV_COMMIT from git commands in case 2nd git clone was skipped
+                logger.debug("SKIP_2ND_GIT_CHECKOUT was set , skipping checkout.")
+                env.GIT_COMMIT      = sh(script: 'git rev-parse --short HEAD', returnStdout: true)
+                env.GIT_PREV_COMMIT = sh(script: 'git rev-parse --short HEAD~', returnStdout: true)
+            }else{
+                forceCleanupWS()
+                def scmVars = checkout scm
+                env.GIT_COMMIT      = scmVars.GIT_COMMIT
+                env.GIT_PREV_COMMIT = scmVars.GIT_PREVIOUS_COMMIT
+            }
 
             logger.debug("Git commit: ${env.GIT_COMMIT} prev commit: ${env.GIT_PREV_COMMIT}")
             run_shell("[ -x .ci/cidemo-init.sh ] && .ci/cidemo-init.sh", 'Run cidemo init hook')
