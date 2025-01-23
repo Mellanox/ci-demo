@@ -1395,12 +1395,14 @@ def startPipeline(String label) {
         logger = new Logger(this)
 
         stage("Checkout source code") {
-            if ( isEnvVarSet(env.SKIP_2ND_GIT_CHECKOUT) ){
+            // check we are in a git directory and that env.SKIP_2ND_GIT_CHECKOUT is set and skip ci-demo clone
+            def gitRc = sh(script: 'git rev-parse --git-dir &>/dev/null', returnStatus: true)
+            if ( isEnvVarSet(env.SKIP_2ND_GIT_CHECKOUT) && gitRc == 0 ){
                 // get GIT_COMMIT and GIT_PREV_COMMIT from git commands in case 2nd git clone was skipped
                 logger.debug("SKIP_2ND_GIT_CHECKOUT was set , skipping checkout.")
-                env.GIT_COMMIT      = sh(script: 'git rev-parse --short HEAD', returnStdout: true)
-                env.GIT_PREV_COMMIT = sh(script: 'git rev-parse --short HEAD~', returnStdout: true)
-            }else{
+                env.GIT_COMMIT      = sh(script: 'git rev-parse --short HEAD || true', returnStdout: true)
+                env.GIT_PREV_COMMIT = sh(script: 'git rev-parse --short HEAD~ || true', returnStdout: true)
+            } else {
                 forceCleanupWS()
                 def scmVars = checkout scm
                 env.GIT_COMMIT      = scmVars.GIT_COMMIT
