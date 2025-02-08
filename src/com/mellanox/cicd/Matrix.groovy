@@ -1402,6 +1402,8 @@ def startPipeline(String label) {
                 logger.debug("SKIP_2ND_GIT_CHECKOUT was set , skipping checkout.")
                 env.GIT_COMMIT      = sh(script: 'git rev-parse --short HEAD || true', returnStdout: true)
                 env.GIT_PREV_COMMIT = sh(script: 'git rev-parse --short HEAD~ || true', returnStdout: true)
+                def debug_bi = sh(script: 'pwd;git rev-parse --is-inside-work-tree ||:; echo "WORKSPACE=${WORKSPACE}"; ls -la ${WORKSPACE};ls -la ${WORKSPACE}@tmp/; ', returnStdout: true)
+                logger.debug("BI:${debug_bi}")
             } else {
                 forceCleanupWS()
                 def scmVars = checkout scm
