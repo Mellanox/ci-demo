@@ -869,10 +869,12 @@ spec:
         volumes: listV
     )
     {
-        node(POD_LABEL) {
-            stage (branchName) {
-                container(cname) {
-                    runSteps(image, config, branchName, axis, steps, 'k8')
+        retry(count: 2, conditions: [kubernetesAgent(), nonresumable()]) {
+            node(POD_LABEL) {
+                stage (branchName) {
+                    container(cname) {
+                        runSteps(image, config, branchName, axis, steps, 'k8')
+                    }
                 }
             }
         }
@@ -1327,16 +1329,18 @@ spec:
         volumes: listV
     )
     {
-        node(POD_LABEL) {
-            unstash getStashName()
-            onUnstash()
+        retry(count: 2, conditions: [kubernetesAgent(), nonresumable()]) {
+            node(POD_LABEL) {
+                unstash getStashName()
+                onUnstash()
 
-            container('docker') {
- //               stage ('Build Docker') {
-                    config.logger.debug("set symbolic link docker => podman (if doesn't exist)")
-                    sh 'type -p docker || ln -sfT $(type -p podman) /usr/bin/docker'
-                    buildDocker(image, config)
- //               }
+                container('docker') {
+                    stage ('Build Docker') {
+                        config.logger.debug("set symbolic link docker => podman (if doesn't exist)")
+                        sh 'type -p docker || ln -sfT $(type -p podman) /usr/bin/docker'
+                        buildDocker(image, config)
+                    }
+                }
             }
         }
     }
@@ -1566,7 +1570,6 @@ def launchMethod(label=null) {
 }
 
 def main() {
-
     def label = 'master'
 
     // legacy launch via agent with label 'master'
@@ -1581,15 +1584,13 @@ def main() {
         label = "worker-${UUID.randomUUID().toString()}"
         println("Cloud launch on ${label}")
 
-        podTemplate(
-            label: label,
-        ) {
+        podTemplate(label: label) {
             startPipeline(label)
         }
         return
     }
 
     reportFail("init", "No launch method detected - define clouds or agents in Jenkins")
-  }
+}
 
 return this
