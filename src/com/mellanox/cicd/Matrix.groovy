@@ -135,7 +135,7 @@ def forceCleanup(prefix='', redirect='') {
 
 def forceCleanupWS() {
 
-    def res = forceCleanup('','&>/dev/null')
+    def res = forceCleanup('','')
     if (res.rc != 0) {
         res = forceCleanup('sudo','')
         if (res.rc != 0) {
