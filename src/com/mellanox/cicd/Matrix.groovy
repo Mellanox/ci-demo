@@ -1337,6 +1337,11 @@ spec:
                 container('docker') {
                     stage ('Build Docker') {
                         config.logger.debug("set symbolic link docker => podman (if doesn't exist)")
+                        // Podman image defaults to using fuse-overlayfs as the storage driver.
+                        // This is much slower on the kubernetes agent then using overlay storage driver.
+                        // So we need to remove the storage.conf file and reset the podman system.
+                        // Also, for rare cases or none podman runs we dont fail the build.
+                        sh 'rm /etc/containers/storage.conf ; podman system reset -f || true'
                         sh 'type -p docker || ln -sfT $(type -p podman) /usr/bin/docker'
                         buildDocker(image, config)
                     }
