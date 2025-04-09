@@ -66,7 +66,7 @@ def entrySet(m) {
 
 def run_shell(cmd, title, retOut=false) {
     def text = ""
-    def rc
+    def rc = -1  // Initialize with error code
     def err = null
     try {
         if (retOut) {
@@ -78,6 +78,7 @@ def run_shell(cmd, title, retOut=false) {
 
     } catch (e) {
         err = e
+        rc = 1  // Set error code on exception
         org.codehaus.groovy.runtime.StackTraceUtils.printSanitizedStackTrace(e)
     }
     return ['text': text, 'rc': rc, 'exception': err]
@@ -135,7 +136,7 @@ def forceCleanup(prefix='', redirect='') {
 
 def forceCleanupWS() {
 
-    def res = forceCleanup('','')
+    def res = forceCleanup('','')  // Don't hide errors
     if (res.rc != 0) {
         res = forceCleanup('sudo','')
         if (res.rc != 0) {
