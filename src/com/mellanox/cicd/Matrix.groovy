@@ -624,6 +624,13 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
                             credentials.add(file(credentialsId: found.credentialsId,
                                             variable: found.variable))
                         }
+                        if (found.type == 'string') {
+                            if (!found.variable) {
+                                reportFail(title, "credentialsId '${found.credentialsId}' has unsupported format (${found})! Missing 'variable' field.")
+                            }
+                            credentials.add(string(credentialsId: found.credentialsId,
+                                            variable: found.variable))
+                        }
                     } else {
                         // usernamePassword by default
                         if (!found.usernameVariable || !found.passwordVariable) {
