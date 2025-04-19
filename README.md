@@ -301,6 +301,7 @@ credentials:
   - {credentialsId: 'jenkins-pulp', usernameVariable: 'pulp_usr', passwordVariable: 'pulp_pwd'}
   - {credentialsId: 'github-ssh-rsa-key', 'keyFileVariable': 'SSH_KEY_FILE', type: 'sshUserPrivateKey'}
   - {credentialsId: 'secret-file', 'variable': 'SECRET_FILE', type: 'file'}
+  - {credentialsId: 'string-credentials', type: 'string', variable: 'STRING_VARIABLE'}
 
 
 # optional: for multi-arch k8 support, can define arch-specific nodeSelectors
