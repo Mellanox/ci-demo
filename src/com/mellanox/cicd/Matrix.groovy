@@ -122,8 +122,75 @@ def run_step_shell(image, cmd, title, oneStep, config) {
 }
 
 def forceCleanup(prefix='', redirect='') {
+    def originalWS = env.WORKSPACE
+    echo "[DEBUG] Branch=${env.BRANCH_NAME ?: 'unknown'}: Original WORKSPACE = ${originalWS}"
+    
+    // Define sync files at the beginning
+    def syncFile = "/auto/sw/release/sw_acceleration/rivermax/tmp/jenkins_sync_${env.BUILD_NUMBER}"
+    def readyFile = "${syncFile}_ready"
+    
+    // Skip synchronization on master branch and swx-media-master host
+    if (env.BRANCH_NAME == 'master' || env.HOSTNAME.startsWith('swx-media-master')) {
+        echo "[DEBUG] Skipping sync on master branch or swx-media-master host"
+    } else {
+        // Mark this branch as ready
+        sh "sudo -u swx-jenkins touch ${readyFile}"
+        
+        // Wait until all branches are ready
+        sh """
+            while true; do
+                ready_count=\$(ls ${syncFile}_ready* 2>/dev/null | wc -l)
+                total_branches=\${MATRIX_BRANCHES_COUNT:-1}
+                if [ "\$ready_count" -eq "\$total_branches" ]; then
+                    break
+                fi
+                echo "[DEBUG] Branch=${env.BRANCH_NAME ?: 'unknown'} waiting for other branches (\$ready_count/\$total_branches)"
+                sleep 1
+            done
+        """
+        
+        // Create main sync file to signal all branches to proceed
+        sh "sudo -u swx-jenkins touch ${syncFile}"
+        
+        // Wait for the signal
+        sh """
+            while [ ! -f ${syncFile} ]; do
+                echo "[DEBUG] Branch=${env.BRANCH_NAME ?: 'unknown'} waiting for sync signal"
+                sleep 1
+            done
+        """
+        
+        // Add small random delay to increase race condition probability
+        sleep(new Random().nextInt(3))
+    }
+    
     env.WORKSPACE = pwd()
-
+    echo "[DEBUG] Branch=${env.BRANCH_NAME ?: 'unknown'}: New WORKSPACE = ${env.WORKSPACE}"
+    
+    // Check for problematic condition
+    if (originalWS?.contains('/scrap/jenkins') && env.WORKSPACE?.startsWith('/home/jenkins/agent')) {
+        echo "[RACE DETECTED] WORKSPACE changed from ${originalWS} to ${env.WORKSPACE}"
+        // Save evidence
+        sh """
+            echo "================ WORKSPACE RACE CONDITION DETECTED ================" > race_condition_evidence.txt
+            echo "Time: \$(date)" >> race_condition_evidence.txt
+            echo "Branch: ${env.BRANCH_NAME ?: 'unknown'}" >> race_condition_evidence.txt
+            echo "Original WS: ${originalWS}" >> race_condition_evidence.txt
+            echo "New WS: ${env.WORKSPACE}" >> race_condition_evidence.txt
+            echo "=================== ENVIRONMENT DUMP ===================" >> race_condition_evidence.txt
+            env | sort >> race_condition_evidence.txt
+            echo "=================== PROCESS INFO ===================" >> race_condition_evidence.txt
+            ps auxww >> race_condition_evidence.txt
+            echo "=================== MOUNT INFO ===================" >> race_condition_evidence.txt
+            mount >> race_condition_evidence.txt
+            echo "=================== PWD OUTPUT ===================" >> race_condition_evidence.txt
+            pwd >> race_condition_evidence.txt
+            echo "=================== LS OUTPUT ===================" >> race_condition_evidence.txt
+            ls -la >> race_condition_evidence.txt
+        """
+        archiveArtifacts artifacts: 'race_condition_evidence.txt'
+    }
+    
     def cmd = """
     if [ -x /bin/bash ]; then
         $prefix bash -eE -c 'shopt -s dotglob; rm -rf ${env.WORKSPACE}/*' ${redirect}
@@ -131,11 +198,23 @@ def forceCleanup(prefix='', redirect='') {
         $prefix find ${env.WORKSPACE} -depth ! -path . ! -path .. ! -path ${env.WORKSPACE} -exec rm -rf {} \\; ${redirect}
     fi
     """
-    return run_shell(cmd, "Clean workspace $prefix")
+    def result = run_shell(cmd, "Clean workspace $prefix")
+    
+    // Cleanup sync files only on non-master branches and non-master hosts
+    if (env.BRANCH_NAME != 'master' && !env.HOSTNAME.startsWith('swx-media-master')) {
+        sh "rm -f ${readyFile} ${syncFile}"
+    }
+    
+    return result
 }
 
 def forceCleanupWS() {
-
+    // Force context switching between branches
+    for (int i = 0; i < 3; i++) {
+        sleep 1
+        sh 'echo "."'  // Force shell execution
+    }
+    
     def res = forceCleanup('','')  // Don't hide errors
     if (res.rc != 0) {
         res = forceCleanup('sudo','')
