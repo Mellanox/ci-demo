@@ -41,7 +41,7 @@ class Logger {
     }
 
 }
- 
+
 @NonCPS
 List getMatrixAxes(matrix_axes) {
     List axes = []
@@ -58,22 +58,33 @@ List getMatrixAxes(matrix_axes) {
 
 // hack to avoid Serializble errors as intermediate access to entrySet returns non-serializable objects
 
-@NonCPS 
+@NonCPS
 def entrySet(m) {
     m.collect { k, v -> [key: k, value: v] }
 }
 
 
-def run_shell(cmd, title, retOut=false) {
+def run_shell(cmd, title, retOut=false, timeout_minutes=null) {
     def text = ""
     def rc
     def err = null
     try {
-        if (retOut) {
-            text = sh(script: cmd, label: title, returnStdout: true)
-            rc = 0
+        if (timeout_minutes) {
+            timeout(time: timeout_minutes, unit: 'MINUTES') {
+                if (retOut) {
+                    text = sh(script: cmd, label: title, returnStdout: true)
+                    rc = 0
+                } else {
+                    rc = sh(script: cmd, label: title, returnStatus: true)
+                }
+            }
         } else {
-            rc = sh(script: cmd, label: title, returnStatus: true)
+            if (retOut) {
+                text = sh(script: cmd, label: title, returnStdout: true)
+                rc = 0
+            } else {
+                rc = sh(script: cmd, label: title, returnStatus: true)
+            }
         }
 
     } catch (e) {
@@ -94,8 +105,11 @@ def run_step_shell(image, cmd, title, oneStep, config) {
         vars.add(names[i] + "=" + config.get(names[i]) ?: '')
     }
 
+    // Get timeout from step configuration
+    def timeout_minutes = getConfigVal(config, ['timeout'], null, true, oneStep, true)
+
     withEnv(vars) {
-        def ret = run_shell(cmd, title)
+        def ret = run_shell(cmd, title, false, timeout_minutes)
 
         if (ret.rc != 0) {
             if (oneStep["onfail"] != null) {
@@ -415,7 +429,7 @@ def getDefaultShell(config=null, step=null, shell=null) {
     """
     def res = run_shell(cmd, "Detect shell", true)
     shell = res.text.trim()
-    
+
     if (isDebugMode()) {
         shell += 'x'
     }
@@ -550,8 +564,8 @@ def toEnvVars(config, vars) {
 
 def run_step(image, config, title, oneStep, axis, runtime=null) {
 
-    if ((image != null) && 
-        (axis != null) && 
+    if ((image != null) &&
+        (axis != null) &&
         check_skip_stage(image, config, title, oneStep, axis, runtime)) {
         return
     }
@@ -633,7 +647,7 @@ def runSteps(image, config, branchName, axis, steps=config.steps, runtime) {
             }
             continue
         }
-        // non-parallel step discovered, need to flush all parallel 
+        // non-parallel step discovered, need to flush all parallel
         // steps collected previously to keep ordering.
         // run non-parallel step right after
         if (parallelNestedSteps.size() > 0) {
@@ -699,7 +713,7 @@ def parseListNfsV(volumes) {
     }
     return listV
 }
-        
+
 
 def parseListA(annotations) {
     def listA = []
@@ -949,7 +963,7 @@ Map getTasks(axes, image, config, include, exclude) {
             withEnv(axisEnv) {
                 if ((config.get("kubernetes") == null) &&
                     (image.nodeLabel == null) &&
-                    (image.cloud == null) 
+                    (image.cloud == null)
                     ) {
                     reportFail('config', "Please define cloud or nodeLabel in yaml config file or define nodeLabel for docker")
                 }
@@ -1396,7 +1410,7 @@ def startPipeline(String label) {
                     branches += getMatrixTasks(image, config)
                 }
             }
-        
+
             if (config.runs_on_agents) {
                 for (int a=0; a<config.runs_on_agents.size();a++) {
                     image = config.runs_on_agents[a]

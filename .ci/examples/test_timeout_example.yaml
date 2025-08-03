@@ -1,0 +1,42 @@
+job: timeout_test
+description: "Test timeout functionality for shell run actions"
+
+# Global timeout (optional)
+timeout: 60
+
+env:
+  DEFAULT_TIMEOUT: 30
+  LONG_TIMEOUT: 120
+
+matrix:
+  axes:
+    arch: [x86_64]
+    os: [ubuntu]
+
+runs_on_dockers:
+  - name: test-image
+    arch: x86_64
+    url: "ubuntu:20.04"
+
+steps:
+  - name: normal_step
+    run: "echo 'This step should complete quickly'"
+    # Uses global timeout of 60 minutes
+
+  - name: short_timeout_step
+    run: "sleep 10 && echo 'This step has a short timeout'"
+    timeout: 5  # 5 minutes timeout - should timeout before completion
+
+  - name: template_timeout_step
+    run: "echo 'This step uses template timeout'"
+    timeout: "${DEFAULT_TIMEOUT}"  # Uses environment variable
+
+  - name: long_running_step
+    run: "sleep 3600"  # 1 hour sleep
+    timeout: 10  # 10 minutes timeout - should timeout
+    onfail: "echo 'Step timed out as expected'"
+
+  - name: always_step
+    run: "echo 'This step has always handler'"
+    timeout: 1  # Very short timeout
+    always: "echo 'Always handler executed'"
