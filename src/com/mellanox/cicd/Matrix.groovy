@@ -64,18 +64,28 @@ def entrySet(m) {
 }
 
 
-def run_shell(cmd, title, retOut=false) {
+def run_shell(cmd, title, retOut=false, timeout_minutes=null) {
     def text = ""
     def rc
     def err = null
     try {
-        if (retOut) {
-            text = sh(script: cmd, label: title, returnStdout: true)
-            rc = 0
+        if (timeout_minutes) {
+            timeout(time: timeout_minutes, unit: 'MINUTES') {
+                if(retOut) {
+                    text = sh(script: cmd, label: title, returnStdout: true)
+                    rc = 0
+                } else {
+                    rc = sh(script: cmd, label: title, returnStatus: true)
+                }
+            }
         } else {
-            rc = sh(script: cmd, label: title, returnStatus: true)
+            if (retOut) {
+                text = sh(script: cmd, label: title, returnStdout: true)
+                rc = 0
+            } else {
+                rc = sh(script: cmd, label: title, returnStatus: true)
+            }
         }
-
     } catch (e) {
         err = e
         org.codehaus.groovy.runtime.StackTraceUtils.printSanitizedStackTrace(e)
@@ -94,8 +104,13 @@ def run_step_shell(image, cmd, title, oneStep, config) {
         vars.add(names[i] + "=" + config.get(names[i]) ?: '')
     }
 
+    // Get timeout from step configuration
+    def timeout_minutes = getConfigVal(config, ['timeout'], null, true, oneStep, true)
+
     withEnv(vars) {
-        def ret = run_shell(cmd, title)
+        def ret = run_shell(cmd, title, false, timeout_minutes)
+
+        config.logger.trace(2, "run_step_shell ${title}: rc=${ret.rc}, err=${ret.exception}")
 
         if (ret.rc != 0) {
             if (oneStep["onfail"] != null) {
