@@ -1082,6 +1082,24 @@ Map getTasks(axes, image, config, include, exclude) {
     return tasks
 }
 
+@NonCPS
+def resolveIncludeExcludeTemplates(filters, config) {
+    def resolvedFilters = []
+    for (int i = 0; i < filters.size(); i++) {
+        def filter = filters[i]
+        def resolvedFilter = [:]
+
+        // Apply template resolution to each key-value pair in the filter
+        filter.each { key, value ->
+            def resolvedValue = resolveTemplate([:], value, config)
+            resolvedFilter[key] = resolvedValue
+        }
+
+        resolvedFilters.add(resolvedFilter)
+    }
+    return resolvedFilters
+}
+
 def getMatrixTasks(image, config) {
 
     def include = [], exclude = [], axes = []
@@ -1091,6 +1109,10 @@ def getMatrixTasks(image, config) {
         axes = getMatrixAxes(config.matrix.axes).findAll()
         exclude = getConfigVal(config, ['matrix', 'exclude'], [], false)
         include = getConfigVal(config, ['matrix', 'include'], [], false)
+
+        // Apply template resolution to include/exclude values to support job parameters
+        include = resolveIncludeExcludeTemplates(include, config)
+        exclude = resolveIncludeExcludeTemplates(exclude, config)
     } else {
         axes.add(image)
     }
