@@ -430,10 +430,26 @@ matrix:
 # include only dimensions as below. Exclude has same syntax. Only either include or exclude can be used.
 # all keywords in include/exclude command are optional - if all provided keys
 # match - the dimension will be include/excluded
+#
+# NEW FEATURE: Include/exclude values now support template resolution with environment variables!
+# You can use Jenkins job parameters, environment variables, and config variables in your filters.
+# Use ${VARIABLE_NAME} syntax for variable substitution.
 
 include:
   - {arch: x86_64, cuda: dev/cuda11.0, driver: MLNX_OFED_LINUX-4.9-0.1.8.0, name: ubuntu16-4}
   - {arch: x86_64, cuda: dev/cuda9.2, driver: MLNX_OFED_LINUX-4.9-0.1.8.0, name: ubuntu16-4}
+  # Examples of using environment variables and job parameters:
+  # - {arch: '${TARGET_ARCH}', name: '${TARGET_OS}', driver: '${DRIVER_VERSION}'}
+  # - {arch: 'x86_64', name: '${BUILD_TYPE == "nightly" ? "ubuntu20-4" : "ubuntu18-4"}'}
+  # - {arch: '${DEFAULT_ARCH}', name: 'centos7-3', cuda: '${CUDA_VERSION}'}
+
+# Available variables for include/exclude filters:
+# - Jenkins job parameters: ${TARGET_ARCH}, ${TARGET_OS}, etc.
+# - Jenkins environment variables: ${BUILD_NUMBER}, ${JOB_NAME}, ${GIT_BRANCH}, etc.
+# - Config variables: ${job}, ${registry_host}, etc.
+# - Custom environment variables from config env section: ${DEFAULT_ARCH}, etc.
+# - Default values: ${VAR:-default_value}
+# - Conditional expressions: ${CONDITION ? "value1" : "value2"}
 
 
 # Steps can contain any number of name/run sections and all will be executed
@@ -543,6 +559,116 @@ timeout_minutes: 60
 # `${name}` comes from `runs_on_dockers` section
 # `${axis_index}` is built-in variable representing axis serial number
 taskName: '${name}/${axis_index}'
+
+```
+
+## Dynamic Include/Exclude Filters
+
+The include and exclude filters now support template resolution, allowing you to dynamically filter matrix combinations based on Jenkins job parameters, environment variables, and configuration variables.
+
+### Basic Usage
+
+```yaml
+matrix:
+  axes:
+    arch: [x86_64, aarch64]
+    os: [ubuntu18-4, centos7-3]
+    driver: [MLNX_OFED_LINUX-4.9-0.1.8.0, MLNX_OFED_LINUX-5.1-1.0.0.0]
+
+  # Use job parameters to filter combinations
+  include:
+    - {arch: '${TARGET_ARCH}', name: '${TARGET_OS}', driver: '${DRIVER_VERSION}'}
+    - {arch: 'x86_64', name: 'ubuntu18-4'}  # Always include this combination
+
+  # Use environment variables
+  exclude:
+    - {arch: 'aarch64'}  # Skip aarch64 for certain conditions
+```
+
+### Available Variables
+
+1. **Jenkins Job Parameters**: Any parameters defined in your Jenkins job
+   ```yaml
+   include:
+     - {arch: '${TARGET_ARCH}', name: '${TARGET_OS}'}
+   ```
+
+2. **Jenkins Environment Variables**: Built-in Jenkins variables
+   ```yaml
+   include:
+     - {arch: 'x86_64', name: 'ubuntu18-4'}  # Only for main branch
+   ```
+
+3. **Config Variables**: Variables from your YAML configuration
+   ```yaml
+   env:
+     DEFAULT_ARCH: x86_64
+     DEFAULT_OS: ubuntu18-4
+
+   include:
+     - {arch: '${DEFAULT_ARCH}', name: '${DEFAULT_OS}'}
+   ```
+
+4. **Default Values**: Provide fallback values
+   ```yaml
+   include:
+     - {arch: '${TARGET_ARCH:-x86_64}', name: '${TARGET_OS:-ubuntu18-4}'}
+   ```
+
+5. **Conditional Expressions**: Simple conditional logic
+   ```yaml
+   include:
+     - {arch: 'x86_64', name: '${BUILD_TYPE == "nightly" ? "ubuntu20-4" : "ubuntu18-4"}'}
+   ```
+
+### Advanced Examples
+
+```yaml
+# Filter by multiple job parameters
+include:
+  - {arch: '${TARGET_ARCH}', name: '${TARGET_OS}', driver: '${DRIVER_VERSION}', cuda: '${CUDA_VERSION}'}
+
+# Conditional filtering based on branch
+include:
+  - {arch: 'x86_64', name: 'ubuntu18-4'}  # Always include
+  - {arch: 'aarch64', name: 'centos7-3'}  # Only for feature branches
+
+# Mix static and dynamic values
+include:
+  - {arch: 'x86_64', name: '${TARGET_OS}', driver: 'MLNX_OFED_LINUX-5.1-2.5.8.0'}
+  - {arch: 'aarch64', name: 'ubuntu18-4', cuda: '${CUDA_VERSION}'}
+
+# Use exclude with parameters
+exclude:
+  - {arch: '${SKIP_ARCH}', name: '${SKIP_OS}'}
+  - {cuda: '${SKIP_CUDA_VERSION}'}
+```
+
+### Debugging
+
+To debug what values are being resolved, add a debug step:
+
+```yaml
+steps:
+  - name: debug-filters
+    run: |
+      echo "Job Parameters:"
+      echo "TARGET_ARCH: ${TARGET_ARCH:-not_set}"
+      echo "TARGET_OS: ${TARGET_OS:-not_set}"
+      echo "DRIVER_VERSION: ${DRIVER_VERSION:-not_set}"
+
+      echo "Environment Variables:"
+      echo "BUILD_NUMBER: ${BUILD_NUMBER}"
+      echo "JOB_NAME: ${JOB_NAME}"
+      echo "GIT_BRANCH: ${GIT_BRANCH}"
+```
+
+### Benefits
+
+- **Dynamic Filtering**: Control which matrix combinations run based on user input
+- **Environment Awareness**: Use Jenkins environment variables for conditional execution
+- **Flexibility**: Mix static and dynamic values in the same configuration
+- **Parameter-Driven CI**: Let users control pipeline execution through job parameters
 
 ```
 
