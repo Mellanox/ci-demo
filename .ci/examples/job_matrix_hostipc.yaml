@@ -1,0 +1,101 @@
+---
+# Example demonstrating hostIPC usage in CI/CD matrix jobs
+# hostIPC enables sharing the host's IPC namespace with the container
+# This is useful for applications that need to communicate via System V IPC
+# or POSIX message queues
+
+job: hostipc-demo
+
+registry_host: harbor.mellanox.com
+registry_path: /swx-storage/ci-demo
+registry_auth: swx-storage
+
+# Global hostIPC setting - applies to all containers unless overridden
+kubernetes:
+  cloud: swx-k8s
+  namespace: ci-demo
+  serviceAccount: jenkins
+  # Enable host IPC namespace sharing globally
+  hostIPC: true
+
+volumes:
+  - {mountPath: /hpc/local, hostPath: /hpc/local}
+  - {mountPath: /tmp, hostPath: /tmp}
+
+env:
+  # Environment variables for IPC testing
+  IPC_TEST_MESSAGE: "Hello from host IPC namespace"
+  SHM_SIZE: "1024"
+
+# Container definitions with different hostIPC settings
+runs_on_dockers:
+  # This container will use global hostIPC setting (true)
+  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4-global', tag: 'latest'}
+
+  # This container explicitly enables hostIPC
+  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4-explicit', tag: 'latest', hostIPC: true}
+
+  # This container explicitly disables hostIPC (overrides global setting)
+  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4-disabled', tag: 'latest', hostIPC: false}
+
+matrix:
+  axes:
+    arch:
+      - x86_64
+    test_type:
+      - "shared_memory"
+      - "message_queue"
+
+steps:
+  - name: Test Shared Memory with hostIPC
+    # This step will only run on containers with hostIPC enabled
+    containerSelector: '{hostIPC: true}'
+    run: |
+      echo "Testing shared memory with host IPC namespace..."
+      # Create a shared memory segment
+      ipcmk -M 1024
+      # List shared memory segments
+      ipcs -m
+      echo "Shared memory test completed"
+
+  - name: Test Message Queue with hostIPC
+    # This step will only run on containers with hostIPC enabled
+    containerSelector: '{hostIPC: true}'
+    run: |
+      echo "Testing message queue with host IPC namespace..."
+      # Create a message queue
+      ipcmk -Q
+      # List message queues
+      ipcs -q
+      echo "Message queue test completed"
+
+  - name: Verify IPC isolation
+    # This step will run on all containers to show the difference
+    run: |
+      echo "Current container: ${name}"
+      echo "Host IPC enabled: ${hostIPC:-false}"
+      echo "Available shared memory segments:"
+      ipcs -m || echo "No shared memory segments or IPC not available"
+      echo "Available message queues:"
+      ipcs -q || echo "No message queues or IPC not available"
+
+  - name: Cleanup IPC resources
+    run: |
+      echo "Cleaning up IPC resources..."
+      # Remove any shared memory segments created by this process
+      ipcs -m | grep $(whoami) | awk '{print $2}' | xargs -r ipcrm -m
+      # Remove any message queues created by this process
+      ipcs -q | grep $(whoami) | awk '{print $2}' | xargs -r ipcrm -q
+      echo "IPC cleanup completed"
+
+# Pipeline hooks
+pipeline_start:
+  run: echo "Starting hostIPC demo job"
+
+pipeline_stop:
+  run: echo "HostIPC demo job completed"
+
+# Job configuration
+failFast: false
+batchSize: 2
+timeout_minutes: 30

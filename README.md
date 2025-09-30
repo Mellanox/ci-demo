@@ -320,6 +320,8 @@ kubernetes:
   caps_add: "[ IPC_LOCK, SYS_RESOURCE ]"
 # optional: tolerations. Tolerations allow the scheduler to schedule pods with matching taints.
   tolerations: "[{key: 'feature.node.kubernetes.io/project', operator: 'Equal', value: 'SPDK', effect: 'NoSchedule'}]"
+# optional: enable host IPC namespace sharing (default: false)
+  hostIPC: true
 
 # optional: can specify jenkins defined credentials and refer/request by credentialsId in step that
 # requires it (it's considered usernamePassword by default if 'type' is not specified)
@@ -390,10 +392,11 @@ defaults:
 # category:tools has special meaning - it will run for steps, that explicitly request it in the
 # step`s containerSelector key.
 # The use-case is as following: if some step requires special container with pre-installed toolchain (clang?)
+# `hostIPC` key is optional, enables host IPC namespace sharing for this specific container (default: false)
 
 runs_on_dockers:
   - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest', category: 'tool'}
-  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
+  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest', hostIPC: true}
 
 # list of jenkins agents labels to run on (optional)
 
