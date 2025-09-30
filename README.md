@@ -1,16 +1,16 @@
 # Matrix workflow project for CI/CD
 
-This is Jenkins CI/CD demo project. You can create custom workflows to automate your project software life cycle process. 
+This is Jenkins CI/CD demo project. You can create custom workflows to automate your project software life cycle process.
 
-You need to configure workflows using YAML syntax, and save them as workflow files in your repository. 
+You need to configure workflows using YAML syntax, and save them as workflow files in your repository.
 Once you've successfully created a YAML workflow file and triggered the workflow - Jenkins parse flow and execute it.
 
 
 ## Quick start
 
-1. Copy ```.ci/Jenkinsfile.shlib``` to your new github project, under ```.ci/``` 
+1. Copy ```.ci/Jenkinsfile.shlib``` to your new github project, under ```.ci/```
 
-2. Copy ```.ci/Makefile``` to your new github project, under ```.ci/``` 
+2. Copy ```.ci/Makefile``` to your new github project, under ```.ci/```
 
 3. Create ```.ci/job_matrix.yaml``` basic workflow file with content:
 
@@ -71,7 +71,7 @@ steps:
 
   - name: Install
     run: make -j 2 install
-     
+
 ```
 
 4. Copy ```.ci/proj_jjb.yaml``` to ```.ci``` folder in your project  and change github URL to point to your own github project as [here](.ci/proj_jjb.yaml#L67).
@@ -118,7 +118,7 @@ Jenkins behavior can be controlled by job_matrix.yaml file which has similar syn
 
 ## Jenkins job builder
 
-* Demo contains [Jenkins Job Builder](https://docs.openstack.org/infra/jenkins-job-builder) config [file](.ci/jjb_proj.yaml) 
+* Demo contains [Jenkins Job Builder](https://docs.openstack.org/infra/jenkins-job-builder) config [file](.ci/jjb_proj.yaml)
 which loads Jenkins project definition into Jenkins server.
 * Jenkins project descibed by [file](.ci/jjb_proj.yaml) supports following UI actions/parameters:
  - boolean - rebuild docker files
@@ -135,7 +135,7 @@ which loads Jenkins project definition into Jenkins server.
 % make shell NAME=ubuntu16-4
 docker%% cd /scratch
 
-# the step below needed so workspace files (which belongs to linux $USER) 
+# the step below needed so workspace files (which belongs to linux $USER)
 # will be copied (and owned) as Docker user 'jenkins' so it can be modified
 # from docker shell
 
@@ -284,6 +284,8 @@ kubernetes:
   caps_add: "[ IPC_LOCK, SYS_RESOURCE ]"
 # optional: tolerations. Tolerations allow the scheduler to schedule pods with matching taints.
   tolerations: "[{key: 'feature.node.kubernetes.io/project', operator: 'Equal', value: 'SPDK', effect: 'NoSchedule'}]"
+# optional: enable host IPC namespace sharing (default: false)
+  hostIPC: true
 
 # optional: can specify jenkins defined credentials and refer/request by credentialsId in step that
 # requires it
@@ -315,7 +317,7 @@ nfs_volumes:
   - {serverAddress: r1, serverPath: /vol/mtrswgwork, mountPath: /.autodirect/mtrswgwork}
   - {serverAddress: r3, serverPath: /vol/mlnx_ofed_release_flexcache, mountPath: /auto/sw/release/mlnx_ofed, readOnly: true}
 
-# environment varibles to insert into Job shell environment, can be referenced from steps 
+# environment varibles to insert into Job shell environment, can be referenced from steps
 # or user-scripts or shell commands.
 # If you want more detailed output in logs, add the following environment variable:
 # `DEBUG: true`
@@ -329,7 +331,7 @@ defaults:
   var1: value1
   var2: value2
 
-# list of dockers to use for the job, `file` key is optional, if defined but docker image 
+# list of dockers to use for the job, `file` key is optional, if defined but docker image
 # does not exist in registry.
 # `arch` key is optional, it defaults to `x86_64` unless specified otherwise.
 # image will be created during 1st invocation or if file was modified
@@ -337,10 +339,11 @@ defaults:
 # category:tools has special meaning - it will run for steps, that explicitly request it in the
 # step`s containerSelector key.
 # The use-case is as following: if some step requires special container with pre-installed toolchain (clang?)
+# `hostIPC` key is optional, enables host IPC namespace sharing for this specific container (default: false)
 
 runs_on_dockers:
   - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest', category: 'tool'}
-  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
+  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest', hostIPC: true}
 
 # list of jenkins agents labels to run on (optional)
 
@@ -375,7 +378,7 @@ matrix:
       - x86_64
 
 # include only dimensions as below. Exclude has same syntax. Only either include or exclude can be used.
-# all keywords in include/exclude command are optional - if all provided keys 
+# all keywords in include/exclude command are optional - if all provided keys
 # match - the dimension will be include/excluded
 
 include:
@@ -387,7 +390,7 @@ include:
 # every matrix dimension will run in parallel with all other dimensions
 # steps itself has sequential execution
 # NOTE:
-# shell environment variable representing dimension values will be inserted automatically and 
+# shell environment variable representing dimension values will be inserted automatically and
 # can be used run section (see below)
 # $name represents current value for docker name
 # Also $driver $cuda,$arch env vars are available and can be used from shell
@@ -400,12 +403,12 @@ steps:
 # with parameters
 # defined by `args` key.
     shell: action
-# dynamicAction is pre-defined action defined at https://github.com/Mellanox/ci-demo/blob/master/vars/dynamicAction.groovy 
+# dynamicAction is pre-defined action defined at https://github.com/Mellanox/ci-demo/blob/master/vars/dynamicAction.groovy
 # dynamicAction will execute ci-demo/vars/actions/$args[0] and will pass $args[1..] to it as command line arguments
     run: dynamicAction
 # step can specify containerSelector filter to apply on `runs_on_dockers` section.
 # make sure to quote the category.
-# `variant` is built-in variable, available for every axis of the run and represents serial number for 
+# `variant` is built-in variable, available for every axis of the run and represents serial number for
 # execution of matrix dimension
 # selector can be regex
     containerSelector: '{category:"tool", variant:1}'
@@ -470,7 +473,7 @@ archiveJunit: 'myproject/target/test-reports/*.xml'
 # Fail job is one of the steps fails or continue
 failFast: false
 
-# Execute parallel job in batches (default 10 jobs in the air), to prevent overload k8 
+# Execute parallel job in batches (default 10 jobs in the air), to prevent overload k8
 # with large amount of parallel jobs
 batchSize: 2
 
