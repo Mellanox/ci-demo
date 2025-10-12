@@ -320,6 +320,11 @@ kubernetes:
   caps_add: "[ IPC_LOCK, SYS_RESOURCE ]"
 # optional: tolerations. Tolerations allow the scheduler to schedule pods with matching taints.
   tolerations: "[{key: 'feature.node.kubernetes.io/project', operator: 'Equal', value: 'SPDK', effect: 'NoSchedule'}]"
+# optional: imagePullSecrets. Specify secrets to use for pulling images from private registries.
+# Can be a single secret or a list of secrets.
+  imagePullSecrets: "['my-registry-secret']"
+# For multiple secrets:
+# imagePullSecrets: "['secret-1', 'secret-2']"
 
 # optional: can specify jenkins defined credentials and refer/request by credentialsId in step that
 # requires it (it's considered usernamePassword by default if 'type' is not specified)
