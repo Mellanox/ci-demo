@@ -41,7 +41,7 @@ class Logger {
     }
 
 }
- 
+
 @NonCPS
 List getMatrixAxes(matrix_axes) {
     List axes = []
@@ -58,7 +58,7 @@ List getMatrixAxes(matrix_axes) {
 
 // hack to avoid Serializble errors as intermediate access to entrySet returns non-serializable objects
 
-@NonCPS 
+@NonCPS
 def entrySet(m) {
     m.collect { k, v -> [key: k, value: v] }
 }
@@ -415,7 +415,7 @@ def getDefaultShell(config=null, step=null, shell=null) {
     """
     def res = run_shell(cmd, "Detect shell", true)
     shell = res.text.trim()
-    
+
     if (isDebugMode()) {
         shell += 'x'
     }
@@ -550,8 +550,8 @@ def toEnvVars(config, vars) {
 
 def run_step(image, config, title, oneStep, axis, runtime=null) {
 
-    if ((image != null) && 
-        (axis != null) && 
+    if ((image != null) &&
+        (axis != null) &&
         check_skip_stage(image, config, title, oneStep, axis, runtime)) {
         return
     }
@@ -633,7 +633,7 @@ def runSteps(image, config, branchName, axis, steps=config.steps, runtime) {
             }
             continue
         }
-        // non-parallel step discovered, need to flush all parallel 
+        // non-parallel step discovered, need to flush all parallel
         // steps collected previously to keep ordering.
         // run non-parallel step right after
         if (parallelNestedSteps.size() > 0) {
@@ -699,7 +699,7 @@ def parseListNfsV(volumes) {
     }
     return listV
 }
-        
+
 
 def parseListA(annotations) {
     def listA = []
@@ -755,6 +755,8 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     def service_account = getConfigVal(config, ['kubernetes', 'serviceAccount'], "default")
     def namespace = getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
+    def imagePullSecrets = image.imagePullSecrets ?: getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]")
+
     def yaml = """
 spec:
   containers:
@@ -783,7 +785,8 @@ spec:
             containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
             containerTemplate(privileged: privileged, name: cname, image: image.url, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
         ],
-        volumes: listV
+        volumes: listV,
+        imagePullSecrets: imagePullSecrets
     )
     {
         node(POD_LABEL) {
@@ -949,7 +952,7 @@ Map getTasks(axes, image, config, include, exclude) {
             withEnv(axisEnv) {
                 if ((config.get("kubernetes") == null) &&
                     (image.nodeLabel == null) &&
-                    (image.cloud == null) 
+                    (image.cloud == null)
                     ) {
                     reportFail('config', "Please define cloud or nodeLabel in yaml config file or define nodeLabel for docker")
                 }
@@ -1205,6 +1208,8 @@ def build_docker_on_k8(image, config) {
     def service_account = getConfigVal(config, ['kubernetes', 'serviceAccount'], "default")
     def namespace = getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
+    def imagePullSecrets = image.imagePullSecrets ?: getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]")
+
     def yaml = """
 spec:
   containers:
@@ -1227,7 +1232,8 @@ spec:
             containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
             containerTemplate(privileged: privileged, name: 'docker', image: k8sArchConf.dockerImage, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
         ],
-        volumes: listV
+        volumes: listV,
+        imagePullSecrets: imagePullSecrets
     )
     {
         node(POD_LABEL) {
@@ -1396,7 +1402,7 @@ def startPipeline(String label) {
                     branches += getMatrixTasks(image, config)
                 }
             }
-        
+
             if (config.runs_on_agents) {
                 for (int a=0; a<config.runs_on_agents.size();a++) {
                     image = config.runs_on_agents[a]
