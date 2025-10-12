@@ -830,6 +830,29 @@ def parseListA(annotations) {
     return listA
 }
 
+def parseImagePullSecrets(secretsInput) {
+    // If it's already a list, return it
+    if (secretsInput instanceof List) {
+        return secretsInput
+    }
+    // If it's a string, parse it as a Groovy list
+    if (secretsInput instanceof String) {
+        try {
+            def parsed = Eval.me(secretsInput)
+            if (parsed instanceof List) {
+                return parsed
+            }
+            // If parsing succeeds but doesn't return a list, fail
+            reportFail('config', "imagePullSecrets must be a list, got: ${parsed.getClass().getName()}")
+        } catch (Exception e) {
+            // If parsing fails, report the error
+            reportFail('config', "Failed to parse imagePullSecrets='${secretsInput}': ${e.message}")
+        }
+    }
+    // If it's neither a list nor a string, fail
+    reportFail('config', "imagePullSecrets must be a List or String, got: ${secretsInput.getClass().getName()}")
+}
+
 def runK8(image, branchName, config, axis, steps=config.steps) {
 
     def cloudName = image.cloud ?: getConfigVal(config, ['kubernetes', 'cloud'], null)
@@ -876,6 +899,7 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     def service_account = getConfigVal(config, ['kubernetes', 'serviceAccount'], "default")
     def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
+    def imagePullSecrets = parseImagePullSecrets(getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]"))
     def yaml = """
 spec:
   containers:
@@ -909,7 +933,8 @@ spec:
             containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
             containerTemplate(privileged: privileged, name: cname, image: image.url, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
         ],
-        volumes: listV
+        volumes: listV,
+        imagePullSecrets: imagePullSecrets
     )
     {
         retry(count: 2, conditions: [kubernetesAgent(), nonresumable()]) {
@@ -1364,6 +1389,7 @@ def build_docker_on_k8(image, config) {
     def service_account = getConfigVal(config, ['kubernetes', 'serviceAccount'], "default")
     def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
+    def imagePullSecrets = parseImagePullSecrets(getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]"))
     def yaml = """
 spec:
   containers:
@@ -1391,7 +1417,8 @@ spec:
             containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
             containerTemplate(privileged: privileged, name: 'docker', image: k8sArchConf.dockerImage, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
         ],
-        volumes: listV
+        volumes: listV,
+        imagePullSecrets: imagePullSecrets
     )
     {
         retry(count: 2, conditions: [kubernetesAgent(), nonresumable()]) {
