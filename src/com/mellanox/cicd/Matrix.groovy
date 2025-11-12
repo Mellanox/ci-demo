@@ -1580,7 +1580,60 @@ def startPipeline(String label) {
                                 run_step(null, config, "pipeline start", config.pipeline_start, null)
                             }
                         }
-                        run_parallel_in_chunks(config, branches, bSize)
+
+                        // Execute steps in order with parallel flag support - only when batchSize is 0
+                        if (bSize == 0 && config.steps && config.steps.size() > 0) {
+                            config.logger.trace(2, "Executing ${config.steps.size()} steps in order across ${branches.size()} branches (batchSize=0)")
+
+                            // Store original steps
+                            def originalSteps = config.steps
+
+                            for (int stepIdx = 0; stepIdx < originalSteps.size(); stepIdx++) {
+                                def stepDef = originalSteps[stepIdx]
+                                def isParallel = stepDef.get("parallel", false)
+
+                                config.logger.trace(2, "Step ${stepIdx}: ${stepDef.name}, parallel=${isParallel}")
+
+                                // Temporarily replace config.steps with only this step
+                                config.steps = [stepDef]
+
+                                // Collect branch tasks for this specific step
+                                def stepTasks = [:]
+                                for (def entry in entrySet(branches)) {
+                                    def branchName = entry.key
+                                    def branchClosure = entry.value
+                                    def stepTaskName = "${branchName} -> ${stepDef.name}"
+                                    stepTasks[stepTaskName] = branchClosure
+                                }
+
+                                if (stepTasks.size() == 0) {
+                                    config.logger.trace(2, "No tasks for step ${stepDef.name}")
+                                    continue
+                                }
+
+                                // Execute based on parallel flag
+                                if (isParallel) {
+                                    config.logger.trace(2, "Running step ${stepDef.name} in PARALLEL across ${stepTasks.size()} branches")
+                                    def val = getConfigVal(config, ['failFast'], false)
+                                    stepTasks['failFast'] = val
+                                    parallel stepTasks
+                                } else {
+                                    config.logger.trace(2, "Running step ${stepDef.name} SEQUENTIALLY across ${stepTasks.size()} branches")
+                                    for (def taskEntry in entrySet(stepTasks)) {
+                                        if (taskEntry.key != 'failFast') {
+                                            taskEntry.value()
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Restore original steps
+                            config.steps = originalSteps
+                        } else {
+                            // Use old batched behavior when batchSize > 0 or no steps defined
+                            config.logger.trace(2, "Using batched execution (batchSize=${bSize})")
+                            run_parallel_in_chunks(config, branches, bSize)
+                        }
                     }
                 }
                 config.env.pipeline_status = 'SUCCESS'
