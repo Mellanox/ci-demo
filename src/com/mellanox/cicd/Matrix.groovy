@@ -1437,7 +1437,7 @@ def loadConfigFile(filepath, logger) {
 }
 
 def String getStashName() {
-	return "${env.BUILD_NUMBER}"
+    return "${env.BUILD_NUMBER}"
 }
 
 
@@ -1585,50 +1585,33 @@ def startPipeline(String label) {
                         if (bSize == 0 && config.steps && config.steps.size() > 0) {
                             config.logger.trace(2, "Executing ${config.steps.size()} steps in order across ${branches.size()} branches (batchSize=0)")
 
-                            // Store original steps
-                            def originalSteps = config.steps
+                            for (int stepIdx = 0; stepIdx < config.steps.size(); stepIdx++) {
+                                def currentStep = config.steps[stepIdx]
+                                def isParallel = currentStep.get("parallel", false)
 
-                            for (int stepIdx = 0; stepIdx < originalSteps.size(); stepIdx++) {
-                                def stepDef = originalSteps[stepIdx]
-                                def isParallel = stepDef.get("parallel", false)
+                                config.logger.trace(2, "Step ${stepIdx}: ${currentStep.name}, parallel=${isParallel}")
 
-                                config.logger.trace(2, "Step ${stepIdx}: ${stepDef.name}, parallel=${isParallel}")
-
-                                // Temporarily replace config.steps with only this step
-                                config.steps = [stepDef]
-
-                                // Collect branch tasks for this specific step
-                                def stepTasks = [:]
-                                for (def entry in entrySet(branches)) {
-                                    def branchName = entry.key
-                                    def branchClosure = entry.value
-                                    def stepTaskName = "${branchName} -> ${stepDef.name}"
-                                    stepTasks[stepTaskName] = branchClosure
-                                }
-
-                                if (stepTasks.size() == 0) {
-                                    config.logger.trace(2, "No tasks for step ${stepDef.name}")
-                                    continue
-                                }
+                                // Temporarily set config to run only this step
+                                def savedSteps = config.steps
+                                config.steps = [currentStep]
 
                                 // Execute based on parallel flag
                                 if (isParallel) {
-                                    config.logger.trace(2, "Running step ${stepDef.name} in PARALLEL across ${stepTasks.size()} branches")
+                                    config.logger.trace(2, "Running step ${currentStep.name} in PARALLEL")
                                     def val = getConfigVal(config, ['failFast'], false)
-                                    stepTasks['failFast'] = val
-                                    parallel stepTasks
+                                    def parallelTasks = branches.clone()
+                                    parallelTasks['failFast'] = val
+                                    parallel parallelTasks
                                 } else {
-                                    config.logger.trace(2, "Running step ${stepDef.name} SEQUENTIALLY across ${stepTasks.size()} branches")
-                                    for (def taskEntry in entrySet(stepTasks)) {
-                                        if (taskEntry.key != 'failFast') {
-                                            taskEntry.value()
-                                        }
+                                    config.logger.trace(2, "Running step ${currentStep.name} SEQUENTIALLY")
+                                    for (def entry in entrySet(branches)) {
+                                        entry.value()
                                     }
                                 }
-                            }
 
-                            // Restore original steps
-                            config.steps = originalSteps
+                                // Restore all steps
+                                config.steps = savedSteps
+                            }
                         } else {
                             // Use old batched behavior when batchSize > 0 or no steps defined
                             config.logger.trace(2, "Using batched execution (batchSize=${bSize})")
