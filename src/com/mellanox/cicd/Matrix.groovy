@@ -672,31 +672,10 @@ def runSteps(image, config, branchName, axis, steps=config.steps, runtime) {
     unstash getStashName()
     onUnstash()
 
-    def parallelNestedSteps = [:]
+    // Run steps sequentially - parallel execution is now handled at the containerSelector level
     for (int i = 0; i < steps.size(); i++) {
-        def one = steps[i]
-        def par = one["parallel"]
-        def oneStep = one
-        // collect parallel steps (if any) and run it when non-parallel step discovered or last element.
-        // Skip parallel stages if not used. Fix for Blueocean UI.
-        if ( par != null && par == true && !check_skip_stage(image, config, branchName, oneStep, axis)) {
-            def stepName = branchName + "->" + one.name
-            parallelNestedSteps[stepName] = { run_step(image, config, stepName, oneStep, axis, runtime) }
-            // last element - run and flush
-            if (i == steps.size() - 1) {
-                parallel(parallelNestedSteps)
-                parallelNestedSteps = [:]
-            }
-            continue
-        }
-        // non-parallel step discovered, need to flush all parallel
-        // steps collected previously to keep ordering.
-        // run non-parallel step right after
-        if (parallelNestedSteps.size() > 0) {
-            parallel(parallelNestedSteps)
-            parallelNestedSteps = [:]
-        }
-        run_step(image, config, one.name, oneStep, axis, runtime)
+        def oneStep = steps[i]
+        run_step(image, config, oneStep.name, oneStep, axis, runtime)
     }
     attachResults(config)
 }
@@ -1566,11 +1545,13 @@ def startPipeline(String label) {
             }
 
             try {
-                def bSize = getConfigVal(config, ['batchSize'], 0)
                 def timeout_min = getConfigVal(config, ['timeout_minutes'], "90")
                 timeout(time: timeout_min, unit: 'MINUTES') {
                     timestamps {
-                        run_parallel_in_chunks(config, parallelBuildDockers, bSize)
+                        // Build docker images first if needed
+                        run_parallel_in_chunks(config, parallelBuildDockers, 0)
+                        
+                        // Run pipeline_start if defined
                         if (config.pipeline_start) {
                             if (config.pipeline_start.image) {
                                 image = config.pipeline_start.image
@@ -1581,29 +1562,30 @@ def startPipeline(String label) {
                             }
                         }
 
-                        // Execute steps in order with parallel flag support - only when batchSize is 0
-                        if (bSize == 0 && config.steps && config.steps.size() > 0) {
-                            config.logger.trace(2, "Executing ${config.steps.size()} steps in order across ${branches.size()} branches (batchSize=0)")
+                        // Execute each step in order across all containerSelectors
+                        if (config.steps && config.steps.size() > 0) {
+                            config.logger.trace(2, "Executing ${config.steps.size()} steps in order across ${branches.size()} containerSelectors")
 
                             for (int stepIdx = 0; stepIdx < config.steps.size(); stepIdx++) {
                                 def currentStep = config.steps[stepIdx]
                                 def isParallel = currentStep.get("parallel", false)
 
-                                config.logger.trace(2, "Step ${stepIdx}: ${currentStep.name}, parallel=${isParallel}")
+                                config.logger.trace(2, "Step ${stepIdx}: '${currentStep.name}', parallel=${isParallel}")
 
-                                // Temporarily set config to run only this step
+                                // Temporarily set config.steps to contain only the current step
                                 def savedSteps = config.steps
                                 config.steps = [currentStep]
 
-                                // Execute based on parallel flag
                                 if (isParallel) {
-                                    config.logger.trace(2, "Running step ${currentStep.name} in PARALLEL")
+                                    // Run this step in PARALLEL across all containerSelectors
+                                    config.logger.trace(2, "Running step '${currentStep.name}' in PARALLEL across all containerSelectors")
                                     def val = getConfigVal(config, ['failFast'], false)
                                     def parallelTasks = branches.clone()
                                     parallelTasks['failFast'] = val
                                     parallel parallelTasks
                                 } else {
-                                    config.logger.trace(2, "Running step ${currentStep.name} SEQUENTIALLY")
+                                    // Run this step SEQUENTIALLY across all containerSelectors
+                                    config.logger.trace(2, "Running step '${currentStep.name}' SEQUENTIALLY across all containerSelectors")
                                     for (def entry in entrySet(branches)) {
                                         entry.value()
                                     }
@@ -1612,10 +1594,6 @@ def startPipeline(String label) {
                                 // Restore all steps
                                 config.steps = savedSteps
                             }
-                        } else {
-                            // Use old batched behavior when batchSize > 0 or no steps defined
-                            config.logger.trace(2, "Using batched execution (batchSize=${bSize})")
-                            run_parallel_in_chunks(config, branches, bSize)
                         }
                     }
                 }
