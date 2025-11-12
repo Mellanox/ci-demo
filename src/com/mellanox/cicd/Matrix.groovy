@@ -666,16 +666,38 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
     }
 }
 
-def runSteps(image, config, branchName, axis, steps=config.steps, runtime) {
+def runStepsForContainer(image, config, branchName, axis, runtime) {
+    // This is called once per container and handles ALL steps for this container
     forceCleanupWS()
     // fetch .git from server and unpack
     unstash getStashName()
     onUnstash()
 
-    // Run steps sequentially - parallel execution is now handled at the containerSelector level
-    for (int i = 0; i < steps.size(); i++) {
-        def oneStep = steps[i]
-        run_step(image, config, oneStep.name, oneStep, axis, runtime)
+    // Run each step that matches this container, coordinating via locks
+    for (int i = 0; i < config.steps.size(); i++) {
+        def oneStep = config.steps[i]
+        def isParallel = oneStep.get("parallel", false)
+        
+        // Skip steps that don't match this container's selector
+        if (check_skip_stage(image, config, branchName, oneStep, axis, runtime)) {
+            config.logger.trace(2, "Container ${branchName}: Skipping step '${oneStep.name}' (doesn't match containerSelector)")
+            continue
+        }
+        
+        def stepLockName = "step-${i}-${oneStep.name}-${env.BUILD_NUMBER}"
+        
+        if (isParallel) {
+            // Parallel steps - all matching containers run simultaneously (no lock needed)
+            config.logger.trace(2, "Container ${branchName}: Executing step '${oneStep.name}' in PARALLEL mode")
+            run_step(image, config, oneStep.name, oneStep, axis, runtime)
+        } else {
+            // Sequential steps - use lock to ensure only one container runs at a time
+            config.logger.trace(2, "Container ${branchName}: Waiting for lock to execute step '${oneStep.name}' in SEQUENTIAL mode")
+            lock(resource: stepLockName, skipIfLocked: false) {
+                config.logger.trace(2, "Container ${branchName}: Got lock, executing step '${oneStep.name}'")
+                run_step(image, config, oneStep.name, oneStep, axis, runtime)
+            }
+        }
     }
     attachResults(config)
 }
@@ -874,7 +896,7 @@ spec:
             node(POD_LABEL) {
                 stage (branchName) {
                     container(cname) {
-                        runSteps(image, config, branchName, axis, steps, 'k8')
+                        runStepsForContainer(image, config, branchName, axis, 'k8')
                     }
                 }
             }
@@ -1031,32 +1053,28 @@ Map getTasks(axes, image, config, include, exclude) {
         }
 
         config.logger.trace(5, "task name " + branchName)
-        tasks[branchName] = [
-            axis: axis,
-            image: image,
-            closure: { ->
-                withEnv(axisEnv) {
-                    if ((config.get("kubernetes") == null) &&
-                        (image.nodeLabel == null) &&
-                        (image.cloud == null)
-                        ) {
-                        reportFail('config', "Please define cloud or nodeLabel in yaml config file or define nodeLabel for docker")
+        tasks[branchName] = { ->
+            withEnv(axisEnv) {
+                if ((config.get("kubernetes") == null) &&
+                    (image.nodeLabel == null) &&
+                    (image.cloud == null)
+                    ) {
+                    reportFail('config', "Please define cloud or nodeLabel in yaml config file or define nodeLabel for docker")
+                }
+                if (image.nodeLabel) {
+                    runBareMetal = true
+                    if (image.url == null) {
+                        runBareMetal = false
                     }
-                    if (image.nodeLabel) {
-                        runBareMetal = true
-                        if (image.url == null) {
-                            runBareMetal = false
-                        }
-                        def callback = {pimage, pconfig, pname, paxis, pruntime ->
-                            runSteps(pimage, pconfig, pname, paxis, pruntime)
-                        }
-                        runAgent(image, config, branchName, axis, callback, runBareMetal)
-                    } else {
-                        runK8(image, branchName, config, axis)
+                    def callback = {pimage, pconfig, pname, paxis, pruntime ->
+                        runStepsForContainer(pimage, pconfig, pname, paxis, pruntime)
                     }
+                    runAgent(image, config, branchName, axis, callback, runBareMetal)
+                } else {
+                    runK8(image, branchName, config, axis)
                 }
             }
-        ]
+        }
     }
 
     config.logger.debug("getTasks() done image=" + image)
@@ -1566,59 +1584,14 @@ def startPipeline(String label) {
                             }
                         }
 
-                        // Execute each step in order across matching containerSelectors
+                        // Execute all branches - each container will run all its matching steps
+                        // The parallel flag within steps affects execution within each container via runSteps()
                         if (config.steps && config.steps.size() > 0) {
-                            config.logger.trace(2, "Executing ${config.steps.size()} steps in order across ${branches.size()} containerSelectors")
-
-                            for (int stepIdx = 0; stepIdx < config.steps.size(); stepIdx++) {
-                                def currentStep = config.steps[stepIdx]
-                                def isParallel = currentStep.get("parallel", false)
-
-                                config.logger.trace(2, "Step ${stepIdx}: '${currentStep.name}', parallel=${isParallel}")
-
-                                // Filter branches that should run this step based on containerSelector
-                                def matchingBranches = [:]
-                                for (def entry in entrySet(branches)) {
-                                    def branchName = entry.key
-                                    def branchData = entry.value
-                                    def branchAxis = branchData.axis
-                                    def branchImage = branchData.image
-                                    
-                                    // Check if this step should run on this branch
-                                    if (!check_skip_stage(branchImage, config, branchName, currentStep, branchAxis)) {
-                                        matchingBranches[branchName] = branchData.closure
-                                    }
-                                }
-
-                                config.logger.trace(2, "Step '${currentStep.name}' matches ${matchingBranches.size()} out of ${branches.size()} containerSelectors")
-
-                                if (matchingBranches.size() == 0) {
-                                    config.logger.trace(2, "Step '${currentStep.name}' has no matching containers, skipping")
-                                    continue
-                                }
-
-                                // Temporarily set config.steps to contain only the current step
-                                def savedSteps = config.steps
-                                config.steps = [currentStep]
-
-                                if (isParallel) {
-                                    // Run this step in PARALLEL across matching containerSelectors
-                                    config.logger.trace(2, "Running step '${currentStep.name}' in PARALLEL across ${matchingBranches.size()} containerSelectors")
-                                    def val = getConfigVal(config, ['failFast'], false)
-                                    def parallelTasks = matchingBranches.clone()
-                                    parallelTasks['failFast'] = val
-                                    parallel parallelTasks
-                                } else {
-                                    // Run this step SEQUENTIALLY across matching containerSelectors
-                                    config.logger.trace(2, "Running step '${currentStep.name}' SEQUENTIALLY across ${matchingBranches.size()} containerSelectors")
-                                    for (def entry in entrySet(matchingBranches)) {
-                                        entry.value()
-                                    }
-                                }
-
-                                // Restore all steps
-                                config.steps = savedSteps
-                            }
+                            config.logger.trace(2, "Executing branches - each will run its matching steps")
+                            def val = getConfigVal(config, ['failFast'], false)
+                            def parallelTasks = branches.clone()
+                            parallelTasks['failFast'] = val
+                            parallel parallelTasks
                         }
                     }
                 }
