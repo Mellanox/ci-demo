@@ -1031,28 +1031,32 @@ Map getTasks(axes, image, config, include, exclude) {
         }
 
         config.logger.trace(5, "task name " + branchName)
-        tasks[branchName] = { ->
-            withEnv(axisEnv) {
-                if ((config.get("kubernetes") == null) &&
-                    (image.nodeLabel == null) &&
-                    (image.cloud == null)
-                    ) {
-                    reportFail('config', "Please define cloud or nodeLabel in yaml config file or define nodeLabel for docker")
-                }
-                if (image.nodeLabel) {
-                    runBareMetal = true
-                    if (image.url == null) {
-                        runBareMetal = false
+        tasks[branchName] = [
+            axis: axis,
+            image: image,
+            closure: { ->
+                withEnv(axisEnv) {
+                    if ((config.get("kubernetes") == null) &&
+                        (image.nodeLabel == null) &&
+                        (image.cloud == null)
+                        ) {
+                        reportFail('config', "Please define cloud or nodeLabel in yaml config file or define nodeLabel for docker")
                     }
-                    def callback = {pimage, pconfig, pname, paxis, pruntime ->
-                        runSteps(pimage, pconfig, pname, paxis, pruntime)
+                    if (image.nodeLabel) {
+                        runBareMetal = true
+                        if (image.url == null) {
+                            runBareMetal = false
+                        }
+                        def callback = {pimage, pconfig, pname, paxis, pruntime ->
+                            runSteps(pimage, pconfig, pname, paxis, pruntime)
+                        }
+                        runAgent(image, config, branchName, axis, callback, runBareMetal)
+                    } else {
+                        runK8(image, branchName, config, axis)
                     }
-                    runAgent(image, config, branchName, axis, callback, runBareMetal)
-                } else {
-                    runK8(image, branchName, config, axis)
                 }
             }
-        }
+        ]
     }
 
     config.logger.debug("getTasks() done image=" + image)
@@ -1562,7 +1566,7 @@ def startPipeline(String label) {
                             }
                         }
 
-                        // Execute each step in order across all containerSelectors
+                        // Execute each step in order across matching containerSelectors
                         if (config.steps && config.steps.size() > 0) {
                             config.logger.trace(2, "Executing ${config.steps.size()} steps in order across ${branches.size()} containerSelectors")
 
@@ -1572,21 +1576,42 @@ def startPipeline(String label) {
 
                                 config.logger.trace(2, "Step ${stepIdx}: '${currentStep.name}', parallel=${isParallel}")
 
+                                // Filter branches that should run this step based on containerSelector
+                                def matchingBranches = [:]
+                                for (def entry in entrySet(branches)) {
+                                    def branchName = entry.key
+                                    def branchData = entry.value
+                                    def branchAxis = branchData.axis
+                                    def branchImage = branchData.image
+                                    
+                                    // Check if this step should run on this branch
+                                    if (!check_skip_stage(branchImage, config, branchName, currentStep, branchAxis)) {
+                                        matchingBranches[branchName] = branchData.closure
+                                    }
+                                }
+
+                                config.logger.trace(2, "Step '${currentStep.name}' matches ${matchingBranches.size()} out of ${branches.size()} containerSelectors")
+
+                                if (matchingBranches.size() == 0) {
+                                    config.logger.trace(2, "Step '${currentStep.name}' has no matching containers, skipping")
+                                    continue
+                                }
+
                                 // Temporarily set config.steps to contain only the current step
                                 def savedSteps = config.steps
                                 config.steps = [currentStep]
 
                                 if (isParallel) {
-                                    // Run this step in PARALLEL across all containerSelectors
-                                    config.logger.trace(2, "Running step '${currentStep.name}' in PARALLEL across all containerSelectors")
+                                    // Run this step in PARALLEL across matching containerSelectors
+                                    config.logger.trace(2, "Running step '${currentStep.name}' in PARALLEL across ${matchingBranches.size()} containerSelectors")
                                     def val = getConfigVal(config, ['failFast'], false)
-                                    def parallelTasks = branches.clone()
+                                    def parallelTasks = matchingBranches.clone()
                                     parallelTasks['failFast'] = val
                                     parallel parallelTasks
                                 } else {
-                                    // Run this step SEQUENTIALLY across all containerSelectors
-                                    config.logger.trace(2, "Running step '${currentStep.name}' SEQUENTIALLY across all containerSelectors")
-                                    for (def entry in entrySet(branches)) {
+                                    // Run this step SEQUENTIALLY across matching containerSelectors
+                                    config.logger.trace(2, "Running step '${currentStep.name}' SEQUENTIALLY across ${matchingBranches.size()} containerSelectors")
+                                    for (def entry in entrySet(matchingBranches)) {
                                         entry.value()
                                     }
                                 }
