@@ -170,19 +170,19 @@ def getArchConf(config, arch) {
     k8sArchConfTable['x86_64']  = [
         nodeSelector: 'kubernetes.io/arch=amd64',
         jnlpImage: 'jenkins/inbound-agent:latest',
-        dockerImage: 'quay.io/podman/stable:v5.0.2'
+        dockerImage: 'quay.io/podman/stable:v5.7.1'
     ]
 
     k8sArchConfTable['aarch64'] = [
         nodeSelector: 'kubernetes.io/arch=arm64',
         jnlpImage: "jenkins/inbound-agent:latest",
-        dockerImage: 'quay.io/podman/stable:v5.0.2'
+        dockerImage: 'quay.io/podman/stable:v5.7.1'
     ]
 
     k8sArchConfTable['ppc64le'] = [
         nodeSelector: 'kubernetes.io/arch=ppc64le',
         jnlpImage: "${config.registry_host}/${config.registry_jnlp_path}/jenkins-ppc64le-agent-jnlp:latest",
-        dockerImage: 'quay.io/podman/stable:v5.0.2'
+        dockerImage: 'quay.io/podman/stable:v5.7.1'
     ]
 
     def aTable = getConfigVal(config, ['kubernetes', 'arch_table'], null)
@@ -1385,8 +1385,12 @@ spec:
                         // This is much slower on the kubernetes agent then using overlay storage driver.
                         // So we need to remove the storage.conf file and reset the podman system.
                         // Also, for rare cases or none podman runs we dont fail the build.
-                        sh 'rm /etc/containers/storage.conf ; podman system reset -f || true'
+                        sh 'rm -f /etc/containers/storage.conf; rm -f /usr/share/containers/storage.conf'
+                        sh 'podman system reset -f || true'
                         sh 'type -p docker || ln -sfT $(type -p podman) /usr/bin/docker'
+                        if (isDebugMode()) {
+                            sh 'podman info'
+                        }
                         buildDocker(image, config)
                     }
                 }
