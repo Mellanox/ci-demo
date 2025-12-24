@@ -310,6 +310,27 @@ def matchMapEntry(filters, entry) {
     return match
 }
 
+def unstashWS (name, config){
+    def maxRetries = 5
+    def lastError = null
+    
+    for (int i = 1; i <= maxRetries; i++) {
+        try {
+            unstash name
+            return // Success, exit the function
+        } catch (Exception e) {
+            lastError = e
+            if (i < maxRetries) {
+                config.logger.debug("Unstash attempt ${i} failed: ${e.message}. Retrying...")
+                sleep(time: 2, unit: 'SECONDS')
+            }
+        }
+    }
+    
+    // If we get here, all retries failed
+    reportFail('unstash', "Failed to unstash '${name}' after ${maxRetries} attempts. Last error: ${lastError.message}")
+}
+
 def onUnstash() {
 
     def cmd = """#!/bin/sh
@@ -669,7 +690,7 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
 def runSteps(image, config, branchName, axis, steps=config.steps, runtime) {
     forceCleanupWS()
     // fetch .git from server and unpack
-    unstash getStashName()
+    unstashWS(getStashName(), config)
     onUnstash()
 
     def parallelNestedSteps = [:]
@@ -963,7 +984,7 @@ def runAgent(image, config, branchName=null, axis=null, Closure func, runInDocke
 
     node(nodeName) {
         forceCleanupWS()
-        unstash getStashName()
+        unstashWS(getStashName(), config)
         onUnstash()
         stage(branchName) {
             env.WORKSPACE = pwd()
@@ -1375,7 +1396,7 @@ spec:
     {
         retry(count: 2, conditions: [kubernetesAgent(), nonresumable()]) {
             node(POD_LABEL) {
-                unstash getStashName()
+                unstashWS(getStashName(), config)
                 onUnstash()
 
                 container('docker') {
