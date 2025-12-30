@@ -3,6 +3,7 @@ job: str()
 kubernetes:
   cloud: str()
   nodeSelector: str()
+  hostIPC: bool(required=False)
 
 registry_host: str(required=False)
 registry_path: str(required=False)

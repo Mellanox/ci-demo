@@ -866,6 +866,7 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
         }
     }
     def hostNetwork = image.hostNetwork ?: getConfigVal(config, ['kubernetes', 'hostNetwork'], false)
+    def hostIPC = image.hostIPC ?: getConfigVal(config, ['kubernetes', 'hostIPC'], false)
     def runAsUser = image.runAsUser ?: getConfigVal(config, ['kubernetes', 'runAsUser'], "0")
     def runAsGroup = image.runAsGroup ?: getConfigVal(config, ['kubernetes', 'runAsGroup'], "0")
     def privileged = image.privileged ?: getConfigVal(config, ['kubernetes', 'privileged'], false)
@@ -878,6 +879,7 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
     def yaml = """
 spec:
+  hostIPC: ${hostIPC}
   containers:
     - name: ${cname}
       env:
