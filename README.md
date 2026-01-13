@@ -124,6 +124,29 @@ Jenkins behavior can be controlled by job_matrix.yaml file which has similar syn
 * Job file can define if need to build docker from dockerfiles and push resulting image to the registry or just fetch image from registry.
 * Job can define different [environment](.ci/job_matrix.yaml#L13) variables that will be added to step run environment
 * Job can define optional [include/exclude](.ci/job_matrix.yaml#L36) filters to select desired matrix dimensions
+* A step can **wait for a step on another container** using `waits_for` (e.g. test on container B after build on container A). See [WAITS_FOR.md](WAITS_FOR.md) and examples under `.ci/examples/test_waits_for_*.yaml`.
+
+### Cross-container step dependency (`waits_for`)
+
+You can run a step on one container/agent only after a step on another has finished:
+
+```yaml
+runs_on_dockers:
+  - {name: 'builder', url: 'ubuntu:20.04', arch: 'x86_64'}
+  - {name: 'tester', url: 'ubuntu:20.04', arch: 'x86_64'}
+
+steps:
+  - name: build
+    run: make build
+  - name: test
+    containerSelector: "{name: 'tester'}"
+    waits_for:
+      step: build
+      containerSelector: "{name: 'builder'}"
+    run: make test
+```
+
+Requires the **Lockable Resources** plugin when using `waits_for`; jobs that do not use `waits_for` do not need it. Full details and more examples: [WAITS_FOR.md](WAITS_FOR.md).
 
 ## Jenkins job builder
 

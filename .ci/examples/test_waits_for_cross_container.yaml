@@ -1,0 +1,22 @@
+---
+# Test: step on one container waits for step on another container to finish
+# Branch "x86_64/master v1" runs build; branch "x86_64/master v2" runs test and waits for v1's build
+job: test-waits-for-cross-container
+
+runs_on_agents:
+  - nodeLabel: 'master'
+
+matrix:
+  axes:
+    variant: [1, 2]
+
+steps:
+  - name: build
+    run: echo "Build on this container"
+
+  - name: test
+    containerSelector: "{variant: 2}"
+    waits_for:
+      step: build
+      agentSelector: "{variant: 1}"
+    run: echo "Test runs after build on container variant 1 has finished"

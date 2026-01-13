@@ -29,6 +29,7 @@ single_volume:
 single_step:
   name: str()
   run: str()
+  waits_for: map(required=False)
   agentSelector: str(required=False)
   containerSelector: str(required=False)
   shell: str(required=False)

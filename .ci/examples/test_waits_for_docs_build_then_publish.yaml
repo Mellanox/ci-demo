@@ -1,0 +1,25 @@
+---
+# Example: Build docs on one container, publish to site on another
+# Publisher waits for docs-build step so the artifact is ready.
+#
+# Requires kubernetes cloud.
+job: waits-for-docs-build-publish
+
+kubernetes:
+  cloud: swx-k8s
+
+runs_on_dockers:
+  - {name: 'docs-builder', url: 'node:20', arch: 'x86_64'}
+  - {name: 'docs-publisher', url: 'ubuntu:20.04', arch: 'x86_64'}
+
+steps:
+  - name: docs-build
+    containerSelector: "{name: 'docs-builder'}"
+    run: echo "Building documentation site..."
+
+  - name: docs-publish
+    containerSelector: "{name: 'docs-publisher'}"
+    waits_for:
+      step: docs-build
+      containerSelector: "{name: 'docs-builder'}"
+    run: echo "Publishing docs to CDN/s3..."

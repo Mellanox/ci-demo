@@ -1,0 +1,34 @@
+---
+# Example: Linear pipeline across 3 containers — Build → Test → Deploy
+# Each stage runs on a different container and waits for the previous stage.
+#
+#   builder (build) → tester (test, waits for build) → deployer (deploy, waits for test)
+#
+# Requires kubernetes cloud.
+job: waits-for-build-test-deploy-chain
+
+kubernetes:
+  cloud: swx-k8s
+
+runs_on_dockers:
+  - {name: 'builder', url: 'ubuntu:20.04', arch: 'x86_64'}
+  - {name: 'tester', url: 'ubuntu:20.04', arch: 'x86_64'}
+  - {name: 'deployer', url: 'ubuntu:20.04', arch: 'x86_64'}
+
+steps:
+  - name: build
+    run: echo "Building artifact..."
+
+  - name: test
+    containerSelector: "{name: 'tester'}"
+    waits_for:
+      step: build
+      containerSelector: "{name: 'builder'}"
+    run: echo "Running integration tests (after builder finished)..."
+
+  - name: deploy
+    containerSelector: "{name: 'deployer'}"
+    waits_for:
+      step: test
+      containerSelector: "{name: 'tester'}"
+    run: echo "Deploying to staging (after tests passed)..."
