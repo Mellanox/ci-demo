@@ -173,7 +173,7 @@ Use this action to manage [Nexus Repository Manager](https://help.sonatype.com/r
 This action allows to create/delete/show nexus hosted repositories and also upload and remove packages.
 Examples:
 
-```
+```json
 # show YUM based repository information
 nexus.py yum --url http://swx-repos.mtr.labs.mlnx:8081/ --name test_yum_repo --user user --password password --action show
 {
@@ -255,7 +255,7 @@ The pipeline supports timeout configuration for shell run actions to prevent lon
 - Step-specific timeout overrides
 - Template variable support (e.g., `${TIMEOUT_VALUE}`)
 - Integration with existing error handling (`onfail` and `always` handlers)
-
+```
 **Example:**
 ```yaml
 # Global timeout
@@ -272,7 +272,6 @@ steps:
 ```
 
 For complete documentation, see [Timeout Feature Documentation](TIMEOUT_FEATURE.md).
-```
 
 ### Job Matrix yaml - Advanced configuration
 
@@ -326,6 +325,16 @@ kubernetes:
 # For multiple secrets:
 # imagePullSecrets: "['secret-1', 'secret-2']"
 
+# optional: for multi-arch k8 support, can define arch-specific nodeSelectors
+# and jnlpImage locations
+  arch_table:
+    x86_64:
+      nodeSelector: 'kubernetes.io/arch=amd64'
+      jnlpImage: 'jenkins/inbound-agent:latest'
+    aarch64:
+      nodeSelector: 'kubernetes.io/arch=arm64'
+      jnlpImage: '${registry_host}/${registry_jnlp_path}/jenkins-arm-agent-jnlp:latest'
+
 # optional: can specify jenkins defined credentials and refer/request by credentialsId in step that
 # requires it (it's considered usernamePassword by default if 'type' is not specified)
 credentials:
@@ -334,18 +343,6 @@ credentials:
   - {credentialsId: 'github-ssh-rsa-key', 'keyFileVariable': 'SSH_KEY_FILE', type: 'sshUserPrivateKey'}
   - {credentialsId: 'secret-file', 'variable': 'SECRET_FILE', type: 'file'}
   - {credentialsId: 'string-credentials', type: 'string', variable: 'STRING_VARIABLE'}
-
-
-# optional: for multi-arch k8 support, can define arch-specific nodeSelectors
-# and jnlpImage locations
-
-  arch_table:
-    x86_64:
-      nodeSelector: 'kubernetes.io/arch=amd64'
-      jnlpImage: 'jenkins/inbound-agent:latest'
-    aarch64:
-      nodeSelector: 'kubernetes.io/arch=arm64'
-      jnlpImage: '${registry_host}/${registry_jnlp_path}/jenkins-arm-agent-jnlp:latest'
 
 # volumes to map into dockers
 volumes:
@@ -372,7 +369,6 @@ secret_volumes:
 empty_volumes:
   - {mountPath: /var/home/user/.local/share/containers, memory: false}
 
-
 # environment varibles to insert into Job shell environment, can be referenced from steps
 # or user-scripts or shell commands.
 # If you want more detailed output in logs, add the following environment variable:
@@ -381,11 +377,13 @@ env:
   mofed_installer_exe: /.autodirect/sw/release/mlnx_ofed/MLNX_OFED/mlnx_ofed_install
   mofed_installer_opt: --user-space-only --without-fw-update --all -q --skip-unsupported-devices-check
 
-
 # default variables and values that can be used in yaml file
 defaults:
   var1: value1
   var2: value2
+
+# optional: docker options to pass to the docker run command
+docker_opt: "--pid=host --privileged --ulimit memlock=-1:-1 --network=host --ipc=host --cap-add=SYS_PTRACE --gpus all --device=/dev/infiniband --device=/dev/gdrdrv"
 
 # list of dockers to use for the job, `file` key is optional, if defined but docker image
 # does not exist in registry.
@@ -395,17 +393,18 @@ defaults:
 # category:tools has special meaning - it will run for steps, that explicitly request it in the
 # step`s containerSelector key.
 # The use-case is as following: if some step requires special container with pre-installed toolchain (clang?)
-
+# `nodeLabel` key is optional, it will run on the node with the label specified in the `nodeLabel` key.
 runs_on_dockers:
   - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest', category: 'tool'}
-  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
+  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest', nodeLabel: 'H100'}
 
 # list of jenkins agents labels to run on (optional)
-
+# `url` key is optional, it will use to pull docker image from the url specified in the `url` key and run container on the node with the label specified in the `nodeLabel` key.
+# if `url` is not specified, it run on the node with the label specified in the `nodeLabel` key.
 runs_on_agents:
   - nodeLabel: '(dockerserver || docker) && x86_64'
   - nodeLabel: 'hpc-test-node-inbox'
-
+    url: 'quay.io/podman/stable:v5.7.1'
 
 # user-defined matrix to run tests, "steps" will be executed for every dimension of matrix.
 # Can contain any use-defined dimensions
@@ -440,9 +439,9 @@ matrix:
 # You can use Jenkins job parameters, environment variables, and config variables in your filters.
 # Use ${VARIABLE_NAME} syntax for variable substitution.
 
-include:
-  - {arch: x86_64, cuda: dev/cuda11.0, driver: MLNX_OFED_LINUX-4.9-0.1.8.0, name: ubuntu16-4}
-  - {arch: x86_64, cuda: dev/cuda9.2, driver: MLNX_OFED_LINUX-4.9-0.1.8.0, name: ubuntu16-4}
+  include:
+    - {arch: x86_64, cuda: dev/cuda11.0, driver: MLNX_OFED_LINUX-4.9-0.1.8.0, name: ubuntu16-4}
+    - {arch: x86_64, cuda: dev/cuda9.2, driver: MLNX_OFED_LINUX-4.9-0.1.8.0, name: ubuntu16-4}
   # Examples of using environment variables and job parameters:
   # - {arch: '${TARGET_ARCH}', name: '${TARGET_OS}', driver: '${DRIVER_VERSION}'}
   # - {arch: 'x86_64', name: '${BUILD_TYPE == "nightly" ? "ubuntu20-4" : "ubuntu18-4"}'}
@@ -564,7 +563,6 @@ timeout_minutes: 60
 # `${name}` comes from `runs_on_dockers` section
 # `${axis_index}` is built-in variable representing axis serial number
 taskName: '${name}/${axis_index}'
-
 ```
 
 ## Dynamic Include/Exclude Filters
@@ -674,12 +672,3 @@ steps:
 - **Environment Awareness**: Use Jenkins environment variables for conditional execution
 - **Flexibility**: Mix static and dynamic values in the same configuration
 - **Parameter-Driven CI**: Let users control pipeline execution through job parameters
-
-```
-
-
-
-
-
-
-
