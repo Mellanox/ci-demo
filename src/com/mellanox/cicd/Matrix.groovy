@@ -1501,7 +1501,20 @@ def startPipeline(String label) {
 
         stage("Checkout source code") {
             forceCleanupWS()
-            def scmVars = checkout scm
+            
+            // Use SSH credentials for checkout if git_credentials_id is specified in config
+            def scmVars
+            def gitCredentialsId = env.git_credentials_id ?: null
+            
+            if (gitCredentialsId) {
+                logger.debug("Using SSH credentials for checkout: ${gitCredentialsId}")
+                sshagent(credentials: [gitCredentialsId]) {
+                    scmVars = checkout scm
+                }
+            } else {
+                logger.debug("No git_credentials_id specified, using default checkout")
+                scmVars = checkout scm
+            }
 
             env.GIT_COMMIT      = scmVars.GIT_COMMIT
             env.GIT_PREV_COMMIT = scmVars.GIT_PREVIOUS_COMMIT
@@ -1545,6 +1558,13 @@ def startPipeline(String label) {
             config.put("cFiles", getChangedFilesList(config))
             if (!config.env) {
                 config.put("env", [:])
+            }
+            
+            // Pass git_credentials_id from config to environment if specified
+            def gitCredentialsId = getConfigVal(config, ['git_credentials_id'], null)
+            if (gitCredentialsId) {
+                env.git_credentials_id = gitCredentialsId
+                logger.debug("Git credentials ID set from config: ${gitCredentialsId}")
             }
 
 
@@ -1658,7 +1678,6 @@ def startPipeline(String label) {
 
 @NonCPS
 def launchMethod(label=null) {
-
     if (label) {
         def labelObj = Jenkins.instance.getLabel(label)
         if (labelObj && (labelObj.nodes.size() + labelObj.clouds.size() > 0) && (labelObj.nodes[0].numExecutors > 0)) {
@@ -1669,7 +1688,6 @@ def launchMethod(label=null) {
 
     def cloudList = Jenkins.instance.clouds
 
-
     if (cloudList.size() > 0) {
         return true
     }
@@ -1678,15 +1696,6 @@ def launchMethod(label=null) {
 }
 
 def main() {
-    def label = 'master'
-
-    // legacy launch via agent with label 'master'
-    if (launchMethod(label)) {
-        println("Legacy launch on ${label}")
-        startPipeline(label)
-        return
-    }
-
     // try launch via Jenkins cloud definition
     if (launchMethod()) {
         label = "worker-${UUID.randomUUID().toString()}"
@@ -1697,7 +1706,7 @@ def main() {
         }
         return
     }
-
+    
     reportFail("init", "No launch method detected - define clouds or agents in Jenkins")
 }
 
