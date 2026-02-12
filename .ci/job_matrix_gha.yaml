@@ -1,0 +1,23 @@
+---
+# Minimal job matrix for GitHub Actions CI: runs on Jenkins controller (master)
+# with a single public Docker image. No Kubernetes, no internal registry/volumes.
+job: ci-demo-gha
+
+runs_on_dockers:
+  - {name: 'ubuntu2204', url: 'ubuntu:22.04', tag: 'latest', arch: 'x86_64', nodeLabel: 'master'}
+
+steps:
+  - name: Install build deps
+    run: |
+      apt-get update -qq && apt-get install -y -qq automake autoconf libtool make gcc
+
+  - name: Configure
+    run: |
+      ./autogen.sh
+      ./configure --prefix ${WORKSPACE}/install
+
+  - name: Build
+    run: make -j 2 all
+
+  - name: Install
+    run: make -j 2 install

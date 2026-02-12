@@ -1,0 +1,84 @@
+# GHA CI: run Jenkins container, install ci-demo as a Pipeline job, trigger basic job matrix.
+name: CI (Jenkins)
+
+on:
+  push:
+    branches: [master, main, feature/gha-ci]
+  pull_request:
+    branches: [master, main, feature/gha-ci]
+
+jobs:
+  jenkins-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start Jenkins (existing image, install Docker CLI at start)
+        run: |
+          mkdir -p .github/scripts
+          docker run -d --name jenkins \
+            -u root \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/.github/scripts/jenkins-disable-security.groovy:/usr/share/jenkins/ref/init.groovy.d/disable-security.groovy:ro" \
+            -p 8080:8080 \
+            -e JAVA_OPTS="-Djenkins.install.runSetupWizard=false" \
+            jenkins/jenkins:lts \
+            bash -c "apt-get update && apt-get install -y docker.io && /usr/local/bin/jenkins.sh"
+
+      - name: Wait for Jenkins
+        run: |
+          echo "Waiting for Jenkins to be ready..."
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/login >/dev/null; then
+              echo "Jenkins is up."
+              break
+            fi
+            sleep 5
+          done
+          curl -sf http://localhost:8080/login || (echo "Jenkins did not become ready"; exit 1)
+
+      - name: Install Docker Pipeline plugin
+        run: |
+          # Install plugin so docker.image().inside() works
+          curl -s -X POST -d '<jenkins><install plugin="docker-workflow@1.30"/></jenkins>' \
+            -H 'Content-Type: application/xml' \
+            "http://localhost:8080/pluginManager/installNecessaryPlugins" || true
+          sleep 10
+
+      - name: Create Pipeline job
+        env:
+          REPO_URL: "https://github.com/${{ github.repository }}.git"
+          BRANCH: "${{ github.ref_name }}"
+        run: |
+          sed -e "s|REPO_URL_PLACEHOLDER|${REPO_URL}|g" \
+              -e "s|BRANCH_PLACEHOLDER|${BRANCH}|g" \
+              .github/jenkins-job-config.xml > /tmp/job-config.xml
+          curl -s -X POST -H "Content-Type: application/xml" \
+            -d @/tmp/job-config.xml \
+            "http://localhost:8080/createItem?name=ci-demo"
+
+      - name: Trigger build
+        run: |
+          curl -s -X POST "http://localhost:8080/job/ci-demo/buildWithParameters?conf_file=.ci/job_matrix_gha.yaml"
+          sleep 5
+
+      - name: Wait for build and check result
+        run: |
+          echo "Waiting for build to complete..."
+          for i in $(seq 1 120); do
+            json=$(curl -s "http://localhost:8080/job/ci-demo/lastBuild/api/json?tree=result,building" || echo "{}")
+            result=$(echo "$json" | jq -r '.result // empty')
+            building=$(echo "$json" | jq -r '.building // true')
+            if [ -n "$result" ] && [ "$building" = "false" ]; then
+              echo "Build finished with result: $result"
+              if [ "$result" != "SUCCESS" ]; then
+                echo "Build failed."
+                exit 1
+              fi
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Build did not complete in time."
+          exit 1
