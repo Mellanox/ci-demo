@@ -313,7 +313,7 @@ def matchMapEntry(filters, entry) {
 def unstashWS (name, config){
     def maxRetries = 5
     def lastError = null
-    
+
     for (int i = 1; i <= maxRetries; i++) {
         try {
             unstash name
@@ -326,7 +326,7 @@ def unstashWS (name, config){
             }
         }
     }
-    
+
     // If we get here, all retries failed
     reportFail('unstash', "Failed to unstash '${name}' after ${maxRetries} attempts. Last error: ${lastError.message}")
 }
@@ -1270,6 +1270,28 @@ String getChangedFilesList(config) {
     return []
 }
 
+/**
+ * Check if a Docker image exists in the registry without pulling it.
+ * Uses podman manifest inspect (fast, fetches manifest only); otherwise falls back to docker pull.
+ * Returns true if image exists (no build needed), false if missing or check failed.
+ */
+def imageExistsInRegistry(String img, config) {
+    def quotedImg = "'" + img.replaceAll("'", "'\\\\''") + "'"
+    def result = run_shell("podman manifest inspect ${quotedImg}", "Check if image exists in registry", false)
+    if (result.rc == 0) {
+        config.logger.info("Image found in registry (podman) - ${img}")
+        return true
+    }
+    config.logger.debug("Podman manifest check failed (rc=${result.rc}), trying docker pull")
+    try {
+        config.logger.info("Pulling image - ${img}")
+        docker.image(img).pull()
+        return true
+    } catch (exception) {
+        return false
+    }
+}
+
 def buildImage(config, image) {
 
     // Vasily Ryabov: we need .toString() to make changed_files.contains(filename) work correctly
@@ -1280,25 +1302,13 @@ def buildImage(config, image) {
     def need_build = 0
     def img = image.url
 
-    try {
-        config.logger.info("Pulling image - ${img}")
-        docker.image(img).pull()
-    } catch (exception) {
-        config.logger.info("Image NOT found - ${img} - will build ${filename} ...")
-        need_build++
-    }
-
     if ("${env.build_dockers}" == "true") {
         config.logger.info("Forcing building file per user request: ${filename} ... ")
         need_build++
-    }
-    config.logger.debug("Changed files: ${changed_files}")
-    if (changed_files.contains(filename)) {
+    } else if (changed_files.contains(filename)) {
         config.logger.info("Forcing building, by modified file: ${filename} ... ")
         need_build++
-    }
-
-    if (image.deps) {
+    } else if (image.deps) {
         for (int i=0; i<image.deps.size(); i++) {
             def oneDep = image.deps[i]
             config.logger.debug("Checking " + oneDep)
@@ -1306,6 +1316,12 @@ def buildImage(config, image) {
                 config.logger.info("Forcing building by dependency on changed file: ${oneDep} ... ")
                 need_build++
             }
+        }
+    } else {
+        def imageExists = imageExistsInRegistry(img, config)
+        if (!imageExists) {
+            config.logger.info("Image NOT found in registry - ${img} - will build ${filename} ...")
+            need_build++
         }
     }
 
