@@ -266,11 +266,11 @@ def gen_image_map(config) {
 
                 dfile.file = dfile.file ?: ''
                 if (dfile.url) {
-                    parts = dfile.url.tokenize('/').last().tokenize(':')
+                    def parts = dfile.url.tokenize('/').last().tokenize(':')
                     if (parts.size() == 2) {
                         dfile.tag = parts[1]
-                        tag_size = dfile.tag.size() + 1
-                        len = dfile.url.size() - tag_size
+                        def tag_size = dfile.tag.size() + 1
+                        def len = dfile.url.size() - tag_size
                         dfile.uri = dfile.url.substring(0,len)
                     }
                 }
@@ -1040,7 +1040,7 @@ Map getTasks(axes, image, config, include, exclude) {
     for (int i = 0; i < axes.size(); i++) {
         Map axis = axes[i]
 
-        if (axis.arch != image.arch) {
+        if (axis.arch != null && axis.arch != image.arch) {
             config.logger.debug("getTasks: skipping axis=" + axis + " as its arch does not match image=" + image)
             continue
         }
@@ -1107,7 +1107,7 @@ Map getTasks(axes, image, config, include, exclude) {
                     reportFail('config', "Please define cloud or nodeLabel in yaml config file or define nodeLabel for docker")
                 }
                 if (image.nodeLabel) {
-                    runBareMetal = true
+                    def runBareMetal = true
                     if (image.url == null) {
                         runBareMetal = false
                     }
@@ -1497,7 +1497,7 @@ def String getStashName() {
 def startPipeline(String label) {
     node(label) {
 
-        logger = new Logger(this)
+        def logger = new Logger(this)
 
         stage("Checkout source code") {
             forceCleanupWS()
@@ -1520,6 +1520,7 @@ def startPipeline(String label) {
             stash includes: "scm-repo.tar", name: getStashName()
         }
 
+        def files
         if (fileExists("${env.conf_file}")) {
             files = [ "${env.conf_file}".toString() ]
         } else {
