@@ -1,9 +1,11 @@
 #!/usr/bin/groovy
 
-// load pipeline functions
+// GHA CI: Pipeline script from SCM so Jenkins sets 'scm'; Matrix.groovy can use checkout scm.
 def matrix
 
 node("master") {
+    checkout scm
+    env.conf_file = params.conf_file ?: '.ci/job_matrix_gha.yaml'
     matrix = load('src/com/mellanox/cicd/Matrix.groovy')
     matrix.main()
 }
