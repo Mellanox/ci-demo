@@ -3,9 +3,9 @@ name: CI (Jenkins)
 
 on:
   push:
-    branches: [master, main, feature/gha-ci]
+    branches: [master, main]
   pull_request:
-    branches: [master, main, feature/gha-ci]
+    branches: ['*']
 
 jobs:
   jenkins-ci:
