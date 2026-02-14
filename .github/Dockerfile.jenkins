@@ -1,0 +1,16 @@
+# Jenkins with Pipeline + Docker plugins pre-installed so flow-definition is
+# registered at startup (no restart needed).
+FROM jenkins/jenkins:lts
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+  && rm -rf /var/lib/apt/lists/* \
+  && mkdir -p /opt/docker-bin \
+  && curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-27.3.1.tgz -o /tmp/docker.tgz \
+  && tar xzf /tmp/docker.tgz -C /tmp \
+  && mv /tmp/docker*/docker /opt/docker-bin/docker \
+  && rm -rf /tmp/docker.tgz /tmp/docker* \
+  && chmod 755 /opt/docker-bin/docker
+ENV PATH="/opt/docker-bin:/usr/bin:/bin:/usr/local/bin:${PATH}"
+RUN echo 2.0 > /usr/share/jenkins/ref/jenkins.install.UpgradeWizard.state
+RUN jenkins-plugin-cli --plugins workflow-aggregator docker-workflow git permissive-script-security pipeline-utility-steps timestamper
+USER jenkins
