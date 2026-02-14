@@ -71,8 +71,10 @@ jobs:
 
       - name: Create ci-demo job (Jenkins CLI)
         env:
-          REPO_URL: "https://github.com/${{ github.repository }}.git"
-          BRANCH: "${{ github.ref_name }}"
+          # For pull_request use head repo (PR source) so Jenkins can fetch the branch; for push use current repo
+          REPO_URL: "https://github.com/${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}.git"
+          # For pull_request use head ref (PR source branch); for push use ref_name (avoids invalid refs like 127/merge)
+          BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
         run: |
           sed -e "s|REPO_URL_PLACEHOLDER|${REPO_URL}|g" \
               -e "s|BRANCH_PLACEHOLDER|${BRANCH}|g" \
