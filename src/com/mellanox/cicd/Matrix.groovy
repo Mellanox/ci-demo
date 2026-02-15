@@ -584,7 +584,7 @@ def toEnvVars(config, vars) {
     return map
 }
 
-def run_step(image, config, title, oneStep, axis, runtime=null) {
+def run_step(image, config, title, oneStep, axis, runtime=null, branchName=null) {
 
     if ((image != null) &&
         (axis != null) &&
@@ -592,8 +592,26 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
         return
     }
 
+    def locksToAcquire = null
+    def producerLock = null
+    if (branchName && config.crossBranchLocks != null) {
+        if (config.crossBranchLocks.consumer != null) {
+            def consumerMap = config.crossBranchLocks.consumer[branchName]
+            locksToAcquire = (consumerMap != null) ? consumerMap[oneStep.name] : null
+        }
+        if (config.crossBranchLocks.producer != null) {
+            def producerMap = config.crossBranchLocks.producer[branchName]
+            producerLock = (producerMap != null) ? producerMap[oneStep.name] : null
+        }
+    }
+    if (locksToAcquire && !locksToAcquire.isEmpty()) {
+        def lockResource = locksToAcquire[0]
+        lock(lockResource) {
+            /* wait for producer step(s) to complete */
+        }
+    }
 
-
+    def runStage = {
     stage("${title}") {
         def shell = getDefaultShell(config, oneStep)
         env.WORKSPACE = pwd()
@@ -685,39 +703,41 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
             }
         }
     }
+    }
+    if (producerLock) {
+        lock(producerLock) {
+            runStage()
+        }
+    } else {
+        runStage()
+    }
 }
 
-def runSteps(image, config, branchName, axis, steps=config.steps, runtime) {
+def runSteps(image, config, branchName, axis, runtime) {
     forceCleanupWS()
-    // fetch .git from server and unpack
     unstashWS(getStashName(), config)
     onUnstash()
 
+    def steps = config.steps
     def parallelNestedSteps = [:]
     for (int i = 0; i < steps.size(); i++) {
         def one = steps[i]
         def par = one["parallel"]
         def oneStep = one
-        // collect parallel steps (if any) and run it when non-parallel step discovered or last element.
-        // Skip parallel stages if not used. Fix for Blueocean UI.
-        if ( par != null && par == true && !check_skip_stage(image, config, branchName, oneStep, axis)) {
+        if ( par != null && par == true && !check_skip_stage(image, config, branchName, oneStep, axis, runtime)) {
             def stepName = branchName + "->" + one.name
-            parallelNestedSteps[stepName] = { run_step(image, config, stepName, oneStep, axis, runtime) }
-            // last element - run and flush
+            parallelNestedSteps[stepName] = { run_step(image, config, stepName, oneStep, axis, runtime, branchName) }
             if (i == steps.size() - 1) {
                 parallel(parallelNestedSteps)
                 parallelNestedSteps = [:]
             }
             continue
         }
-        // non-parallel step discovered, need to flush all parallel
-        // steps collected previously to keep ordering.
-        // run non-parallel step right after
         if (parallelNestedSteps.size() > 0) {
             parallel(parallelNestedSteps)
             parallelNestedSteps = [:]
         }
-        run_step(image, config, one.name, oneStep, axis, runtime)
+        run_step(image, config, one.name, oneStep, axis, runtime, branchName)
     }
     attachResults(config)
 }
@@ -853,6 +873,64 @@ def parseImagePullSecrets(secretsInput) {
     reportFail('config', "imagePullSecrets must be a List or String, got: ${secretsInput.getClass().getName()}")
 }
 
+/**
+ * Compute lock map for cross-branch step dependencies (waits_for).
+ * Requires config.branchInfoList to be populated by getTasks.
+ * Sets config.crossBranchLocks = [ producer: [branchName: [stepName: lockId]], consumer: [branchName: [stepName: [lockIds]]] ]
+ */
+def computeCrossBranchLocks(config) {
+    if (!config.branchInfoList || config.branchInfoList.size() == 0) {
+        return
+    }
+    def producer = [:]
+    def consumer = [:]
+    def jobPrefix = "matrix-${config.job}-"
+    config.branchInfoList.each { info ->
+        def branchName = info.branchName
+        def axis = info.axis
+        if (!producer[branchName]) { producer[branchName] = [:] }
+        config.steps.each { step ->
+            def lockId = "${jobPrefix}${branchName}-${step.name}".replaceAll(/[^a-zA-Z0-9_-]/, '-')
+            producer[branchName][step.name] = lockId
+        }
+    }
+    config.steps.each { step ->
+        def wf = step.waits_for
+        def branchSelector = (wf != null) ? (wf.containerSelector ?: wf.agentSelector) : null
+        if (!wf || !wf.step || !branchSelector) {
+            return
+        }
+        def targetStep = wf.step
+        def selector = stringToList(branchSelector)
+        def producerBranchName = null
+        for (info in config.branchInfoList) {
+            if (matchMapEntry(selector, info.axis)) {
+                producerBranchName = info.branchName
+                break
+            }
+        }
+        if (!producerBranchName) {
+            reportFail('config', "waits_for containerSelector/agentSelector '${branchSelector}' does not match any branch")
+        }
+        def producerMap = producer[producerBranchName]
+        def lockId = (producerMap != null) ? producerMap[targetStep] : null
+        if (!lockId) {
+            reportFail('config', "waits_for step '${targetStep}' not found on producer branch")
+        }
+        config.branchInfoList.each { info ->
+            def branchName = info.branchName
+            if (!consumer[branchName]) { consumer[branchName] = [:] }
+            if (!consumer[branchName][step.name]) { consumer[branchName][step.name] = [] }
+            consumer[branchName][step.name].add(lockId)
+        }
+    }
+    if (consumer.isEmpty()) {
+        return
+    }
+    config.crossBranchLocks = [ producer: producer, consumer: consumer ]
+    config.logger.info("Cross-branch locks computed: ${config.crossBranchLocks}")
+}
+
 def runK8(image, branchName, config, axis, steps=config.steps) {
 
     def cloudName = image.cloud ?: getConfigVal(config, ['kubernetes', 'cloud'], null)
@@ -941,7 +1019,7 @@ spec:
             node(POD_LABEL) {
                 stage (branchName) {
                     container(cname) {
-                        runSteps(image, config, branchName, axis, steps, 'k8')
+                        runSteps(image, config, branchName, axis, 'k8')
                     }
                 }
             }
@@ -1098,6 +1176,10 @@ Map getTasks(axes, image, config, include, exclude) {
         }
 
         config.logger.trace(5, "task name " + branchName)
+        if (!config.branchInfoList) {
+            config.branchInfoList = []
+        }
+        config.branchInfoList.add([branchName: branchName, image: image, axis: new HashMap(axis)])
         tasks[branchName] = { ->
             withEnv(axisEnv) {
                 if ((config.get("kubernetes") == null) &&
@@ -1646,8 +1728,11 @@ def startPipeline(String label) {
                                 config.pipeline_start.name = "pipeline_start"
                                 runK8(image, "pipline start on ${image.name}", config, image, [config.pipeline_start])
                             } else {
-                                run_step(null, config, "pipeline start", config.pipeline_start, null)
+                                run_step(null, config, "pipeline start", config.pipeline_start, null, null)
                             }
+                        }
+                        if (config.branchInfoList) {
+                            computeCrossBranchLocks(config)
                         }
                         run_parallel_in_chunks(config, branches, bSize)
                     }
@@ -1665,7 +1750,7 @@ def startPipeline(String label) {
                         config.pipeline_stop.name = "pipeline_stop"
                         runK8(image, "pipline stop on ${image.name}", config, image, [config.pipeline_stop])
                     } else {
-                        run_step(null, config, "pipeline stop", config.pipeline_stop, null)
+                        run_step(null, config, "pipeline stop", config.pipeline_stop, null, null)
                     }
                 }
             }

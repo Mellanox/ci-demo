@@ -1,0 +1,22 @@
+---
+# Example: Deploy to staging on one agent, then run smoke tests on another
+# Smoke-test step waits for deploy step to finish so the environment is up.
+#
+# Use two nodeLabels (e.g. deployer + smoketest) or two agents.
+job: waits-for-deploy-then-smoke
+
+runs_on_agents:
+  - nodeLabel: 'deployer'
+  - nodeLabel: 'smoketest'
+
+steps:
+  - name: deploy-staging
+    agentSelector: "{name: 'deployer'}"
+    run: echo "Deploying to staging..."
+
+  - name: smoke-test
+    agentSelector: "{name: 'smoketest'}"
+    waits_for:
+      step: deploy-staging
+      agentSelector: "{name: 'deployer'}"
+    run: echo "Running smoke tests against staging..."

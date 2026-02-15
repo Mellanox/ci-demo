@@ -1,0 +1,27 @@
+---
+# Example: Backend build, then frontend runs E2E tests that need the backend
+# Backend and frontend are different containers; E2E step runs only on frontend
+# and waits for backend's "build" so the API is ready.
+#
+# Requires kubernetes cloud.
+job: waits-for-backend-frontend-e2e
+
+kubernetes:
+  cloud: swx-k8s
+
+runs_on_dockers:
+  - {name: 'backend', url: 'ubuntu:20.04', arch: 'x86_64'}
+  - {name: 'frontend', url: 'node:20', arch: 'x86_64'}
+
+steps:
+  - name: build
+    run: echo "Build (backend or frontend each build their own)"
+
+  - name: e2e-tests
+    containerSelector: "{name: 'frontend'}"
+    waits_for:
+      step: build
+      containerSelector: "{name: 'backend'}"
+    run: |
+      echo "E2E tests need backend API to be built first"
+      echo "Running E2E against backend..."

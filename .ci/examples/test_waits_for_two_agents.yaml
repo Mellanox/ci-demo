@@ -1,0 +1,22 @@
+---
+# Example: step on agent "tester" waits for step on agent "builder" to finish
+# Two distinct agents (two nodeLabels). Branch name comes from nodeLabel (name).
+#
+# Use two different nodeLabels so you get two branches; then match by name in
+# containerSelector. If you only have one node, use the variant example instead.
+job: test-waits-for-two-agents
+
+runs_on_agents:
+  - nodeLabel: 'builder'
+  - nodeLabel: 'tester'
+
+steps:
+  - name: build
+    run: echo "Build on agent builder"
+
+  - name: test
+    agentSelector: "{name: 'tester'}"
+    waits_for:
+      step: build
+      agentSelector: "{name: 'builder'}"
+    run: echo "Test on agent tester runs after builder has finished build"

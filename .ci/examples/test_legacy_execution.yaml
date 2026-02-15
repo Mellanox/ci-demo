@@ -1,0 +1,33 @@
+---
+# Test file for backward compatibility - no dependencies, uses legacy execution
+job: test-legacy-execution
+
+runs_on_agents:
+  - nodeLabel: 'master'
+
+steps:
+  # Sequential step
+  - name: step1
+    run: echo "Step 1 - sequential"
+
+  # Parallel steps
+  - name: step2
+    parallel: true
+    run: echo "Step 2 - parallel"
+
+  - name: step3
+    parallel: true
+    run: echo "Step 3 - parallel"
+
+  # Sequential step (flushes parallel queue)
+  - name: step4
+    run: echo "Step 4 - sequential (flushes parallel)"
+
+  # More parallel steps
+  - name: step5
+    parallel: true
+    run: echo "Step 5 - parallel"
+
+  - name: step6
+    parallel: true
+    run: echo "Step 6 - parallel (last, auto-flush)"

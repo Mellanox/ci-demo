@@ -1,0 +1,28 @@
+---
+# Example: step on container "tester" waits for step on container "builder" to finish
+# Two distinct containers (two images), no matrix variants.
+#
+# Container "builder" runs step "build"; container "tester" runs step "test"
+# and waits for builder's "build" to complete using waits_for + containerSelector.
+#
+# Requires kubernetes cloud. For agents, use two nodeLabels (e.g. builder/tester)
+# and containerSelector: "{name: 'builder'}" (name comes from nodeLabel).
+job: test-waits-for-two-containers
+
+kubernetes:
+  cloud: swx-k8s
+
+runs_on_dockers:
+  - {name: 'builder', url: 'ubuntu:20.04', arch: 'x86_64'}
+  - {name: 'tester', url: 'ubuntu:20.04', arch: 'x86_64'}
+
+steps:
+  - name: build
+    run: echo "Build on container builder"
+
+  - name: test
+    containerSelector: "{name: 'tester'}"
+    waits_for:
+      step: build
+      containerSelector: "{name: 'builder'}"
+    run: echo "Test on container tester runs after builder has finished build"
