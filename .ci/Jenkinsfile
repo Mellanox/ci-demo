@@ -1,11 +1,25 @@
 #!/usr/bin/groovy
 
-// GHA CI: Pipeline script from SCM so Jenkins sets 'scm'; Matrix.groovy can use checkout scm.
+// Local-first: if repo is mounted into Jenkins container, run from mounted workspace.
+// Fallback to SCM checkout for non-local flows (e.g. GitHub Actions).
 def matrix
 
 node("master") {
-    checkout scm
-    env.conf_file = params.conf_file ?: '.ci/job_matrix_gha.yaml'
-    matrix = load('src/com/mellanox/cicd/Matrix.groovy')
-    matrix.main()
+    def repoDir = env.CI_REPO_DIR ?: '/workspace/ci-demo'
+    def hasMountedRepo = sh(script: "[ -f '${repoDir}/src/com/mellanox/cicd/Matrix.groovy' ] && echo yes || echo no", returnStdout: true).trim()
+
+    if (hasMountedRepo == 'yes') {
+        echo "Using mounted repo at ${repoDir} (skip checkout scm)"
+        dir(repoDir) {
+            env.conf_file = params.conf_file ?: '.ci/job_matrix_gha.yaml'
+            matrix = load('src/com/mellanox/cicd/Matrix.groovy')
+            matrix.main()
+        }
+    } else {
+        echo "Mounted repo not found, using checkout scm"
+        checkout scm
+        env.conf_file = params.conf_file ?: '.ci/job_matrix_gha.yaml'
+        matrix = load('src/com/mellanox/cicd/Matrix.groovy')
+        matrix.main()
+    }
 }

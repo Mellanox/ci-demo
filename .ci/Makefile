@@ -23,7 +23,7 @@ CONF_FILE := job_matrix.yaml
 
 JENKINS_HOST := hpc-master
 JENKINS_URL  := http://$(JENKINS_HOST):8080
-JENKINS_TOKEN := $(shell cat ${HOME}/.jenkins_${USER}_token)
+JENKINS_TOKEN := $(shell test -f ${HOME}/.jenkins_${USER}_token && cat ${HOME}/.jenkins_${USER}_token)
 JENKINS_AUTH  := ${USER}:${JENKINS_TOKEN}
 CONF := .ci/job_matrix.yaml
 JPROJ := cidemo-debug
@@ -109,3 +109,15 @@ jjb:
 clean:
 	docker image prune -a -f
 
+
+local-gha-ci:
+	@../scripts/local_gha_ci.sh
+
+local-gha-ci-colima:
+	@USE_COLIMA=true COLIMA_PROFILE=native ../scripts/local_gha_ci.sh
+
+local-gha-clean:
+	@docker rm -f jenkins-local k3s 2>/dev/null || true
+	@docker network rm ci-demo-net 2>/dev/null || true
+	@docker rmi -f jenkins-ci-demo-local 2>/dev/null || true
+	@rm -rf ../.tmp/local-gha-ci ../.tmp ../tmp
