@@ -873,11 +873,28 @@ def ensureK8sCloud(cloudName, namespace = "default") {
         j.clouds.add(cloud)
     }
 
-    cloud.serverUrl = System.getenv("JENKINS_K8S_API_URL") ?: "https://k3s:6443"
+    // Only set serverUrl when JENKINS_K8S_API_URL is set; otherwise preserve existing (e.g. from
+    // startup script). Do not default to "https://k3s:6443" here—that hostname only resolves in
+    // local Docker; on shared Jenkins it causes UnknownHostException. Local runs must pass
+    // JENKINS_K8S_API_URL (e.g. scripts/local_gha_ci.sh does).
+    def apiUrl = System.getenv("JENKINS_K8S_API_URL")?.trim()
+    if (apiUrl) {
+        cloud.serverUrl = apiUrl
+    }
     cloud.skipTlsVerify = true
     cloud.namespace = namespace ?: "default"
-    cloud.jenkinsUrl = System.getenv("JENKINS_URL") ?: "http://jenkins:8080"
-    cloud.jenkinsTunnel = System.getenv("JENKINS_TUNNEL") ?: "jenkins:50000"
+    def jenkinsUrlEnv = System.getenv("JENKINS_URL")?.trim()
+    if (jenkinsUrlEnv) {
+        cloud.jenkinsUrl = jenkinsUrlEnv
+    } else if (!cloud.jenkinsUrl) {
+        cloud.jenkinsUrl = "http://jenkins:8080"
+    }
+    def tunnelEnv = System.getenv("JENKINS_TUNNEL")?.trim()
+    if (tunnelEnv) {
+        cloud.jenkinsTunnel = tunnelEnv
+    } else if (!cloud.jenkinsTunnel) {
+        cloud.jenkinsTunnel = "jenkins:50000"
+    }
     if ((System.getenv("JENKINS_K8S_TOKEN") ?: "").trim()) {
         cloud.credentialsId = "k8s-sa-token"
     }
