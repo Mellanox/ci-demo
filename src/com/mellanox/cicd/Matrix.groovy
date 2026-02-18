@@ -1310,12 +1310,30 @@ String getChangedFilesList(config) {
  */
 def imageExistsInRegistry(String img, config) {
     def quotedImg = "'" + img.replaceAll("'", "'\\\\''") + "'"
-    def result = run_shell("podman manifest inspect ${quotedImg}", "Check if image exists in registry", false)
+
+    // Try docker/podman manifest inspect
+    def result = run_shell("docker manifest inspect ${quotedImg}", "Check if image exists in registry", false)
     if (result.rc == 0) {
-        config.logger.info("Image found in registry (podman) - ${img}")
+        config.logger.info("Image found in registry (docker/podman manifest) - ${img}")
         return true
     }
-    config.logger.debug("Podman manifest check failed (rc=${result.rc}), trying docker pull")
+    config.logger.debug("Podman manifest check failed (rc=${result.rc}), trying podman search")
+
+    // Try podman search --list-tags
+    def parts = img.split(':')
+    if (parts.size() >= 1) {
+        def quotedRepo = "'" + parts[0].replaceAll("'", "'\\\\''") + "'"
+        def tag = parts.size() == 2 ? parts[1] : "latest"
+        def quotedTag = "'" + tag.replaceAll("'", "'\\\\''") + "'"
+        result = run_shell("podman search --list-tags --format \"{{.Tag}}\" ${quotedRepo} 2> /dev/null | grep ${quotedTag}", "Check tag via podman search", false)
+        if (result.rc == 0) {
+            config.logger.info("Image found in registry (podman search) - ${img}")
+            return true
+        }
+        config.logger.debug("Podman search check failed (rc=${result.rc}), trying docker pull")
+    }
+
+    // Last resort: docker pull
     try {
         config.logger.info("Pulling image - ${img}")
         docker.image(img).pull()
