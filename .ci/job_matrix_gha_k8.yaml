@@ -1,0 +1,71 @@
+---
+job: ci-k8-static
+
+kubernetes:
+  cloud: swx-k8s
+  namespace: default
+  serviceAccount: jenkins
+  hostNetwork: false
+  privileged: false
+  limits: "{memory: 2Gi, cpu: 1000m}"
+  requests: "{memory: 512Mi, cpu: 250m}"
+  caps_add: "[]"
+  tolerations: "[]"
+  imagePullSecrets: "[]"
+
+arch_table:
+  x86_64:
+    nodeSelector: "kubernetes.io/os=linux,kubernetes.io/arch=amd64"
+    jnlpImage: "jenkins/inbound-agent:latest"
+  aarch64:
+    nodeSelector: "kubernetes.io/os=linux,kubernetes.io/arch=arm64"
+    jnlpImage: "jenkins/inbound-agent:latest"
+
+empty_volumes:
+  - {mountPath: /tmp/workspace, memory: false}
+
+runs_on_dockers:
+  - {name: "ubuntu-x86_64", url: "ubuntu:22.04", arch: "x86_64"}
+  - {name: "ubuntu-aarch64", url: "ubuntu:22.04", arch: "aarch64"}
+
+matrix:
+  axes:
+    arch:
+      - x86_64
+      - aarch64
+    variant:
+      - debug
+      - release
+  include:
+    - {arch: '${TARGET_ARCH}'}
+
+steps:
+  - name: Print environment
+    run: |
+      echo "job=${job} arch=${arch} variant=${variant} name=${name} axis_index=${axis_index}"
+      uname -a
+      env | sort | head -n 40
+
+  - name: Custom shell
+    shell: "#!/bin/bash -eE"
+    run: |
+      echo "running from bash"
+      type ls
+
+  - name: Timeout step
+    timeout: 2
+    run: |
+      echo "timeout step ok"
+
+  - name: Create artifact
+    run: |
+      echo "ci-k8-static artifact ${arch}-${variant}-${name}" > ci-k8-static-artifact.txt
+    archiveArtifacts: "ci-k8-static-artifact.txt"
+
+pipeline_start:
+  run: echo "pipeline_start for ${job}"
+
+pipeline_stop:
+  run: echo "pipeline_stop status=${pipeline_status}"
+
+failFast: false

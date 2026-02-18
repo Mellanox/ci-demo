@@ -551,7 +551,7 @@ def check_skip_stage(image, config, title, oneStep, axis, runtime=null) {
     }
 
     for (int i=0; i<selectors.size(); i++) {
-        selector = selectors[i]
+        def selector = selectors[i]
         if (selector && selector.size() > 0) {
             def customSel = stringToList(selector)
             config.logger.trace(2, "Selector=" + selector + " custom=" + customSel + " name=" + image.name)
@@ -633,7 +633,7 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
                     reportFail(title, "credentialsId should be either a List or a String")
                 }
                 def foundList = []
-                for (credentialsId in credentialsIdList) {
+                for (def credentialsId in credentialsIdList) {
                     def found = false
                     for (int i=0; i<config.credentials.size(); i++) {
                         Map entry = config.credentials[i]
@@ -753,9 +753,9 @@ def getConfigVal(config, list, defaultVal=null, toString=true, oneStep=null, use
 def parseListV(volumes) {
     def listV = []
     volumes.each { vol ->
-        hostPath = vol.get("hostPath")
-        mountPath = vol.get("mountPath")
-        hpv = hostPathVolume(hostPath: hostPath, mountPath: mountPath)
+        def hostPath = vol.get("hostPath")
+        def mountPath = vol.get("mountPath")
+        def hpv = hostPathVolume(hostPath: hostPath, mountPath: mountPath)
         listV.add(hpv)
     }
     return listV
@@ -764,11 +764,11 @@ def parseListV(volumes) {
 def parseListNfsV(volumes) {
     def listV = []
     volumes.each { vol ->
-        serverAddress = vol.get("serverAddress")
-        serverPath = vol.get("serverPath")
-        mountPath = vol.get("mountPath")
-        readOnly = vol.get("readOnly", false)
-        nfsv = nfsVolume(serverAddress: serverAddress,
+        def serverAddress = vol.get("serverAddress")
+        def serverPath = vol.get("serverPath")
+        def mountPath = vol.get("mountPath")
+        def readOnly = vol.get("readOnly", false)
+        def nfsv = nfsVolume(serverAddress: serverAddress,
                          serverPath: serverPath,
                          mountPath: mountPath,
                          readOnly: readOnly)
@@ -780,10 +780,10 @@ def parseListNfsV(volumes) {
 def parseListPVC(volumes) {
     def listV = []
     volumes.each { vol ->
-        claimName = vol.get("claimName")
-        mountPath = vol.get("mountPath")
-        readOnly = vol.get("readOnly", false)
-        PVCv = persistentVolumeClaim(claimName: claimName,
+        def claimName = vol.get("claimName")
+        def mountPath = vol.get("mountPath")
+        def readOnly = vol.get("readOnly", false)
+        def PVCv = persistentVolumeClaim(claimName: claimName,
                                      mountPath: mountPath,
                                      readOnly: readOnly)
         listV.add(PVCv)
@@ -794,11 +794,11 @@ def parseListPVC(volumes) {
 def parseSecretV(volumes) {
     def listV = []
     volumes.each { vol ->
-        secretName = vol.get("secretName")
-        mountPath = vol.get("mountPath")
-        optional = vol.get("optional")
-        defaultMode = vol.get("defaultMode")
-        secretV = secretVolume(secretName: secretName,
+        def secretName = vol.get("secretName")
+        def mountPath = vol.get("mountPath")
+        def optional = vol.get("optional")
+        def defaultMode = vol.get("defaultMode")
+        def secretV = secretVolume(secretName: secretName,
                                mountPath: mountPath,
                                optional: optional,
                                defaultMode: defaultMode)
@@ -810,9 +810,9 @@ def parseSecretV(volumes) {
 def parseEmptyDirV(volumes) {
     def listV = []
     volumes.each { vol ->
-        mountPath = vol.get("mountPath")
-        memoryFlag = vol.get("memory", false)
-        EmptyDirV = emptyDirVolume(  mountPath: mountPath,
+        def mountPath = vol.get("mountPath")
+        def memoryFlag = vol.get("memory", false)
+        def EmptyDirV = emptyDirVolume(  mountPath: mountPath,
                                      memory: memoryFlag)
         listV.add(EmptyDirV)
     }
@@ -822,9 +822,9 @@ def parseEmptyDirV(volumes) {
 def parseListA(annotations) {
     def listA = []
     annotations.each { an ->
-        key = an.get("key")
-        value = an.get("value")
-        pan = podAnnotation(key: key, value: value)
+        def key = an.get("key")
+        def value = an.get("value")
+        def pan = podAnnotation(key: key, value: value)
         listA.add(pan)
     }
     return listA
@@ -851,6 +851,38 @@ def parseImagePullSecrets(secretsInput) {
     }
     // If it's neither a list nor a string, fail
     reportFail('config', "imagePullSecrets must be a List or String, got: ${secretsInput.getClass().getName()}")
+}
+
+@NonCPS
+def ensureK8sCloud(cloudName, namespace = "default") {
+    if (!cloudName) {
+        return false
+    }
+    def j = Jenkins.instance
+    def cl = j.pluginManager.uberClassLoader
+    def k8sCloudClass = cl.loadClass("org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud")
+    def cloud = j.clouds.getByName(cloudName)
+
+    if (cloud != null && !k8sCloudClass.isInstance(cloud)) {
+        j.clouds.remove(cloud)
+        cloud = null
+    }
+
+    if (cloud == null) {
+        cloud = k8sCloudClass.getConstructor(String).newInstance(cloudName)
+        j.clouds.add(cloud)
+    }
+
+    cloud.serverUrl = System.getenv("JENKINS_K8S_API_URL") ?: "https://k3s:6443"
+    cloud.skipTlsVerify = true
+    cloud.namespace = namespace ?: "default"
+    cloud.jenkinsUrl = System.getenv("JENKINS_URL") ?: "http://jenkins:8080"
+    cloud.jenkinsTunnel = System.getenv("JENKINS_TUNNEL") ?: "jenkins:50000"
+    if ((System.getenv("JENKINS_K8S_TOKEN") ?: "").trim()) {
+        cloud.credentialsId = "k8s-sa-token"
+    }
+    j.save()
+    return true
 }
 
 def runK8(image, branchName, config, axis, steps=config.steps) {
@@ -900,6 +932,7 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
     def imagePullSecrets = parseImagePullSecrets(getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]"))
+    ensureK8sCloud(cloudName, namespace)
     def yaml = """
 spec:
   containers:
@@ -995,7 +1028,7 @@ def getDockerOpt(config) {
     if (config.get("volumes")) {
         for (int i=0; i<config.volumes.size(); i++) {
             def vol = config.volumes[i]
-            hostPath = vol.get("hostPath")? vol.hostPath : vol.mountPath
+            def hostPath = vol.get("hostPath")? vol.hostPath : vol.mountPath
             opts += " -v ${vol.mountPath}:${hostPath}"
         }
     }
@@ -1424,6 +1457,7 @@ def build_docker_on_k8(image, config) {
     def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
     def imagePullSecrets = parseImagePullSecrets(getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]"))
+    ensureK8sCloud(cloudName, namespace)
     def yaml = """
 spec:
   containers:

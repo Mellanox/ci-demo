@@ -3,9 +3,9 @@ name: CI (Jenkins)
 
 on:
   push:
-    branches: [master, main]
+    branches: ["**"]
   pull_request:
-    branches: ['*']
+    branches: ["*"]
 
 jobs:
   jenkins-ci:
@@ -14,95 +14,46 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build Jenkins image with plugins
+      - name: Detect TARGET_ARCH
         run: |
-          docker build -t jenkins-ci-demo -f .github/Dockerfile.jenkins .
+          arch=""
+          case "${RUNNER_ARCH}" in
+            X64) arch="x86_64" ;;
+            ARM64) arch="aarch64" ;;
+            *) arch="x86_64" ;;
+          esac
+          echo "TARGET_ARCH=${arch}" >> "${GITHUB_ENV}"
+          echo "Detected TARGET_ARCH=${arch}"
 
-      - name: Start Jenkins
-        run: |
-          docker run -d --name jenkins \
-            -u root \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$PWD/.github/scripts/jenkins-disable-security.groovy:/usr/share/jenkins/ref/init.groovy.d/disable-security.groovy:ro" \
-            -v "$PWD/.github/scripts/jenkins-add-master-label.groovy:/usr/share/jenkins/ref/init.groovy.d/add-master-label.groovy:ro" \
-            -p 8080:8080 \
-            -e JAVA_OPTS="-Djenkins.install.runSetupWizard=false -Dhudson.security.csrf.GlobalCrumbIssuerConfiguration.DISABLE_CSRF_PROTECTION=true -Dpermissive-script-security.enabled=no_security" \
-            jenkins-ci-demo \
-            /usr/local/bin/jenkins.sh
-          echo "Jenkins container started. Initial log:"
-          sleep 5
-          docker logs jenkins 2>&1 | tail -60
-
-      - name: Wait for Jenkins
-        run: |
-          echo "Waiting for Jenkins to be ready..."
-          max=90
-          for i in $(seq 1 $max); do
-            if curl -sf http://localhost:8080/login >/dev/null; then
-              echo "Jenkins is up."
-              break
-            fi
-            echo "  ... waiting for Jenkins ($i/$max)"
-            sleep 5
-          done
-          if ! curl -sf http://localhost:8080/login >/dev/null; then
-            echo "Jenkins did not become ready. Container status and last 80 lines of logs:"
-            docker ps -a --filter name=jenkins
-            docker logs jenkins 2>&1 | tail -80
-            exit 1
-          fi
-          echo "Waiting 30s for init scripts (disable security) and plugin activation..."
-          sleep 30
-
-      - name: Verify Jenkins API accessible
-        run: |
-          code=$(curl -s -o /tmp/api-out -w "%{http_code}" "http://localhost:8080/api/json")
-          if [ "$code" != "200" ]; then
-            echo "Jenkins API returned $code (expected 200). Security may not be disabled. Response:"
-            head -c 500 /tmp/api-out
-            exit 1
-          fi
-          echo "Jenkins API OK (unauthenticated)."
-
-      - name: Get Jenkins CLI
-        run: |
-          curl -s -o jenkins-cli.jar "http://localhost:8080/jnlpJars/jenkins-cli.jar"
-          java -jar jenkins-cli.jar -s http://localhost:8080 version || (echo "Jenkins CLI failed"; exit 1)
-
-      - name: Create ci-demo job (Jenkins CLI)
+      - name: Run local-gha-ci script
         env:
-          # For pull_request use head repo (PR source) so Jenkins can fetch the branch; for push use current repo
-          REPO_URL: "https://github.com/${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}.git"
-          # For pull_request use head ref (PR source branch); for push use ref_name (avoids invalid refs like 127/merge)
           BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+          REPO_URL: "https://github.com/${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}.git"
+          TARGET_ARCHES: ${{ env.TARGET_ARCH }}
+          CI_K8_FILE: .ci/job_matrix_gha_k8.yaml
+          KEEP_JENKINS: "false"
+          KEEP_K8S: "false"
         run: |
-          sed -e "s|REPO_URL_PLACEHOLDER|${REPO_URL}|g" \
-              -e "s|BRANCH_PLACEHOLDER|${BRANCH}|g" \
-              .github/jenkins-job-config.xml > job-config.xml
-          java -jar jenkins-cli.jar -s http://localhost:8080 create-job ci-demo < job-config.xml || true
-          java -jar jenkins-cli.jar -s http://localhost:8080 update-job ci-demo < job-config.xml
+          bash ./scripts/local_gha_ci.sh
 
-      - name: Verify Pipeline job exists (Jenkins CLI)
+      - name: Print local-gha-ci log tails
+        if: always()
         run: |
-          java -jar jenkins-cli.jar -s http://localhost:8080 get-job ci-demo > /dev/null
-          echo "Job ci-demo exists."
+          if [ -d .tmp/local-gha-ci/logs ]; then
+            echo "=== local-gha-ci logs (last 200 lines each) ==="
+            for f in .tmp/local-gha-ci/logs/*.log; do
+              [ -e "$f" ] || continue
+              echo "----- $f (tail -n 200) -----"
+              tail -n 200 "$f" || true
+            done
+          else
+            echo "No .tmp/local-gha-ci/logs directory found."
+          fi
 
-      - name: Trigger first build (may fail until script is approved)
-        continue-on-error: true
-        run: |
-          java -jar jenkins-cli.jar -s http://localhost:8080 build ci-demo -p conf_file=.ci/job_matrix_gha.yaml -s -v || true
-
-      - name: Approve pipeline scripts
-        run: |
-          script='import jenkins.model.Jenkins; def sa = Jenkins.instance.getExtensionList("org.jenkinsci.plugins.scriptsecurity.scripts.ScriptApproval")[0].get(); sa.preapproveAll(); sa.save(); return "OK";'
-          out=$(curl -s -X POST --data-urlencode "script=$script" "http://localhost:8080/scriptText")
-          echo "$out"
-
-      - name: Trigger build and wait (Jenkins CLI)
-        run: |
-          java -jar jenkins-cli.jar -s http://localhost:8080 build ci-demo -p conf_file=.ci/job_matrix_gha.yaml -s -v
-
-      - name: Show Jenkins build console
-        run: |
-          echo "=== Jenkins pipeline console (last build) ==="
-          curl -s "http://localhost:8080/job/ci-demo/lastBuild/consoleText" || echo "Could not fetch console"
+      - name: Upload local-gha-ci logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-gha-ci-logs
+          path: .tmp/local-gha-ci/logs
+          if-no-files-found: ignore

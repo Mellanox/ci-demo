@@ -672,3 +672,39 @@ steps:
 - **Environment Awareness**: Use Jenkins environment variables for conditional execution
 - **Flexibility**: Mix static and dynamic values in the same configuration
 - **Parameter-Driven CI**: Let users control pipeline execution through job parameters
+
+## Local VS Code Runner (Jenkins + k3s)
+
+Use the local helper from your terminal (including VS Code integrated terminal):
+
+```bash
+cd .ci
+make local-gha-ci
+```
+
+Defaults:
+- Builds local Jenkins image from `.github/Dockerfile.jenkins`
+- Starts k3s in a Docker container
+- Generates a single dynamic config (`ci-k8.yaml`) from active k8 node labels/arch
+- Starts Jenkins on `http://localhost:8080`
+- Runs the generated config and stores logs in `.tmp/local-gha-ci/logs`
+
+Useful environment overrides:
+
+```bash
+# keep containers for debugging
+KEEP_JENKINS=true KEEP_K8S=true .ci/../scripts/local_gha_ci.sh
+```
+
+```bash
+# run with Colima docker context
+cd .ci
+make local-gha-ci-colima
+```
+
+```bash
+# cleanup local runner containers/network/image/logs
+cd .ci
+make local-gha-clean
+```
+
