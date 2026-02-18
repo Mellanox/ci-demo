@@ -862,6 +862,7 @@ def ensureK8sCloud(cloudName, namespace = "default") {
     def cl = j.pluginManager.uberClassLoader
     def k8sCloudClass = cl.loadClass("org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud")
     def cloud = j.clouds.getByName(cloudName)
+    def cloudCreated = false
 
     if (cloud != null && !k8sCloudClass.isInstance(cloud)) {
         j.clouds.remove(cloud)
@@ -871,6 +872,7 @@ def ensureK8sCloud(cloudName, namespace = "default") {
     if (cloud == null) {
         cloud = k8sCloudClass.getConstructor(String).newInstance(cloudName)
         j.clouds.add(cloud)
+        cloudCreated = true
     }
 
     // Only set serverUrl when JENKINS_K8S_API_URL is set; otherwise preserve existing (e.g. from
@@ -882,7 +884,12 @@ def ensureK8sCloud(cloudName, namespace = "default") {
         cloud.serverUrl = apiUrl
     }
     cloud.skipTlsVerify = true
-    cloud.namespace = namespace ?: "default"
+    // Do not overwrite namespace on existing shared clouds unless explicitly requested.
+    def namespaceEnv = System.getenv("JENKINS_K8S_NAMESPACE")?.trim()
+    def desiredNamespace = namespaceEnv ?: namespace ?: "default"
+    if (namespaceEnv || cloudCreated || !cloud.namespace) {
+        cloud.namespace = desiredNamespace
+    }
     def jenkinsUrlEnv = System.getenv("JENKINS_URL")?.trim()
     if (jenkinsUrlEnv) {
         cloud.jenkinsUrl = jenkinsUrlEnv
