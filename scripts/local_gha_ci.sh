@@ -130,7 +130,7 @@ fi
 
 mkdir -p "${LOG_DIR}"
 
-echo "[1/8] Using static workflow config ${CI_K8_FILE}"
+echo "[1/9] Using static workflow config ${CI_K8_FILE}"
 if [[ ! -f "${CI_K8_FILE}" ]]; then
   echo "ERROR: Config file not found: ${CI_K8_FILE}" >&2
   exit 1
@@ -158,7 +158,7 @@ echo "Target matrix arch(es): ${target_arch_list[*]}"
 clouds_csv=""
 labels_csv=""
 
-echo "[2/8] Building Jenkins image ${JENKINS_IMAGE}"
+echo "[2/9] Building Jenkins image ${JENKINS_IMAGE}"
 docker build -t "${JENKINS_IMAGE}" -f .github/Dockerfile.jenkins .
 
 if ! docker network inspect "${DOCKER_NETWORK}" >/dev/null 2>&1; then
@@ -166,7 +166,7 @@ if ! docker network inspect "${DOCKER_NETWORK}" >/dev/null 2>&1; then
 fi
 
 if [[ "${ENABLE_K8S}" == "true" ]]; then
-  echo "[3/8] Starting Kubernetes container ${K8S_CONTAINER_NAME}"
+  echo "[3/9] Starting Kubernetes container ${K8S_CONTAINER_NAME}"
   docker rm -f "${K8S_CONTAINER_NAME}" >/dev/null 2>&1 || true
   docker run -d --name "${K8S_CONTAINER_NAME}" \
     --hostname "${K8S_CONTAINER_NAME}" \
@@ -239,7 +239,7 @@ elif [[ -n "${arch_labels_csv}" ]]; then
   labels_csv="${arch_labels_csv}"
 fi
 
-echo "[4/8] Starting Jenkins container ${JENKINS_NAME}"
+echo "[4/9] Starting Jenkins container ${JENKINS_NAME}"
 docker rm -f "${JENKINS_NAME}" >/dev/null 2>&1 || true
 
 docker run -d --name "${JENKINS_NAME}" \
@@ -264,7 +264,7 @@ docker run -d --name "${JENKINS_NAME}" \
   "${JENKINS_IMAGE}" \
   /usr/local/bin/jenkins.sh >/dev/null
 
-echo "[5/8] Waiting for Jenkins at ${JENKINS_URL}"
+echo "[5/9] Waiting for Jenkins at ${JENKINS_URL}"
 for i in $(seq 1 90); do
   if [[ "$(docker inspect -f '{{.State.Running}}' "${JENKINS_NAME}" 2>/dev/null || echo false)" != "true" ]]; then
     echo "ERROR: Jenkins container '${JENKINS_NAME}' stopped before becoming ready" >&2
@@ -345,7 +345,24 @@ fi
 docker exec "${JENKINS_NAME}" git config --global --add safe.directory "${REPO_MOUNT}" >/dev/null 2>&1 || true
 docker exec "${JENKINS_NAME}" git config --global --add safe.directory "${REPO_MOUNT}/.git" >/dev/null 2>&1 || true
 
-echo "[6/8] Creating/updating Jenkins job ci-demo"
+echo "[6/9] Validating matrix schema in Jenkins container"
+validator_python=${SCHEMA_VALIDATOR_PYTHON:-/opt/schema-validator/bin/python3}
+if ! docker exec "${JENKINS_NAME}" "${validator_python}" -c "import yamale" >/dev/null 2>&1; then
+  echo "ERROR: validator runtime not available in Jenkins container (${validator_python}). Rebuild ${JENKINS_IMAGE} from .github/Dockerfile.jenkins" >&2
+  exit 1
+fi
+for conf in "${conf_files[@]}"; do
+  conf_rel="${conf}"
+  if [[ "${conf_rel}" == ./* ]]; then
+    conf_rel="${REPO_MOUNT}/${conf_rel#./}"
+  elif [[ "${conf_rel}" != /* ]]; then
+    conf_rel="${REPO_MOUNT}/${conf_rel}"
+  fi
+  echo "Validating schema: ${conf_rel}"
+  docker exec "${JENKINS_NAME}" "${validator_python}" "${REPO_MOUNT}/schema_validator/ci_demo_yaml_validator.py" "${conf_rel}"
+done
+
+echo "[7/9] Creating/updating Jenkins job ci-demo"
 sed -e "s|REPO_URL_PLACEHOLDER|${REPO_URL}|g" \
     -e "s|BRANCH_PLACEHOLDER|${branch_name}|g" \
     -e "s|TARGET_ARCH_PLACEHOLDER|${detected_ci_arch}|g" \
@@ -379,7 +396,7 @@ docker exec -i "${JENKINS_NAME}" java -jar "${CLI_JAR_IN_CONTAINER}" -s http://l
 script='import jenkins.model.Jenkins; def sa = Jenkins.instance.getExtensionList("org.jenkinsci.plugins.scriptsecurity.scripts.ScriptApproval")[0].get(); sa.preapproveAll(); sa.save(); return "OK";'
 curl -sf -X POST --data-urlencode "script=${script}" "${JENKINS_URL}/scriptText" >/dev/null
 
-echo "[7/8] Verifying Jenkins cloud/label startup configuration"
+echo "[8/9] Verifying Jenkins cloud/label startup configuration"
 
 echo "Configured clouds: ${clouds_csv:-<none>}"
 echo "Configured labels: ${labels_csv:-<none>}"
@@ -532,7 +549,7 @@ for conf in "${conf_files[@]}"; do
   fi
 
   for target_arch in "${target_arch_list[@]}"; do
-    echo "[8/8] Running ${conf_rel} with TARGET_ARCH=${target_arch}"
+    echo "[9/9] Running ${conf_rel} with TARGET_ARCH=${target_arch}"
     output_prefix="${conf_base}.${target_arch}"
     job_output_log="${LOG_DIR}/${output_prefix}.job-output.log"
     set +e

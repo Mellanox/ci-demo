@@ -2,7 +2,9 @@
 # registered at startup (no restart needed).
 FROM jenkins/jenkins:lts-jdk17
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+RUN apt-get update && apt-get install -y --no-install-recommends curl python3 python3-pip python3-venv \
+  && python3 -m venv /opt/schema-validator \
+  && /opt/schema-validator/bin/pip install --no-cache-dir yamale \
   && rm -rf /var/lib/apt/lists/* \
   && mkdir -p /opt/docker-bin \
   && arch="${TARGETARCH:-}" \
