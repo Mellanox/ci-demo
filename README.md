@@ -1,710 +1,241 @@
-# Matrix workflow project for CI/CD
+# ci-demo
 
-This is Jenkins CI/CD demo project. You can create custom workflows to automate your project software life cycle process.
+`ci-demo` is a Jenkins pipeline framework driven by YAML job-matrix files.
 
-You need to configure workflows using YAML syntax, and save them as workflow files in your repository.
-Once you've successfully created a YAML workflow file and triggered the workflow - Jenkins parse flow and execute it.
+It lets you define CI flows with matrix axes, container/agent selection, and optional Kubernetes execution, while keeping local runs and GitHub Actions runs on the same path.
 
+## Goal and Role
 
-## Quick start
+Goal:
 
-1. Copy ```.ci/Jenkinsfile.shlib``` to your new github project, under ```.ci/```
+- Enable YAML-based configuration of Jenkins jobs.
+- Keep CI behavior declarative through job-matrix YAML files instead of hardcoded pipeline logic.
+- Make CI definitions portable across YAML-driven ecosystems such as GitHub Actions, GitLab CI, and similar systems.
+- Provide a single, reproducible CI execution model for local development, Jenkins, and GitHub Actions.
 
-2. Copy ```.ci/Makefile``` to your new github project, under ```.ci/```
+Role in a project:
 
-3. Create ```.ci/job_matrix.yaml``` basic workflow file with content:
+- `ci-demo` is the CI orchestration layer.
+- Your matrix YAML defines what to run; `Matrix.groovy` and Jenkins execute it across containers/agents/k8s.
+- `scripts/local_gha_ci.sh` is the bridge that makes local and GHA execute the same flow.
 
-``` yaml
----
-job: ci-demo
+## What It Runs
 
-registry_host: harbor.mellanox.com
-registry_path: /swx-storage/ci-demo
-registry_auth: swx-storage
+Core runtime files:
 
-volumes:
-  - {mountPath: /hpc/local, hostPath: /hpc/local}
-  - {mountPath: /auto/sw_tools, hostPath: /auto/sw_tools}
-  - {mountPath: /.autodirect/mtrswgwork, hostPath: /.autodirect/mtrswgwork}
-  - {mountPath: /.autodirect/sw/release, hostPath: /.autodirect/sw/release}
+- `src/com/mellanox/cicd/Matrix.groovy`: matrix engine and pipeline behavior
+- `.ci/Jenkinsfile`: loads matrix YAML and executes it via `Matrix.groovy`
+- `scripts/local_gha_ci.sh`: local/GHA runner that bootstraps Jenkins + k3s and triggers matrix job
+- `.github/workflows/ci.yml`: CI workflow that calls `scripts/local_gha_ci.sh`
 
-nfs_volumes:
-  - {serverAddress: r1, serverPath: /vol/mtrswgwork, mountPath: /.autodirect/mtrswgwork}
-  - {serverAddress: r3, serverPath: /vol/mlnx_ofed_release_flexcache, mountPath: /auto/sw/release/mlnx_ofed, readOnly: true}
+Common matrix files:
 
-pvc_volumes:
-  - {claimName: nbu-swx-storage-devops-pvc, mountPath: /mnt/pvc, readOnly: false}
+- `.ci/job_matrix_gha_k8.yaml`: static matrix used by local/GHA k8 flow
+- `.ci/job_matrix_gha.yaml`: GHA-friendly docker-only example
+- `.ci/job_matrix_debug.yaml`: broader feature/example matrix
 
-secret_volumes:
-  - {secretName: 'mellanox-debs-keyring', mountPath: '/mnt/secret'}
+Documentation:
 
-empty_volumes:
-  - {mountPath: /var/home/user/.local/share/containers, memory: false}
+- [`USERGUIDE.md`](USERGUIDE.md): schema-driven key reference and YAML examples
 
-kubernetes:
-  cloud: swx-k8s
+## Quick Start
 
-runs_on_dockers:
-  - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest'}
-  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest'}
+Prerequisites:
 
-matrix:
-  axes:
-    flags:
-      - '--enable-debug'
-      - '--prefix=/tmp/install'
-    arch:
-      - x86_64
+- `docker`
+- optionally `colima` (for native profile flows on macOS)
 
-pipeline_start:
-  run: echo Starting new job
+Run the same flow used by GitHub Actions:
 
-pipeline_stop:
-  run: echo All done
-
-steps:
-  - name: Install mofed
-    run: |
-      echo Installing driver: ${driver} ...
-      mofed_installer_exe=/auto/sw/release/mlnx_ofed/MLNX_OFED/mlnx_ofed_install
-      mofed_installer_opt='--user-space-only --without-fw-update --all -q --skip-unsupported-devices-check'
-      sudo env build=$driver $mofed_installer_exe $mofed_installer_opt
-
-  - name: Configure
-    run: |
-      ./autogen.sh
-      ./configure $flags
-
-  - name: Build
-    run: make -j 2 all
-
-  - name: Install
-    run: make -j 2 install
-
+```bash
+make -C .ci local-gha-ci
 ```
 
-4. Copy ```.ci/proj_jjb.yaml``` to ```.ci``` folder in your project  and change github URL to point to your own github project as [here](.ci/proj_jjb.yaml#L67).
-Also change the value of the ```jjb_proj: 'ci-demo'``` to the name you want to give to your job.
+Use Colima native profile:
 
-
-5. Register new Jenkins project via jenkins-job cli (or create new with UI)
-
-``` bash
-% cd .ci; make jjb
+```bash
+make -C .ci local-gha-ci-colima
 ```
 
-6. Trigger run via Jenkins UI
+Clean local CI artifacts/containers:
 
-
-## Matrix job example
-
-![Alt text](.ci/pict/snapshot2.png?raw=true "Matrix Job")
-
-
-## Important files
-
-The CI scripts are located in ```.ci``` folder
-Jenkins behavior can be controlled by job_matrix.yaml file which has similar syntax/approach as Github actions.
-
-* jenkinsfile parses .ci/job_matrix*.yaml files
-* the job is bootstrapped and executing according to steps, as defined in yaml file
-* The method works with vanilla jenkins [Jenkinsfile](.ci/Jenkinsfile)
-* The method also works with pipeline as shared library [Jenkinsfile.shlib](.ci/Jenkinsfile.shlib) and uses this [shlib](src/com/mellanox/cicd/Matrix.groovy)
-
-* [Basic job](.ci/job_matrix_basic.yaml) definition can be found at ```.ci/job_matrix_basic.yaml```
-* [Advanced job](.ci/job_matrix.yaml) definition is at ```.ci/job_matrix.yaml```
-* The actual [Jenkinsfile](.ci/Jenkinsfile.shlib) that gets executed is here at ```.ci/Jenkinsfile.shlib```
-
-
-## Job matrix file
-
-* Job file can contain array of steps, which are executed sequentially in the docker
-* Job file can define own matrix and Jenkinsfile will generate axis combinations to execute in the docker
-* Job file can define list of dockerfiles, in ```.ci/Dockerfiles.*``` that will be added to matrix combinations.
-* Job file can define if need to build docker from dockerfiles and push resulting image to the registry or just fetch image from registry.
-* Job can define different [environment](.ci/job_matrix.yaml#L13) variables that will be added to step run environment
-* Job can define optional [include/exclude](.ci/job_matrix.yaml#L36) filters to select desired matrix dimensions
-
-## Jenkins job builder
-
-* Demo contains [Jenkins Job Builder](https://docs.openstack.org/infra/jenkins-job-builder) config [file](.ci/jjb_proj.yaml)
-which loads Jenkins project definition into Jenkins server.
-* Jenkins project descibed by [file](.ci/jjb_proj.yaml) supports following UI actions/parameters:
- - boolean - rebuild docker files
- - string - Use named Dockerfile (defaul: .ci/Jenkinsfile.shlib)
- - string - Configuration file for Job Matrix (can be regex to load multiple), default: job_matrix.yaml
-
-
-### Running/Debugging Job Matrix pipeline locally
-
-1. You can fetch docker image descibed in job_matrix.yaml and run steps in it to mimic Jenkins k8 approach
-
-``` shell
-% cd .ci
-% make shell NAME=ubuntu16-4
-docker%% cd /scratch
-
-# the step below needed so workspace files (which belongs to linux $USER)
-# will be copied (and owned) as Docker user 'jenkins' so it can be modified
-# from docker shell
-
-docker%% cp -pr /scratch /tmp/ws
-docker%% cd /tmp/ws
-docker%% ./autogen.sh && ./configure && make
+```bash
+make -C .ci local-gha-clean
 ```
 
-2. You can build docker locally (if it does not exist in registry) as following
+Logs are written to:
 
+- `.tmp/local-gha-ci/logs`
+
+## CI and GHA Flow
+
+GitHub Actions (`.github/workflows/ci.yml`) does not implement a separate CI path.
+It calls:
+
+```bash
+bash ./scripts/local_gha_ci.sh
 ```
-% cd .ci
-% make build NAME=ubuntu16-4
+
+So local and GHA behavior is intentionally aligned.
+
+High-level flow in `scripts/local_gha_ci.sh`:
+
+1. Build Jenkins image (`.github/Dockerfile.jenkins`)
+2. Start local k3s container
+3. Start Jenkins container and configure cloud/labels
+4. Validate matrix YAML schema
+5. Create/update Jenkins job
+6. Trigger Jenkins build with matrix config
+7. Save logs/artifacts in `.tmp/local-gha-ci/logs`
+
+## Pipeline View
+
+![Matrix Pipeline View](.ci/pict/snapshot2.png?raw=true "Matrix Pipeline View")
+
+## Schema Validation
+
+Matrix schema validation is part of the default local/GHA flow and runs before job execution.
+
+Files:
+
+- `schema_validator/ci_demo_schema.yaml`: schema
+- `schema_validator/ci_demo_yaml_validator.py`: validator entrypoint
+
+Behavior:
+
+- Validation failures stop the script and fail CI.
+- Unknown keys are rejected in structured sections.
+- Generic map sections (for example `matrix.axes`) allow custom axis names.
+
+## Local Development
+
+### Useful Environment Variables
+
+`local_gha_ci.sh` supports overrides through env vars.
+
+Most useful:
+
+- `CI_K8_FILE`: matrix file to run (default: `.ci/job_matrix_gha_k8.yaml`)
+- `TARGET_ARCHES`: comma-separated target matrix arch list (`x86_64`, `aarch64`)
+- `KEEP_JENKINS`: keep Jenkins container after run (`true`/`false`)
+- `KEEP_K8S`: keep k3s container after run (`true`/`false`)
+- `USE_COLIMA`: enable colima mode (`true`/`false`)
+- `COLIMA_PROFILE`: colima profile name (for example `native`)
+
+Example:
+
+```bash
+TARGET_ARCHES=aarch64 KEEP_JENKINS=false KEEP_K8S=false make -C .ci local-gha-ci
 ```
 
+### Run With a Different Matrix File
 
-### Job Actions
-
-Scripts located in `resources/actions` folder can be invoked
-on runtime without needing to store them in project's CI folder.
-Please check examples - [job_matrix_actions.yaml](https://github.com/Mellanox/ci-demo/blob/master/.ci/examples/job_matrix_actions.yaml)
-
-#### nexus.py
-
-Use this action to manage [Nexus Repository Manager](https://help.sonatype.com/repomanager3).
-This action allows to create/delete/show nexus hosted repositories and also upload and remove packages.
-Examples:
-
-```json
-# show YUM based repository information
-nexus.py yum --url http://swx-repos.mtr.labs.mlnx:8081/ --name test_yum_repo --user user --password password --action show
-{
-  "name": "test_yum_repo",
-  "url": "http://swx-repos.mtr.labs.mlnx:8081/repository/test_yum_repo",
-  "online": true,
-  "storage": {
-    "blobStoreName": "default",
-    "strictContentTypeValidation": true,
-    "writePolicy": "allow_once"
-  },
-  "cleanup": {
-    "policyNames": [
-      "string"
-    ]
-  },
-  "yum": {
-    "repodataDepth": 1,
-    "deployPolicy": "STRICT"
-  },
-  "component": {
-    "proprietaryComponents": false
-  },
-  "format": "yum",
-  "type": "hosted"
-}
-
-# Create YUM repository
-nexus.py yum --url http://swx-repos.mtr.labs.mlnx:8081/ --name test_yum_repo --user user --password password --action create
-[08/Apr/2021 18:32:11] INFO [root.create_yum_repo:141] Creating hosted yum repository: test_yum_repo
-[08/Apr/2021 18:32:11] INFO [root.create_yum_repo:146] Done
-
-# Remove YUM repository
-nexus.py yum --url http://swx-repos.mtr.labs.mlnx:8081/ --name test_yum_repo --user user --password password --action delete
-[08/Apr/2021 18:31:29] INFO [root.delete_repository:89] Repository has been deleted: test_yum_repo
-
-# Show APT Repository
-nexus.py apt --url http://swx-repos.mtr.labs.mlnx:8081/ --name test_apt_repo --user user --password password --action show
-{
-  "name": "test_apt_repo",
-  "url": "http://swx-repos.mtr.labs.mlnx:8081/repository/test_apt_repo",
-  "online": true,
-  "storage": {
-    "blobStoreName": "default",
-    "strictContentTypeValidation": true,
-    "writePolicy": "allow"
-  },
-  "cleanup": {
-    "policyNames": [
-      "string"
-    ]
-  },
-  "apt": {
-    "distribution": "focal"
-  },
-  "aptSigning": null,
-  "component": {
-    "proprietaryComponents": true
-  },
-  "format": "apt",
-  "type": "hosted"
-}
-
-# Remove APT repository
-nexus.py apt --url http://swx-repos.mtr.labs.mlnx:8081/ --name test_apt_repo --user user --password password --action delete
-[08/Apr/2021 18:34:09] INFO [root.delete_repository:89] Repository has been deleted: test_apt_repo
-
-# Create APT repository
-./nexus.py apt --url http://swx-repos.mtr.labs.mlnx:8081/ --name test_apt_repo --user user --password password --action create --keypair-file /tmp/debs-keyring.priv --distro focal
-[08/Apr/2021 18:34:52] INFO [root.create_apt_repo:208] Creating hosted APT repository: test_apt_repo
-[08/Apr/2021 18:34:52] INFO [root.create_apt_repo:213] Done
-
-### Timeout Feature
-
-The pipeline supports timeout configuration for shell run actions to prevent long-running commands from hanging the pipeline. You can set timeouts globally or per step.
-
-**Features:**
-- Global timeout for all steps
-- Step-specific timeout overrides
-- Template variable support (e.g., `${TIMEOUT_VALUE}`)
-- Integration with existing error handling (`onfail` and `always` handlers)
+```bash
+CI_K8_FILE=.ci/job_matrix_debug.yaml make -C .ci local-gha-ci
 ```
-**Example:**
+
+## Matrix YAML Essentials
+
+A matrix config must include:
+
+- `job`
+- `steps`
+- at least one execution backend, usually `runs_on_dockers`
+
+Typical optional sections:
+
+- `kubernetes`
+- `matrix.axes/include/exclude`
+- `pipeline_start` / `pipeline_stop`
+- `env`
+- `failFast`
+
+### Minimal Docker Example
+
 ```yaml
-# Global timeout
-timeout_minutes: 60
-
-steps:
-  - name: quick_step
-    run: "echo hello"
-    timeout: 5  # Override for this step
-
-  - name: template_step
-    run: "echo world"
-    timeout: "${DEFAULT_TIMEOUT}"  # Template variable
-```
-
-For complete documentation, see [Timeout Feature Documentation](TIMEOUT_FEATURE.md).
-
-### Job Matrix yaml - Advanced configuration
-
-``` yaml
 ---
-# Job name
-job: ci-demo
+job: ci-demo-mini
 
-# Specify if containerSelector and agentSelector options per step are mutually
-# exclusive (default: true)
-step_allow_single_selector: false
-
-# URI to docker registry
-registry_host: harbor.mellanox.com
-
-# Path to project`s dockers space under registry
-registry_path: /swx-storage/ci-demo
-
-# optional: Path to jnlp containers under $registry_host
-# if not set - auto-calculated to $registry_path/..
-registry_jnlp_path: /swx-storage
-
-# Credentials (must be defined in Jenkins server configuration) to for access to registry
-registry_auth: swx-storage
-
-# k8 cloud name (must be defined in Jenkins server configuration)
-kubernetes:
-# cloud name to use for all containers
-# cloud tag can be specified per specific container in runs_on_containers section
-  cloud: swx-k8s
-# Example how to use k8 node selector to request specific nodes for allocation
-  nodeSelector: 'beta.kubernetes.io/os=linux'
-# optional: enforce limits so that the running container is not allowed to use
-# more of that resource than the limit you set. If a Container specifies its own limit,
-# but does not specify a request, Kubernetes automatically assigns a request
-# that matches the limit.
-  limits: "{rdma/bw_port_a: 1, hugepages-1Gi: 1024Mi, hugepages-2Mi: 1024Mi, memory: 2048Mi}"
-# optional: request additional k8s resources that isn't supported by
-# kubernetes-plugin by default
-  requests: "{hugepages-1Gi: 1024Mi, hugepages-2Mi: 1024Mi, memory: 2048Mi}"
-# optional: annotations can be used to attach arbitrary non-identifying metadata to objects
-  annotations:
-    - {key: 'k8s.v1.cni.cncf.io/networks', value: 'roce-bw-port1@roce0'}
-# optional: container capabilities to add
-  caps_add: "[ IPC_LOCK, SYS_RESOURCE ]"
-# optional: tolerations. Tolerations allow the scheduler to schedule pods with matching taints.
-  tolerations: "[{key: 'feature.node.kubernetes.io/project', operator: 'Equal', value: 'SPDK', effect: 'NoSchedule'}]"
-# optional: imagePullSecrets. Specify secrets to use for pulling images from private registries.
-# Can be a single secret or a list of secrets.
-  imagePullSecrets: "['my-registry-secret']"
-# For multiple secrets:
-# imagePullSecrets: "['secret-1', 'secret-2']"
-
-# optional: for multi-arch k8 support, can define arch-specific nodeSelectors
-# and jnlpImage locations
-  arch_table:
-    x86_64:
-      nodeSelector: 'kubernetes.io/arch=amd64'
-      jnlpImage: 'jenkins/inbound-agent:latest'
-    aarch64:
-      nodeSelector: 'kubernetes.io/arch=arm64'
-      jnlpImage: '${registry_host}/${registry_jnlp_path}/jenkins-arm-agent-jnlp:latest'
-
-# optional: can specify jenkins defined credentials and refer/request by credentialsId in step that
-# requires it (it's considered usernamePassword by default if 'type' is not specified)
-credentials:
-  - {credentialsId: '311997c9-cc1c-4d5d-8ba2-6eb43ba0a06d', usernameVariable: 'SWX_REPOS_USER', passwordVariable: 'SWX_REPOS_PASS'}
-  - {credentialsId: 'jenkins-pulp', usernameVariable: 'pulp_usr', passwordVariable: 'pulp_pwd'}
-  - {credentialsId: 'github-ssh-rsa-key', 'keyFileVariable': 'SSH_KEY_FILE', type: 'sshUserPrivateKey'}
-  - {credentialsId: 'secret-file', 'variable': 'SECRET_FILE', type: 'file'}
-  - {credentialsId: 'string-credentials', type: 'string', variable: 'STRING_VARIABLE'}
-
-# volumes to map into dockers
-volumes:
-  - {mountPath: /hpc/local, hostPath: /hpc/local}
-  - {mountPath: /auto/sw_tools, hostPath: /auto/sw_tools}
-  - {mountPath: /.autodirect/mtrswgwork, hostPath: /.autodirect/mtrswgwork}
-  - {mountPath: /.autodirect/sw/release, hostPath: /.autodirect/sw/release}
-
-# NFS volumes to map into dockers
-nfs_volumes:
-  - {serverAddress: r1, serverPath: /vol/mtrswgwork, mountPath: /.autodirect/mtrswgwork}
-  - {serverAddress: r3, serverPath: /vol/mlnx_ofed_release_flexcache, mountPath: /auto/sw/release/mlnx_ofed, readOnly: true}
-
-# PersistentVolumeClaim volumes to map into containers
-pvc_volumes:
-  - {claimName: nbu-swx-storage-devops-pvc, mountPath: /mnt/pvc, readOnly: false}
-
-# secretVolume volumes to map into containers
-secret_volumes:
-  - {secretName: 'mellanox-debs-keyring', mountPath: '/mnt/secret'}
-
-# emptyDir volumes to map into containers
-# memory flag creates volumes in RAM instead of Disk (size of RAM depends on memory limits/requests)
-empty_volumes:
-  - {mountPath: /var/home/user/.local/share/containers, memory: false}
-
-# environment varibles to insert into Job shell environment, can be referenced from steps
-# or user-scripts or shell commands.
-# If you want more detailed output in logs, add the following environment variable:
-# `DEBUG: true`
-env:
-  mofed_installer_exe: /.autodirect/sw/release/mlnx_ofed/MLNX_OFED/mlnx_ofed_install
-  mofed_installer_opt: --user-space-only --without-fw-update --all -q --skip-unsupported-devices-check
-
-# default variables and values that can be used in yaml file
-defaults:
-  var1: value1
-  var2: value2
-
-# optional: docker options to pass to the docker run command
-docker_opt: "--pid=host --privileged --ulimit memlock=-1:-1 --network=host --ipc=host --cap-add=SYS_PTRACE --gpus all --device=/dev/infiniband --device=/dev/gdrdrv"
-
-# list of dockers to use for the job, `file` key is optional, if defined but docker image
-# does not exist in registry.
-# `arch` key is optional, it defaults to `x86_64` unless specified otherwise.
-# image will be created during 1st invocation or if file was modified
-# runs_on_dockers list can contain use-defined keys as well
-# category:tools has special meaning - it will run for steps, that explicitly request it in the
-# step`s containerSelector key.
-# The use-case is as following: if some step requires special container with pre-installed toolchain (clang?)
-# `nodeLabel` key is optional, it will run on the node with the label specified in the `nodeLabel` key.
 runs_on_dockers:
-  - {file: '.ci/Dockerfile.centos7.7.1908', name: 'centos7-7', tag: 'latest', category: 'tool'}
-  - {file: '.ci/Dockerfile.ubuntu16-4', name: 'ubuntu16-4', tag: 'latest', nodeLabel: 'H100'}
+  - {name: ubuntu2204, url: ubuntu:22.04, arch: x86_64, nodeLabel: master}
 
-# list of jenkins agents labels to run on (optional)
-# `url` key is optional, it will use to pull docker image from the url specified in the `url` key and run container on the node with the label specified in the `nodeLabel` key.
-# if `url` is not specified, it run on the node with the label specified in the `nodeLabel` key.
-runs_on_agents:
-  - nodeLabel: '(dockerserver || docker) && x86_64'
-  - nodeLabel: 'hpc-test-node-inbox'
-    url: 'quay.io/podman/stable:v5.7.1'
-
-# user-defined matrix to run tests, "steps" will be executed for every dimension of matrix.
-# Can contain any use-defined dimensions
-# Docker list will be added automatically to dimensions list
-# foreach image in dockers_list
-#   foreach driver in drivers_list
-#       foreach cuda in cuda_list
-#          foreach arch in arch_list
-#              run steps
-#          done
-#       done
-#   done
-# done
-#
-# Note that the matrix should ALWAYS include the `arch` axis.
-# Other variables are optional and should be set as per your needs.
 matrix:
   axes:
-    driver:
-      - MLNX_OFED_LINUX-4.9-0.1.8.0
-      - MLNX_OFED_LINUX-5.1-1.0.0.0
-    cuda:
-      - dev/cuda9.2
-    arch:
-      - x86_64
-
-# include only dimensions as below. Exclude has same syntax. Only either include or exclude can be used.
-# all keywords in include/exclude command are optional - if all provided keys
-# match - the dimension will be include/excluded
-#
-# NEW FEATURE: Include/exclude values now support template resolution with environment variables!
-# You can use Jenkins job parameters, environment variables, and config variables in your filters.
-# Use ${VARIABLE_NAME} syntax for variable substitution.
-
-  include:
-    - {arch: x86_64, cuda: dev/cuda11.0, driver: MLNX_OFED_LINUX-4.9-0.1.8.0, name: ubuntu16-4}
-    - {arch: x86_64, cuda: dev/cuda9.2, driver: MLNX_OFED_LINUX-4.9-0.1.8.0, name: ubuntu16-4}
-  # Examples of using environment variables and job parameters:
-  # - {arch: '${TARGET_ARCH}', name: '${TARGET_OS}', driver: '${DRIVER_VERSION}'}
-  # - {arch: 'x86_64', name: '${BUILD_TYPE == "nightly" ? "ubuntu20-4" : "ubuntu18-4"}'}
-  # - {arch: '${DEFAULT_ARCH}', name: 'centos7-3', cuda: '${CUDA_VERSION}'}
-
-# Available variables for include/exclude filters:
-# - Jenkins job parameters: ${TARGET_ARCH}, ${TARGET_OS}, etc.
-# - Jenkins environment variables: ${BUILD_NUMBER}, ${JOB_NAME}, ${GIT_BRANCH}, etc.
-# - Config variables: ${job}, ${registry_host}, etc.
-# - Custom environment variables from config env section: ${DEFAULT_ARCH}, etc.
-# - Default values: ${VAR:-default_value}
-# - Conditional expressions: ${CONDITION ? "value1" : "value2"}
-
-
-# Steps can contain any number of name/run sections and all will be executed
-# every matrix dimension will run in parallel with all other dimensions
-# steps itself has sequential execution
-# NOTE:
-# shell environment variable representing dimension values will be inserted automatically and
-# can be used run section (see below)
-# $name represents current value for docker name
-# Also $driver $cuda,$arch env vars are available and can be used from shell
-# $variant represents current axis serial number (relative to docker loop)
+    variant: [debug, release]
 
 steps:
+  - name: Print context
+    run: echo "variant=$variant name=$name arch=$arch"
 
-  - name: Coverity scan
-# `shell` can be type of action, it will run script located in ci-demo/vars/actions/scriptname.sh
-# with parameters
-# defined by `args` key.
-    shell: action
-# dynamicAction is pre-defined action defined at https://github.com/Mellanox/ci-demo/blob/master/vars/dynamicAction.groovy
-# dynamicAction will execute ci-demo/vars/actions/$args[0] and will pass $args[1..] to it as command line arguments
-    run: dynamicAction
-# step can specify containerSelector filter to apply on `runs_on_dockers` section.
-# make sure to quote the category.
-# `variant` is built-in variable, available for every axis of the run and represents serial number for
-# execution of matrix dimension
-# selector can be regex
-    containerSelector: '{category:"tool", variant:1}'
-    args:
-      - "--pre_script './autogen.sh;./configure;make -j 3 clean'"
-      - "--build_script 'make -j 3'"
-      - "--ignore_files 'devx googletest tests'"
-    archiveArtifacts: 'cov.log'
-# run this step in parallel with others
-# each non-parallel step is a barrier for previous group of parallel steps
-    parallel: true
-
-  - name: Check package
-# use 'jenkins-pulp' credentials in this steps
-    credentialsId: 'jenkins-pulp'
-# can set shell per step or globally
-    shell: '!/bin/bash -xeEl'
-    run: cuda=$cuda .ci/check_package.sh
-    parallel: true
-
-  - name: Run tests
-# multiple credentials can be used as a list in one step
-    credentialsId:
-      - 'jenkins-pulp'
-      - 'github-ssh-rsa-key'
-      - 'secret-file'
-    run: cuda=$cuda .ci/runtests.sh
-# define shell command(s) to run if step fails
-    onfail: |
-      echo step execution step failed
-      touch myfile.html
-      touch step_failed.log
-# define shell command to run always, regardless if "run" step passed or failed
-    always: env > always_env.txt
-# define artifacts to collect for specific step
-    archiveArtifacts-onfail: 'step_failed.log'
-    archiveArtifacts: 'always_env.txt'
-# Publish HTML on jenkins page for given run
-    publishHTML:
-      reportDir: '.'
-      reportFiles: 'myfile.html'
-      reportName: 'Test'
-# define raw xml results to collect for specific step
-    archiveJunit: 'test-results.xml'
-# define TAP results to collect for specific step (see jenkins TAP plugin)
-    archiveTap: '**/*.tap'
-
-# executed once, before job starts its steps
-pipeline_start:
-  run: echo Starting new job
-
-# executed once, after steps are done
-pipeline_stop:
-  run: echo All done
-
-# executed before each container image build phase
-# user can run any script to modify container image content
-# also, can define 'on_image_build: script' key in runs_on_containers
-# section , per specific containers
-pipeline_on_image_build:
-  run: echo Building image
-
-# List of artifacts to attach to Jenkins results page for build
-archiveArtifacts: config.log
-
-# List of raw xml results to attach to Jenkins results page for build
-archiveJunit: 'myproject/target/test-reports/*.xml'
-
-# Fail job is one of the steps fails or continue
 failFast: false
-
-# Execute parallel job in batches (default 10 jobs in the air), to prevent overload k8
-# with large amount of parallel jobs
-batchSize: 2
-
-# Job timeout - fail job if it runs more than specified amount of minutes (default is 90 minutes)
-timeout_minutes: 60
-
-# Customize name of the parallel subtask as appears in Jenkins UI, according to the template below
-# can use variable names from `axis` part of the `matrix` config section
-# also can use variable names from `runs_on_dockers` config section.
-# `${name}` comes from `runs_on_dockers` section
-# `${axis_index}` is built-in variable representing axis serial number
-taskName: '${name}/${axis_index}'
 ```
 
-## Dynamic Include/Exclude Filters
-
-The include and exclude filters now support template resolution, allowing you to dynamically filter matrix combinations based on Jenkins job parameters, environment variables, and configuration variables.
-
-### Basic Usage
+### Kubernetes Example (arch-aware)
 
 ```yaml
+---
+job: ci-k8-mini
+
+kubernetes:
+  cloud: swx-k8s
+  namespace: default
+  serviceAccount: jenkins
+
+runs_on_dockers:
+  - {name: ubuntu-x86_64, url: ubuntu:22.04, arch: x86_64}
+  - {name: ubuntu-aarch64, url: ubuntu:22.04, arch: aarch64}
+
 matrix:
   axes:
     arch: [x86_64, aarch64]
-    os: [ubuntu18-4, centos7-3]
-    driver: [MLNX_OFED_LINUX-4.9-0.1.8.0, MLNX_OFED_LINUX-5.1-1.0.0.0]
-
-  # Use job parameters to filter combinations
   include:
-    - {arch: '${TARGET_ARCH}', name: '${TARGET_OS}', driver: '${DRIVER_VERSION}'}
-    - {arch: 'x86_64', name: 'ubuntu18-4'}  # Always include this combination
+    - {arch: '${TARGET_ARCH}'}
 
-  # Use environment variables
-  exclude:
-    - {arch: 'aarch64'}  # Skip aarch64 for certain conditions
-```
-
-### Available Variables
-
-1. **Jenkins Job Parameters**: Any parameters defined in your Jenkins job
-   ```yaml
-   include:
-     - {arch: '${TARGET_ARCH}', name: '${TARGET_OS}'}
-   ```
-
-2. **Jenkins Environment Variables**: Built-in Jenkins variables
-   ```yaml
-   include:
-     - {arch: 'x86_64', name: 'ubuntu18-4'}  # Only for main branch
-   ```
-
-3. **Config Variables**: Variables from your YAML configuration
-   ```yaml
-   env:
-     DEFAULT_ARCH: x86_64
-     DEFAULT_OS: ubuntu18-4
-
-   include:
-     - {arch: '${DEFAULT_ARCH}', name: '${DEFAULT_OS}'}
-   ```
-
-4. **Default Values**: Provide fallback values
-   ```yaml
-   include:
-     - {arch: '${TARGET_ARCH:-x86_64}', name: '${TARGET_OS:-ubuntu18-4}'}
-   ```
-
-5. **Conditional Expressions**: Simple conditional logic
-   ```yaml
-   include:
-     - {arch: 'x86_64', name: '${BUILD_TYPE == "nightly" ? "ubuntu20-4" : "ubuntu18-4"}'}
-   ```
-
-### Advanced Examples
-
-```yaml
-# Filter by multiple job parameters
-include:
-  - {arch: '${TARGET_ARCH}', name: '${TARGET_OS}', driver: '${DRIVER_VERSION}', cuda: '${CUDA_VERSION}'}
-
-# Conditional filtering based on branch
-include:
-  - {arch: 'x86_64', name: 'ubuntu18-4'}  # Always include
-  - {arch: 'aarch64', name: 'centos7-3'}  # Only for feature branches
-
-# Mix static and dynamic values
-include:
-  - {arch: 'x86_64', name: '${TARGET_OS}', driver: 'MLNX_OFED_LINUX-5.1-2.5.8.0'}
-  - {arch: 'aarch64', name: 'ubuntu18-4', cuda: '${CUDA_VERSION}'}
-
-# Use exclude with parameters
-exclude:
-  - {arch: '${SKIP_ARCH}', name: '${SKIP_OS}'}
-  - {cuda: '${SKIP_CUDA_VERSION}'}
-```
-
-### Debugging
-
-To debug what values are being resolved, add a debug step:
-
-```yaml
 steps:
-  - name: debug-filters
-    run: |
-      echo "Job Parameters:"
-      echo "TARGET_ARCH: ${TARGET_ARCH:-not_set}"
-      echo "TARGET_OS: ${TARGET_OS:-not_set}"
-      echo "DRIVER_VERSION: ${DRIVER_VERSION:-not_set}"
-
-      echo "Environment Variables:"
-      echo "BUILD_NUMBER: ${BUILD_NUMBER}"
-      echo "JOB_NAME: ${JOB_NAME}"
-      echo "GIT_BRANCH: ${GIT_BRANCH}"
+  - name: Verify
+    run: uname -m
 ```
 
-### Benefits
+## Troubleshooting
 
-- **Dynamic Filtering**: Control which matrix combinations run based on user input
-- **Environment Awareness**: Use Jenkins environment variables for conditional execution
-- **Flexibility**: Mix static and dynamic values in the same configuration
-- **Parameter-Driven CI**: Let users control pipeline execution through job parameters
+### Jenkins does not become ready
 
-## Local VS Code Runner (Jenkins + k3s)
+- Check container logs:
+  - `docker logs jenkins-local | tail -200`
+- Verify local port binding:
+  - `docker exec jenkins-local curl -sf http://localhost:8080/login`
 
-Use the local helper from your terminal (including VS Code integrated terminal):
+### Schema validation fails
 
-```bash
-cd .ci
-make local-gha-ci
-```
+- Read validator errors in stdout.
+- Check against `schema_validator/ci_demo_schema.yaml`.
+- Ensure matrix file path passed by `CI_K8_FILE` is correct.
 
-Defaults:
-- Builds local Jenkins image from `.github/Dockerfile.jenkins`
-- Starts k3s in a Docker container
-- Generates a single dynamic config (`ci-k8.yaml`) from active k8 node labels/arch
-- Starts Jenkins on `http://localhost:8080`
-- Runs the generated config and stores logs in `.tmp/local-gha-ci/logs`
+### k8 node arch mismatch
 
-Useful environment overrides:
+- `local_gha_ci.sh` relabels k3s node arch based on `TARGET_ARCHES`.
+- Keep `TARGET_ARCHES` aligned with matrix include/filter expectations.
 
-```bash
-# keep containers for debugging
-KEEP_JENKINS=true KEEP_K8S=true .ci/../scripts/local_gha_ci.sh
-```
+### Jenkins checkout cannot find revision
 
-```bash
-# run with Colima docker context
-cd .ci
-make local-gha-ci-colima
-```
+- Ensure `BRANCH` and `REPO_URL` are correct.
+- In GHA, `REPO_URL` should be the GitHub repository URL, not a stale local `file://` ref.
 
-```bash
-# cleanup local runner containers/network/image/logs
-cd .ci
-make local-gha-clean
-```
+### Need all logs/artifacts
 
+Use files under:
+
+- `.tmp/local-gha-ci/logs/*.log`
+- `.tmp/local-gha-ci/logs/*.job-output.log`
+- `.tmp/local-gha-ci/logs/*.jenkins-console.log`
+- `.tmp/local-gha-ci/logs/*.jenkins-build.json`
+- `.tmp/local-gha-ci/logs/*.jenkins-container.log`
+
+## Contributing
+
+Before opening a PR for CI behavior changes:
+
+1. Run `make -C .ci local-gha-clean`
+2. Run `make -C .ci local-gha-ci`
+3. Check `.tmp/local-gha-ci/logs`
+4. Confirm `.github/workflows/ci.yml` and `scripts/local_gha_ci.sh` are still aligned
