@@ -145,3 +145,5 @@ src/hello/hello-world
 
 # End of https://www.toptal.com/developers/gitignore/api/autotools+strict,c++,c
 .DS_Store
+
+.tmp/
