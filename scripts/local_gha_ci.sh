@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR=$(git rev-parse --show-toplevel)
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+ROOT_DIR=${HOST_REPO_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}
 cd "${ROOT_DIR}"
 
 ENABLE_K8S=${ENABLE_K8S:-true}
@@ -27,10 +28,9 @@ AGENT_EXECUTORS=${AGENT_EXECUTORS:-8}
 
 WORK_DIR=${WORK_DIR:-${ROOT_DIR}/.tmp/local-gha-ci}
 LOG_DIR="${WORK_DIR}/logs"
-CLI_JAR="${WORK_DIR}/jenkins-cli.jar"
 JOB_CONFIG_XML="${WORK_DIR}/job-config.xml"
 
-BRANCH=${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}
+BRANCH=${BRANCH:-}
 REPO_MOUNT=${REPO_MOUNT:-/workspace/ci-demo}
 REPO_URL=${REPO_URL:-}
 DOCKER_NETWORK=${DOCKER_NETWORK:-ci-demo-net}
@@ -60,35 +60,24 @@ cleanup() {
 }
 trap cleanup EXIT
 
-require_cmd git
 require_cmd docker
-require_cmd curl
 
+if [[ -z "${BRANCH}" ]]; then
+  BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-master}}"
+fi
 branch_name="${BRANCH#refs/heads/}"
 if [[ -z "${branch_name}" || "${branch_name}" == "HEAD" ]]; then
-  branch_name="$(git symbolic-ref --short -q HEAD 2>/dev/null || true)"
-fi
-if [[ -z "${branch_name}" ]]; then
-  branch_name="$(git rev-parse --abbrev-ref HEAD)"
-fi
-if [[ -z "${branch_name}" || "${branch_name}" == "HEAD" ]]; then
-  echo "ERROR: Unable to determine branch name for Jenkins job configuration" >&2
-  exit 1
+  branch_name="master"
 fi
 
 if [[ -z "${REPO_URL}" ]]; then
   if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
-    REPO_URL="$(git config --get remote.origin.url 2>/dev/null || true)"
+    gh_repo="${GITHUB_HEAD_REPOSITORY:-${GITHUB_REPOSITORY:-}}"
+    if [[ -n "${gh_repo}" ]]; then
+      REPO_URL="https://github.com/${gh_repo}.git"
+    fi
   fi
   REPO_URL="${REPO_URL:-file://${REPO_MOUNT}}"
-fi
-
-# In GHA checkout can be detached and miss refs/heads/<branch>.
-# Ensure local branch ref exists so Jenkins GitSCM can resolve it from file:// repo.
-if ! git show-ref --verify --quiet "refs/heads/${branch_name}"; then
-  head_commit=$(git rev-parse HEAD)
-  git update-ref "refs/heads/${branch_name}" "${head_commit}"
-  echo "Created local git ref refs/heads/${branch_name} -> ${head_commit}"
 fi
 
 host_arch=$(uname -m 2>/dev/null || echo unknown)
@@ -271,7 +260,7 @@ for i in $(seq 1 90); do
     docker logs "${JENKINS_NAME}" | tail -120 >&2 || true
     exit 1
   fi
-  if curl -sf "${JENKINS_URL}/login" >/dev/null; then
+  if docker exec "${JENKINS_NAME}" curl -sf http://localhost:8080/login >/dev/null; then
     break
   fi
   sleep 5
@@ -282,13 +271,13 @@ for i in $(seq 1 90); do
   fi
 done
 
-curl -sf -o "${CLI_JAR}" "${JENKINS_URL}/jnlpJars/jenkins-cli.jar"
-CLI_JAR_IN_CONTAINER="${REPO_MOUNT}/.tmp/local-gha-ci/jenkins-cli.jar"
+CLI_JAR_IN_CONTAINER="/opt/jenkins-cli/jenkins-cli.jar"
+echo "Using Jenkins CLI jar in container: ${CLI_JAR_IN_CONTAINER}"
 jenkins_cli() {
   docker exec "${JENKINS_NAME}" java -jar "${CLI_JAR_IN_CONTAINER}" -s http://localhost:8080 "$@"
 }
 jenkins_script() {
-  curl -sf -X POST --data-urlencode "script=$1" "${JENKINS_URL}/scriptText"
+  docker exec "${JENKINS_NAME}" curl -sf -X POST --data-urlencode "script=$1" http://localhost:8080/scriptText
 }
 save_jenkins_artifacts() {
   local prefix="$1"
@@ -345,6 +334,16 @@ fi
 docker exec "${JENKINS_NAME}" git config --global --add safe.directory "${REPO_MOUNT}" >/dev/null 2>&1 || true
 docker exec "${JENKINS_NAME}" git config --global --add safe.directory "${REPO_MOUNT}/.git" >/dev/null 2>&1 || true
 
+# In GHA checkout can be detached and miss refs/heads/<branch>.
+# Ensure local branch ref exists (inside Jenkins container) so GitSCM can resolve it from file:// repo.
+if [[ "${REPO_URL}" == file://* ]]; then
+  if ! docker exec "${JENKINS_NAME}" sh -lc "cd '${REPO_MOUNT}' && git show-ref --verify --quiet 'refs/heads/${branch_name}'"; then
+    head_commit=$(docker exec "${JENKINS_NAME}" sh -lc "cd '${REPO_MOUNT}' && git rev-parse HEAD")
+    docker exec "${JENKINS_NAME}" sh -lc "cd '${REPO_MOUNT}' && git update-ref 'refs/heads/${branch_name}' '${head_commit}'"
+    echo "Created in-container git ref refs/heads/${branch_name} -> ${head_commit}"
+  fi
+fi
+
 echo "[6/9] Validating matrix schema in Jenkins container"
 validator_python=${SCHEMA_VALIDATOR_PYTHON:-/opt/schema-validator/bin/python3}
 if ! docker exec "${JENKINS_NAME}" "${validator_python}" -c "import yamale" >/dev/null 2>&1; then
@@ -394,7 +393,7 @@ docker exec -i "${JENKINS_NAME}" java -jar "${CLI_JAR_IN_CONTAINER}" -s http://l
 docker exec -i "${JENKINS_NAME}" java -jar "${CLI_JAR_IN_CONTAINER}" -s http://localhost:8080 update-job ci-demo < "${JOB_CONFIG_XML}" >/dev/null
 
 script='import jenkins.model.Jenkins; def sa = Jenkins.instance.getExtensionList("org.jenkinsci.plugins.scriptsecurity.scripts.ScriptApproval")[0].get(); sa.preapproveAll(); sa.save(); return "OK";'
-curl -sf -X POST --data-urlencode "script=${script}" "${JENKINS_URL}/scriptText" >/dev/null
+jenkins_script "${script}" >/dev/null
 
 echo "[8/9] Verifying Jenkins cloud/label startup configuration"
 

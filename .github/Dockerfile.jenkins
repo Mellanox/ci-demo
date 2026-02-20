@@ -6,6 +6,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl python3 py
   && python3 -m venv /opt/schema-validator \
   && /opt/schema-validator/bin/pip install --no-cache-dir yamale \
   && rm -rf /var/lib/apt/lists/* \
+  && mkdir -p /opt/jenkins-cli \
+  && JENKINS_VERSION=$(/opt/java/openjdk/bin/java -jar /usr/share/jenkins/jenkins.war --version) \
+  && curl -fsSL "https://repo.jenkins-ci.org/public/org/jenkins-ci/main/cli/${JENKINS_VERSION}/cli-${JENKINS_VERSION}.jar" -o /opt/jenkins-cli/jenkins-cli.jar \
+  && chmod 0644 /opt/jenkins-cli/jenkins-cli.jar \
   && mkdir -p /opt/docker-bin \
   && arch="${TARGETARCH:-}" \
   && if [ -z "${arch}" ]; then arch="$(uname -m)"; fi \
