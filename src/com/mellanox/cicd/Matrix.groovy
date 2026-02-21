@@ -1706,6 +1706,25 @@ def startPipeline(String label) {
                     image = config.runs_on_agents[a]
                     image.name = image.nodeLabel
                     image.arch = 'x86_64'
+
+                    // Check if this agent matches pipeline_start agentSelector
+                    if (config.pipeline_start && !config.pipeline_start.image) {
+                        if (config.pipeline_start.agentSelector) {
+                            if (matchMapEntry(stringToList(config.pipeline_start.agentSelector), image)) {
+                                config.pipeline_start.image = image
+                            }
+                        }
+                    }
+
+                    // Check if this agent matches pipeline_stop agentSelector
+                    if (config.pipeline_stop && !config.pipeline_stop.image) {
+                        if (config.pipeline_stop.agentSelector) {
+                            if (matchMapEntry(stringToList(config.pipeline_stop.agentSelector), image)) {
+                                config.pipeline_stop.image = image
+                            }
+                        }
+                    }
+
                     branches += getMatrixTasks(image, config)
                 }
             }
@@ -1720,7 +1739,18 @@ def startPipeline(String label) {
                             if (config.pipeline_start.image) {
                                 image = config.pipeline_start.image
                                 config.pipeline_start.name = "pipeline_start"
-                                runK8(image, "pipline start on ${image.name}", config, image, [config.pipeline_start])
+                                // Check if this should run on an agent or K8s
+                                if (image.nodeLabel) {
+                                    // Run on agent
+                                    def callback = { pimage, pconfig, pname, paxis, pruntime ->
+                                        runSteps(pimage, pconfig, pname, paxis, [config.pipeline_start], pruntime)
+                                    }
+                                    def runInDocker = (image.url != null)
+                                    runAgent(image, config, "pipeline start on ${image.name}", image, callback, runInDocker)
+                                } else {
+                                    // Run on K8s
+                                    runK8(image, "pipline start on ${image.name}", config, image, [config.pipeline_start])
+                                }
                             } else {
                                 run_step(null, config, "pipeline start", config.pipeline_start, null)
                             }
@@ -1739,7 +1769,18 @@ def startPipeline(String label) {
                     if (config.pipeline_stop.image) {
                         image = config.pipeline_stop.image
                         config.pipeline_stop.name = "pipeline_stop"
-                        runK8(image, "pipline stop on ${image.name}", config, image, [config.pipeline_stop])
+                        // Check if this should run on an agent or K8s
+                        if (image.nodeLabel) {
+                            // Run on agent
+                            def callback = { pimage, pconfig, pname, paxis, pruntime ->
+                                runSteps(pimage, pconfig, pname, paxis, [config.pipeline_stop], pruntime)
+                            }
+                            def runInDocker = (image.url != null)
+                            runAgent(image, config, "pipeline stop on ${image.name}", image, callback, runInDocker)
+                        } else {
+                            // Run on K8s
+                            runK8(image, "pipline stop on ${image.name}", config, image, [config.pipeline_stop])
+                        }
                     } else {
                         run_step(null, config, "pipeline stop", config.pipeline_stop, null)
                     }
