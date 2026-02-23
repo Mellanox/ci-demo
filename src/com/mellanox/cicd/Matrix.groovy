@@ -859,7 +859,10 @@ def isCiDemoOwnCi() {
 }
 
 @NonCPS
-def ensureK8sCloud(cloudName, namespace = "default") {
+def ensureK8sCloud(cloudName, namespace = "default", isOwnCi = null) {
+    if (isOwnCi == null || !isOwnCi) {
+        return false
+    }
     if (!cloudName) {
         return false
     }
@@ -961,9 +964,7 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
     def imagePullSecrets = parseImagePullSecrets(getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]"))
-    if (isCiDemoOwnCi()) {
-        ensureK8sCloud(cloudName, namespace)
-    }
+    ensureK8sCloud(cloudName, namespace, isCiDemoOwnCi())
     def yaml = """
 spec:
   containers:
@@ -1488,9 +1489,7 @@ def build_docker_on_k8(image, config) {
     def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
     def imagePullSecrets = parseImagePullSecrets(getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]"))
-    if (isCiDemoOwnCi()) {
-        ensureK8sCloud(cloudName, namespace)
-    }
+    ensureK8sCloud(cloudName, namespace, isCiDemoOwnCi())
     def yaml = """
 spec:
   containers:
