@@ -4,6 +4,7 @@
 // - JENKINS_AGENT_EXECUTORS (integer)
 // - JENKINS_K8S_CLOUDS (comma-separated cloud names)
 // - JENKINS_K8S_API_URL (Kubernetes API URL)
+// - JENKINS_K8S_NAMESPACE (optional; default "default")
 // - JENKINS_K8S_TOKEN (service account bearer token)
 
 import jenkins.model.Jenkins
@@ -18,7 +19,9 @@ def labelTokens = (env.get("JENKINS_AGENT_LABELS") ?: "")
   .split(",")
   .collect { it.trim() }
   .findAll { it }
-def apiUrl = env.get("JENKINS_K8S_API_URL") ?: "https://kind-control-plane:6443"
+def apiUrlRaw = (env.get("JENKINS_K8S_API_URL") ?: "").trim()
+def apiUrl = apiUrlRaw ?: "https://kind-control-plane:6443"
+def namespace = (env.get("JENKINS_K8S_NAMESPACE") ?: "default").trim() ?: "default"
 def k8sToken = env.get("JENKINS_K8S_TOKEN") ?: ""
 def jenkinsUrl = env.get("JENKINS_K8S_JENKINS_URL") ?: "http://jenkins:8080"
 def jenkinsTunnel = env.get("JENKINS_K8S_JENKINS_TUNNEL") ?: "jenkins:50000"
@@ -105,9 +108,11 @@ cloudNames.each { name ->
     cloud = new KubernetesCloud(name)
     j.clouds.add(cloud)
   }
-  cloud.serverUrl = apiUrl
+  if (apiUrlRaw) {
+    cloud.serverUrl = apiUrl
+  }
   cloud.skipTlsVerify = true
-  cloud.namespace = "default"
+  cloud.namespace = namespace
   cloud.jenkinsUrl = jenkinsUrl
   cloud.jenkinsTunnel = jenkinsTunnel
   if (tokenCredReady) {

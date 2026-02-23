@@ -249,6 +249,7 @@ docker run -d --name "${JENKINS_NAME}" \
   -e JENKINS_K8S_TOKEN="${K8S_TOKEN}" \
   -e JENKINS_K8S_JENKINS_URL="http://${JENKINS_K8S_DNS_NAME}:8080" \
   -e JENKINS_K8S_JENKINS_TUNNEL="${JENKINS_K8S_DNS_NAME}:50000" \
+  -e JENKINS_K8S_NAMESPACE="${JENKINS_K8S_NAMESPACE:-default}" \
   -e JAVA_OPTS="-Djenkins.install.runSetupWizard=false -Dhudson.security.csrf.GlobalCrumbIssuerConfiguration.DISABLE_CSRF_PROTECTION=true -Dpermissive-script-security.enabled=no_security -Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true" \
   "${JENKINS_IMAGE}" \
   /usr/local/bin/jenkins.sh >/dev/null
