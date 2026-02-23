@@ -853,62 +853,6 @@ def parseImagePullSecrets(secretsInput) {
     reportFail('config', "imagePullSecrets must be a List or String, got: ${secretsInput.getClass().getName()}")
 }
 
-@NonCPS
-def ensureK8sCloud(cloudName, namespace = "default") {
-    if (!cloudName) {
-        return false
-    }
-    def j = Jenkins.instance
-    def cl = j.pluginManager.uberClassLoader
-    def k8sCloudClass = cl.loadClass("org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud")
-    def cloud = j.clouds.getByName(cloudName)
-    def cloudCreated = false
-
-    if (cloud != null && !k8sCloudClass.isInstance(cloud)) {
-        j.clouds.remove(cloud)
-        cloud = null
-    }
-
-    if (cloud == null) {
-        cloud = k8sCloudClass.getConstructor(String).newInstance(cloudName)
-        j.clouds.add(cloud)
-        cloudCreated = true
-    }
-
-    // Only set serverUrl when JENKINS_K8S_API_URL is set; otherwise preserve existing (e.g. from
-    // startup script). Do not default to "https://k3s:6443" here—that hostname only resolves in
-    // local Docker; on shared Jenkins it causes UnknownHostException. Local runs must pass
-    // JENKINS_K8S_API_URL (e.g. scripts/local_gha_ci.sh does).
-    def apiUrl = System.getenv("JENKINS_K8S_API_URL")?.trim()
-    if (apiUrl) {
-        cloud.serverUrl = apiUrl
-    }
-    cloud.skipTlsVerify = true
-    // Do not overwrite namespace on existing shared clouds unless explicitly requested.
-    def namespaceEnv = System.getenv("JENKINS_K8S_NAMESPACE")?.trim()
-    def desiredNamespace = namespaceEnv ?: namespace ?: "default"
-    if (namespaceEnv || cloudCreated || !cloud.namespace) {
-        cloud.namespace = desiredNamespace
-    }
-    def jenkinsUrlEnv = System.getenv("JENKINS_URL")?.trim()
-    if (jenkinsUrlEnv) {
-        cloud.jenkinsUrl = jenkinsUrlEnv
-    } else if (!cloud.jenkinsUrl) {
-        cloud.jenkinsUrl = "http://jenkins:8080"
-    }
-    def tunnelEnv = System.getenv("JENKINS_TUNNEL")?.trim()
-    if (tunnelEnv) {
-        cloud.jenkinsTunnel = tunnelEnv
-    } else if (!cloud.jenkinsTunnel) {
-        cloud.jenkinsTunnel = "jenkins:50000"
-    }
-    if ((System.getenv("JENKINS_K8S_TOKEN") ?: "").trim()) {
-        cloud.credentialsId = "k8s-sa-token"
-    }
-    j.save()
-    return true
-}
-
 def runK8(image, branchName, config, axis, steps=config.steps) {
 
     def cloudName = image.cloud ?: getConfigVal(config, ['kubernetes', 'cloud'], null)
@@ -956,7 +900,6 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
     def imagePullSecrets = parseImagePullSecrets(getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]"))
-    ensureK8sCloud(cloudName, namespace)
     def yaml = """
 spec:
   containers:
@@ -1481,7 +1424,6 @@ def build_docker_on_k8(image, config) {
     def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
     def imagePullSecrets = parseImagePullSecrets(getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]"))
-    ensureK8sCloud(cloudName, namespace)
     def yaml = """
 spec:
   containers:

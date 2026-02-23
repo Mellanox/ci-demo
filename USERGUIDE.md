@@ -58,6 +58,8 @@ Source of truth: `schema_validator/ci_demo_schema.yaml`.
 
 ### `kubernetes_conf`
 
+When using Kubernetes, the Jenkins server must have the Kubernetes cloud(s) referenced by `cloud` pre-configured (e.g. via init scripts at startup or by administrators). The pipeline does not create or update Jenkins cloud configuration.
+
 | Key | Type |
 |---|---|
 | `cloud` | `str` |
