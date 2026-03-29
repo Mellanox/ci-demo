@@ -1,0 +1,59 @@
+---
+job: slurm-example
+
+# Slurm head node and job configuration — set these as Jenkins env vars or override here.
+env:
+  SLURM_HEAD_NODE: scctl
+  SLURM_PARTITION: gpu
+  SLURM_NODES: '1'
+  SLURM_JOB_TIMEOUT: '01:00:00'
+  DOCKER_IMAGE: 'ubuntu:22.04'
+  SLURM_JOB_ID_DIR: '/tmp'
+  SLURM_JOB_ID_FILE: '/tmp/job_id_${BUILD_NUMBER}.txt'
+  # SCCTL_CREDENTIALS_ID must be set to a Jenkins username/password credential id
+  # when SLURM_HEAD_NODE is 'scctl'.
+
+runs_on_agents:
+  - {nodeLabel: master}
+
+# Allocate Slurm nodes before steps run.
+# credentialsId is required when headNode is 'scctl'.
+pipeline_start:
+  shell: action
+  module: slurmCI
+  run: allocation
+  args:
+    partition: '${SLURM_PARTITION}'
+    headNode: '${SLURM_HEAD_NODE}'
+    nodes: '${SLURM_NODES}'
+    jobTimeout: '${SLURM_JOB_TIMEOUT}'
+    jobIdFile: '${SLURM_JOB_ID_FILE}'
+    credentialsId: '${SCCTL_CREDENTIALS_ID}'
+
+steps:
+  # Read the job ID written by allocation() into a Jenkins env var so
+  # subsequent slurm.run() steps can reference it as ${SLURM_JOB_ID}.
+  - name: Read Slurm job ID
+    shell: action
+    module: groovy
+    run: env.SLURM_JOB_ID = readFile(env.SLURM_JOB_ID_FILE).trim()
+
+  - name: Run test script
+    shell: action
+    module: slurmCI
+    run: run
+    args:
+      jobId: '${SLURM_JOB_ID}'
+      headNode: '${SLURM_HEAD_NODE}'
+      testScript: 'echo "Hello from Slurm node $(hostname)"'
+      dockerImage: '${DOCKER_IMAGE}'
+      nodes: '${SLURM_NODES}'
+
+# Cancel all allocations for this build on completion (success or failure).
+pipeline_stop:
+  shell: action
+  module: slurmCI
+  run: stopAllForBuild
+  args:
+    headNode: '${SLURM_HEAD_NODE}'
+    jobIdDir: '${SLURM_JOB_ID_DIR}'

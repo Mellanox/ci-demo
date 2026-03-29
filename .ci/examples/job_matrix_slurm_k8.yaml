@@ -1,0 +1,79 @@
+---
+job: slurm-k8-example
+
+kubernetes:
+  cloud: swx-k8s
+  namespace: default
+  limits: "{memory: 1Gi, cpu: 500m}"
+  requests: "{memory: 256Mi, cpu: 250m}"
+
+# for step persistance job id file location
+pvc_volumes:
+  - {claimName: nbu-swx-pvc, mountPath: /mnt/pvc, readOnly: false}
+
+empty_volumes:
+  - {mountPath: /root, memory: false}
+
+# Slurm head node and job configuration — set these as Jenkins env vars or override here.
+env:
+  SLURM_HEAD_NODE: headnode
+  SLURM_PARTITION: gpu
+  SLURM_NODES: '1'
+  SLURM_GRES: "gpu:1"
+  SLURM_JOB_TIMEOUT: '01:00:00'
+  DOCKER_IMAGE: 'ubuntu:22.04'
+  SLURM_JOB_ID_DIR: '/mnt/pvc'
+  SLURM_JOB_ID_FILE: '/mnt/pvc/job_id_${BUILD_NUMBER}.txt'
+  # CREDENTIALS_ID: must be set to a Jenkins ssh key credential id with access to the Slurm head node.
+
+# when using scctl use docker image with scctl client installed, otherwise use any image that matches the architecture of the Slurm nodes
+runs_on_dockers:
+  - {name: "ubuntu-x86_64", url: "ubuntu:22.04", arch: "x86_64"}
+
+steps:
+  - name: Allocate Slurm nodes
+    shell: action
+    module: slurmCI
+    run: allocation
+    args:
+      headNode: '${SLURM_HEAD_NODE}'
+      partition: '${SLURM_PARTITION}'
+      nodes: '${SLURM_NODES}'
+      timeout: '${SLURM_JOB_TIMEOUT}'
+      jobIdFile: '${SLURM_JOB_ID_FILE}'
+      credentialsId: '${CREDENTIALS_ID}'
+      extraArgs: [
+        "--gres=${SLURM_GRES}",
+      ]
+
+  # Read the job ID written by allocation() into a Jenkins env var so
+  # subsequent slurm.run() steps can reference it as ${SLURM_JOB_ID}.
+  - name: Read Slurm job ID
+    shell: action
+    module: groovy
+    run: env.SLURM_JOB_ID = readFile(env.SLURM_JOB_ID_FILE).trim()
+
+  - name: Run test script
+    shell: action
+    module: slurmCI
+    run: run
+    args:
+      jobId: '${SLURM_JOB_ID}'
+      headNode: '${SLURM_HEAD_NODE}'
+      testScript: 'env | grep SLURM'
+      dockerImage: '${DOCKER_IMAGE}'
+      credentialsId: '${CREDENTIALS_ID}'
+      nodes: '${SLURM_NODES}'
+      slurmEnv: [
+        "SLURM_TEST_VAR=hello_slurm"
+      ]
+
+# Cancel all allocations for this build on completion (success or failure).
+pipeline_stop:
+  shell: action
+  module: slurmCI
+  run: stop
+  args:
+    credentialsId: '${CREDENTIALS_ID}'
+    headNode: '${SLURM_HEAD_NODE}'
+    jobId: '${SLURM_JOB_ID}'
