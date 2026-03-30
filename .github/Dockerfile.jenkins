@@ -1,6 +1,8 @@
 # Jenkins with Pipeline + Docker plugins pre-installed so flow-definition is
 # registered at startup (no restart needed).
-FROM jenkins/jenkins:lts-jdk17
+# Pin LTS so CI does not break when :lts-jdk17 moves. CLI jar below uses the same
+# version as jenkins.war bundled in this image (no separate CLI pin needed).
+FROM jenkins/jenkins:2.541.3-lts-jdk17
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends curl python3 python3-pip python3-venv \
   && python3 -m venv /opt/schema-validator \
