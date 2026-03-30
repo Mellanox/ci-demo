@@ -1,0 +1,39 @@
+---
+job: ci-demo-stages-example
+
+kubernetes:
+  cloud: swx-k8s-spray
+
+runs_on_dockers:
+  - {name: 'ubuntu2204', url: 'ubuntu:22.04', arch: 'x86_64'}
+  - {name: 'rhel9', url: 'redhat/ubi9', arch: 'x86_64'}
+
+# Steps with the same 'stage' value are grouped and run in parallel
+# under a single Jenkins stage block. Steps without 'stage' run
+# sequentially as usual.
+
+steps:
+  - name: Build lib
+    run: echo "building lib"
+    stage: build
+
+  - name: Build tools
+    run: echo "building tools"
+    stage: build
+
+  - name: Build docs
+    run: echo "building docs"
+    stage: build
+
+  - name: Unit tests
+    run: echo "running unit tests"
+    stage: test
+
+  - name: Integration tests
+    run: echo "running integration tests"
+    stage: test
+
+  - name: Publish
+    containerSelector: "{name:'ubuntu2204'}"
+    stage: publish
+    run: echo "publishing artifacts"
