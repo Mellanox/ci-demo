@@ -1,0 +1,59 @@
+# GHA CI: run Jenkins container, install ci-demo as a Pipeline job, trigger basic job matrix.
+name: CI (Jenkins)
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["*"]
+
+jobs:
+  jenkins-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect TARGET_ARCH
+        run: |
+          arch=""
+          case "${RUNNER_ARCH}" in
+            X64) arch="x86_64" ;;
+            ARM64) arch="aarch64" ;;
+            *) arch="x86_64" ;;
+          esac
+          echo "TARGET_ARCH=${arch}" >> "${GITHUB_ENV}"
+          echo "Detected TARGET_ARCH=${arch}"
+
+      - name: Run local-gha-ci script
+        env:
+          BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+          REPO_URL: "https://github.com/${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}.git"
+          TARGET_ARCHES: ${{ env.TARGET_ARCH }}
+          CI_K8_FILE: .ci/job_matrix_gha_k8.yaml
+          KEEP_JENKINS: "false"
+          KEEP_K8S: "false"
+        run: |
+          bash ./scripts/local_gha_ci.sh
+
+      - name: Print local-gha-ci log tails
+        if: always()
+        run: |
+          if [ -d .tmp/local-gha-ci/logs ]; then
+            echo "=== local-gha-ci logs (last 200 lines each) ==="
+            for f in .tmp/local-gha-ci/logs/*.log; do
+              [ -e "$f" ] || continue
+              echo "----- $f (tail -n 200) -----"
+              tail -n 200 "$f" || true
+            done
+          else
+            echo "No .tmp/local-gha-ci/logs directory found."
+          fi
+
+      - name: Upload local-gha-ci logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-gha-ci-logs
+          path: .tmp/local-gha-ci/logs
+          if-no-files-found: ignore
