@@ -1,39 +1,141 @@
 ---
 job: str()
-kubernetes:
-  cloud: str()
-  nodeSelector: str()
 
 registry_host: str(required=False)
 registry_path: str(required=False)
 registry_auth: str(required=False)
+registry_jnlp_path: str(required=False)
+docker_opt: str(required=False)
 
-volumes: list(include('single_volume'), required=False)
+kubernetes: include('kubernetes_conf', required=False)
+arch_table: map(required=False)
 
-env: map(str(), int(), bool())
+env: map(str(), any(str(), int(), num(), bool()), required=False)
 step_allow_single_selector: bool(required=False)
 
-runs_on_dockers: list(required=False)
-runs_on_agents: list(required=False)
+volumes: list(include('host_volume'), required=False)
+nfs_volumes: list(include('nfs_volume'), required=False)
+pvc_volumes: list(include('pvc_volume'), required=False)
+secret_volumes: list(include('secret_volume'), required=False)
+empty_volumes: list(include('empty_volume'), required=False)
 
-steps: list(include('single_step'), min=1)
-pipeline_start: map(required=False)
-pipeline_stop: map(required=False)
+credentials: list(include('credential'), required=False)
+
+runs_on_dockers: list(include('docker_image'), required=False)
+runs_on_agents: list(include('agent_image'), required=False)
+
+matrix: include('matrix_conf', required=False)
+
+steps: list(include('step_conf'), min=1)
+disable: list(include('step_conf'), required=False)
+
+pipeline_on_image_build: include('step_conf', required=False)
+pipeline_start: include('step_conf', required=False)
+pipeline_stop: include('step_conf', required=False)
+
+archiveArtifacts: str(required=False)
+taskName: str(required=False)
+taskNameSetupImage: str(required=False)
+batchSize: int(required=False)
+timeout_minutes: any(int(), str(), required=False)
+timeout: any(int(), str(), required=False)
 failFast: bool(required=False)
 
 ---
-single_volume:
+kubernetes_conf:
+  cloud: str(required=False)
+  nodeSelector: str(required=False)
+  namespace: str(required=False)
+  serviceAccount: str(required=False)
+  hostNetwork: bool(required=False)
+  runAsUser: any(str(), int(), required=False)
+  runAsGroup: any(str(), int(), required=False)
+  privileged: bool(required=False)
+  limits: any(str(), map(), required=False)
+  requests: any(str(), map(), required=False)
+  annotations: any(list(), map(), str(), required=False)
+  caps_add: any(str(), list(), required=False)
+  tolerations: any(str(), list(), required=False)
+  imagePullSecrets: any(str(), list(), required=False)
+  arch_table: map(required=False)
+
+host_volume:
   mountPath: str()
   hostPath: str(required=False)
 
-single_step:
-  name: str()
-  run: str()
-  agentSelector: str(required=False)
-  containerSelector: str(required=False)
+nfs_volume:
+  mountPath: str()
+  serverAddress: str(required=False)
+  serverPath: str(required=False)
+
+pvc_volume:
+  mountPath: str()
+  claimName: str(required=False)
+  readOnly: bool(required=False)
+
+secret_volume:
+  mountPath: str()
+  secretName: str(required=False)
+
+empty_volume:
+  mountPath: str()
+  memory: bool(required=False)
+
+credential:
+  credentialsId: str()
+  usernameVariable: str(required=False)
+  passwordVariable: str(required=False)
+  variable: str(required=False)
+
+docker_image:
+  name: str(required=False)
+  url: str(required=False)
+  tag: str(required=False)
+  uri: str(required=False)
+  file: str(required=False)
+  arch: str(required=False)
+  nodeLabel: str(required=False)
+  cloud: str(required=False)
+  category: str(required=False)
+  enable: any(bool(), str(), required=False)
+  hostNetwork: bool(required=False)
+  privileged: any(bool(), str(), required=False)
+  runAsUser: any(str(), int(), required=False)
+  runAsGroup: any(str(), int(), required=False)
+  limits: any(str(), map(), required=False)
+  requests: any(str(), map(), required=False)
+  namespace: str(required=False)
+  tolerations: any(str(), list(), required=False)
+  imagePullSecrets: any(str(), list(), required=False)
+  annotations: any(list(), map(), str(), required=False)
+  caps_add: any(str(), list(), required=False)
+  on_image_build: any(str(), map(), required=False)
+  build_args: any(str(), list(), map(), required=False)
+  deps: list(str(), required=False)
+
+agent_image:
+  nodeLabel: str(required=False)
+  name: str(required=False)
+  arch: str(required=False)
+
+matrix_conf:
+  axes: map(required=False)
+  include: list(map(), required=False)
+  exclude: list(map(), required=False)
+
+step_conf:
+  name: str(required=False)
+  run: str(required=False)
+  onfail: str(required=False)
+  always: str(required=False)
   shell: str(required=False)
   module: str(required=False)
-  archiveArtifacts: str(required=False)
+  timeout: any(int(), str(), required=False)
+  enable: any(bool(), str(), required=False)
   parallel: bool(required=False)
-  always: str(required=False)
-
+  archiveArtifacts: str(required=False)
+  containerSelector: any(str(), list(str()), required=False)
+  agentSelector: any(str(), list(str()), required=False)
+  credentialsId: any(str(), list(str()), required=False)
+  args: any(list(), map(), str(), required=False)
+  env: map(required=False)

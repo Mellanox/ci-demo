@@ -1,0 +1,63 @@
+---
+# Minimal job matrix for GitHub Actions CI: runs on Jenkins controller (master)
+# with public Docker images. No Kubernetes, no internal registry/volumes.
+# Exercises: matrix axes, containerSelector, enable, pipeline_start/stop, archiveArtifacts, shell, timeout.
+job: ci-demo-gha
+
+runs_on_dockers:
+  - {name: 'ubuntu2204', url: 'ubuntu:22.04', tag: 'latest', arch: 'x86_64', nodeLabel: 'master'}
+  - {name: 'ubuntu2404', url: 'ubuntu:24.04', tag: 'latest', arch: 'x86_64', nodeLabel: 'master'}
+
+matrix:
+  axes:
+    version: ['1', '2']
+
+steps:
+  - name: Install build deps
+    run: |
+      echo Installing build deps...
+      ls -al
+      echo "apt-get update -qq && apt-get install -y -qq automake autoconf libtool make gcc"
+
+  - name: Configure
+    run: |
+      echo Configuring...
+      echo ./autogen.sh
+      echo ./configure --prefix ${WORKSPACE}/install
+
+  - name: Build
+    run: echo make -j 2 all
+
+  - name: Install
+    run: echo "make -j 2 install"
+
+  - name: Echo axis
+    run: echo "Axis version=$version"
+
+  - name: Run only on ubuntu2204
+    containerSelector: "{name:'ubuntu2204', variant:1}"
+    run: echo "Running on selected container"
+
+  - name: Disabled step
+    enable: false
+    run: echo skipped
+
+  - name: Create artifact
+    run: echo "GHA test" > gha_artifact.txt
+    archiveArtifacts: gha_artifact.txt
+
+  - name: Custom shell step
+    shell: '#!/bin/bash -eE'
+    run: echo "from bash" && type ls
+
+  - name: Step with timeout
+    timeout: 2
+    run: echo "timeout step ok"
+
+pipeline_start:
+  run: echo Starting new job
+
+pipeline_stop:
+  run: echo All done
+
+failFast: false

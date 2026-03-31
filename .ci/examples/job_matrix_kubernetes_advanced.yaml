@@ -1,0 +1,100 @@
+---
+# Example demonstrating advanced Kubernetes configuration options
+job: kubernetes-advanced-demo
+
+registry_host: harbor.mellanox.com
+registry_path: /swx-storage/ci-demo
+registry_auth: swx-storage
+
+kubernetes:
+  # Cloud name to use for all containers (must be defined in Jenkins server configuration)
+  cloud: swx-k8s
+
+  # Kubernetes namespace to use
+  namespace: ci-demo
+
+  # Service account for the pods
+  serviceAccount: jenkins
+
+  # Node selector to request specific nodes for allocation
+  nodeSelector: 'beta.kubernetes.io/os=linux'
+
+  # Optional: enforce limits on resource usage
+  limits: "{memory: 8Gi, cpu: 4000m}"
+
+  # Optional: request resources
+  requests: "{memory: 8Gi, cpu: 4000m}"
+
+  # Optional: annotations for pods
+  annotations:
+    - {key: 'k8s.v1.cni.cncf.io/networks', value: 'roce-bw-port1@roce0'}
+
+  # Optional: container capabilities to add
+  caps_add: "[ IPC_LOCK, SYS_RESOURCE ]"
+
+  # Optional: tolerations allow scheduling on nodes with matching taints
+  tolerations: "[{key: 'feature.node.kubernetes.io/project', operator: 'Equal', value: 'SPDK', effect: 'NoSchedule'}]"
+
+  # Optional: imagePullSecrets for pulling images from private registries
+  # Single secret:
+  imagePullSecrets: "['my-registry-secret']"
+  # Or multiple secrets:
+  # imagePullSecrets: "['secret-1', 'secret-2', 'secret-3']"
+
+  # Optional: run pods with specific user/group IDs
+  runAsUser: "1000"
+  runAsGroup: "1000"
+
+  # Optional: run containers in privileged mode
+  privileged: false
+
+  # Optional: enable host network
+  hostNetwork: false
+
+# Optional: multi-arch support with arch-specific configurations
+arch_table:
+  x86_64:
+    nodeSelector: 'kubernetes.io/arch=amd64'
+    jnlpImage: 'jenkins/inbound-agent:latest'
+  aarch64:
+    nodeSelector: 'kubernetes.io/arch=arm64'
+    jnlpImage: '${registry_host}/${registry_jnlp_path}/jenkins-arm-agent-jnlp:latest'
+
+volumes:
+  - {mountPath: /hpc/local, hostPath: /hpc/local}
+  - {mountPath: /auto/sw_tools, hostPath: /auto/sw_tools}
+
+# PersistentVolumeClaim volumes
+pvc_volumes:
+  - {claimName: my-pvc, mountPath: /mnt/pvc, readOnly: false}
+
+# Secret volumes
+secret_volumes:
+  - {secretName: 'my-secret', mountPath: '/mnt/secret'}
+
+# EmptyDir volumes (memory: true creates volumes in RAM)
+empty_volumes:
+  - {mountPath: /tmp/workspace, memory: false}
+
+runs_on_dockers:
+  - {file: '.ci/Dockerfile.rhel8-6', name: 'ci-demo-rhel8-6', tag: 'latest'}
+
+matrix:
+  axes:
+    arch:
+      - x86_64
+
+steps:
+  - name: Test kubernetes configuration
+    run: |
+      echo "Running in Kubernetes pod"
+      hostname
+      env
+      df -h
+
+pipeline_start:
+  run: echo Starting Kubernetes job
+
+pipeline_stop:
+  run: echo Kubernetes job completed
+

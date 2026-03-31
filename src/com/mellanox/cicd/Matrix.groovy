@@ -64,18 +64,28 @@ def entrySet(m) {
 }
 
 
-def run_shell(cmd, title, retOut=false) {
+def run_shell(cmd, title, retOut=false, timeout_minutes=null) {
     def text = ""
     def rc
     def err = null
     try {
-        if (retOut) {
-            text = sh(script: cmd, label: title, returnStdout: true)
-            rc = 0
+        if (timeout_minutes) {
+            timeout(time: timeout_minutes, unit: 'MINUTES') {
+                if(retOut) {
+                    text = sh(script: cmd, label: title, returnStdout: true)
+                    rc = 0
+                } else {
+                    rc = sh(script: cmd, label: title, returnStatus: true)
+                }
+            }
         } else {
-            rc = sh(script: cmd, label: title, returnStatus: true)
+            if (retOut) {
+                text = sh(script: cmd, label: title, returnStdout: true)
+                rc = 0
+            } else {
+                rc = sh(script: cmd, label: title, returnStatus: true)
+            }
         }
-
     } catch (e) {
         err = e
         org.codehaus.groovy.runtime.StackTraceUtils.printSanitizedStackTrace(e)
@@ -94,8 +104,13 @@ def run_step_shell(image, cmd, title, oneStep, config) {
         vars.add(names[i] + "=" + config.get(names[i]) ?: '')
     }
 
+    // Get timeout from step configuration
+    def timeout_minutes = getConfigVal(config, ['timeout'], null, true, oneStep, true)
+
     withEnv(vars) {
-        def ret = run_shell(cmd, title)
+        def ret = run_shell(cmd, title, false, timeout_minutes)
+
+        config.logger.trace(2, "run_step_shell ${title}: rc=${ret.rc}, err=${ret.exception}")
 
         if (ret.rc != 0) {
             if (oneStep["onfail"] != null) {
@@ -155,19 +170,19 @@ def getArchConf(config, arch) {
     k8sArchConfTable['x86_64']  = [
         nodeSelector: 'kubernetes.io/arch=amd64',
         jnlpImage: 'jenkins/inbound-agent:latest',
-        dockerImage: 'quay.io/podman/stable:v5.0.2'
+        dockerImage: 'quay.io/podman/stable:v5.7.1'
     ]
 
     k8sArchConfTable['aarch64'] = [
         nodeSelector: 'kubernetes.io/arch=arm64',
         jnlpImage: "jenkins/inbound-agent:latest",
-        dockerImage: 'quay.io/podman/stable:v5.0.2'
+        dockerImage: 'quay.io/podman/stable:v5.7.1'
     ]
 
     k8sArchConfTable['ppc64le'] = [
         nodeSelector: 'kubernetes.io/arch=ppc64le',
         jnlpImage: "${config.registry_host}/${config.registry_jnlp_path}/jenkins-ppc64le-agent-jnlp:latest",
-        dockerImage: 'quay.io/podman/stable:v5.0.2'
+        dockerImage: 'quay.io/podman/stable:v5.7.1'
     ]
 
     def aTable = getConfigVal(config, ['kubernetes', 'arch_table'], null)
@@ -251,11 +266,11 @@ def gen_image_map(config) {
 
                 dfile.file = dfile.file ?: ''
                 if (dfile.url) {
-                    parts = dfile.url.tokenize('/').last().tokenize(':')
+                    def parts = dfile.url.tokenize('/').last().tokenize(':')
                     if (parts.size() == 2) {
                         dfile.tag = parts[1]
-                        tag_size = dfile.tag.size() + 1
-                        len = dfile.url.size() - tag_size
+                        def tag_size = dfile.tag.size() + 1
+                        def len = dfile.url.size() - tag_size
                         dfile.uri = dfile.url.substring(0,len)
                     }
                 }
@@ -293,6 +308,27 @@ def matchMapEntry(filters, entry) {
         }
     }
     return match
+}
+
+def unstashWS (name, config){
+    def maxRetries = 5
+    def lastError = null
+
+    for (int i = 1; i <= maxRetries; i++) {
+        try {
+            unstash name
+            return // Success, exit the function
+        } catch (Exception e) {
+            lastError = e
+            if (i < maxRetries) {
+                config.logger.debug("Unstash attempt ${i} failed: ${e.message}. Retrying...")
+                sleep(time: 2, unit: 'SECONDS')
+            }
+        }
+    }
+
+    // If we get here, all retries failed
+    reportFail('unstash', "Failed to unstash '${name}' after ${maxRetries} attempts. Last error: ${lastError.message}")
 }
 
 def onUnstash() {
@@ -515,7 +551,7 @@ def check_skip_stage(image, config, title, oneStep, axis, runtime=null) {
     }
 
     for (int i=0; i<selectors.size(); i++) {
-        selector = selectors[i]
+        def selector = selectors[i]
         if (selector && selector.size() > 0) {
             def customSel = stringToList(selector)
             config.logger.trace(2, "Selector=" + selector + " custom=" + customSel + " name=" + image.name)
@@ -597,7 +633,7 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
                     reportFail(title, "credentialsId should be either a List or a String")
                 }
                 def foundList = []
-                for (credentialsId in credentialsIdList) {
+                for (def credentialsId in credentialsIdList) {
                     def found = false
                     for (int i=0; i<config.credentials.size(); i++) {
                         Map entry = config.credentials[i]
@@ -654,7 +690,7 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
 def runSteps(image, config, branchName, axis, steps=config.steps, runtime) {
     forceCleanupWS()
     // fetch .git from server and unpack
-    unstash getStashName()
+    unstashWS(getStashName(), config)
     onUnstash()
 
     def parallelNestedSteps = [:]
@@ -717,9 +753,9 @@ def getConfigVal(config, list, defaultVal=null, toString=true, oneStep=null, use
 def parseListV(volumes) {
     def listV = []
     volumes.each { vol ->
-        hostPath = vol.get("hostPath")
-        mountPath = vol.get("mountPath")
-        hpv = hostPathVolume(hostPath: hostPath, mountPath: mountPath)
+        def hostPath = vol.get("hostPath")
+        def mountPath = vol.get("mountPath")
+        def hpv = hostPathVolume(hostPath: hostPath, mountPath: mountPath)
         listV.add(hpv)
     }
     return listV
@@ -728,11 +764,11 @@ def parseListV(volumes) {
 def parseListNfsV(volumes) {
     def listV = []
     volumes.each { vol ->
-        serverAddress = vol.get("serverAddress")
-        serverPath = vol.get("serverPath")
-        mountPath = vol.get("mountPath")
-        readOnly = vol.get("readOnly", false)
-        nfsv = nfsVolume(serverAddress: serverAddress,
+        def serverAddress = vol.get("serverAddress")
+        def serverPath = vol.get("serverPath")
+        def mountPath = vol.get("mountPath")
+        def readOnly = vol.get("readOnly", false)
+        def nfsv = nfsVolume(serverAddress: serverAddress,
                          serverPath: serverPath,
                          mountPath: mountPath,
                          readOnly: readOnly)
@@ -744,10 +780,10 @@ def parseListNfsV(volumes) {
 def parseListPVC(volumes) {
     def listV = []
     volumes.each { vol ->
-        claimName = vol.get("claimName")
-        mountPath = vol.get("mountPath")
-        readOnly = vol.get("readOnly", false)
-        PVCv = persistentVolumeClaim(claimName: claimName,
+        def claimName = vol.get("claimName")
+        def mountPath = vol.get("mountPath")
+        def readOnly = vol.get("readOnly", false)
+        def PVCv = persistentVolumeClaim(claimName: claimName,
                                      mountPath: mountPath,
                                      readOnly: readOnly)
         listV.add(PVCv)
@@ -758,11 +794,11 @@ def parseListPVC(volumes) {
 def parseSecretV(volumes) {
     def listV = []
     volumes.each { vol ->
-        secretName = vol.get("secretName")
-        mountPath = vol.get("mountPath")
-        optional = vol.get("optional")
-        defaultMode = vol.get("defaultMode")
-        secretV = secretVolume(secretName: secretName,
+        def secretName = vol.get("secretName")
+        def mountPath = vol.get("mountPath")
+        def optional = vol.get("optional")
+        def defaultMode = vol.get("defaultMode")
+        def secretV = secretVolume(secretName: secretName,
                                mountPath: mountPath,
                                optional: optional,
                                defaultMode: defaultMode)
@@ -774,9 +810,9 @@ def parseSecretV(volumes) {
 def parseEmptyDirV(volumes) {
     def listV = []
     volumes.each { vol ->
-        mountPath = vol.get("mountPath")
-        memoryFlag = vol.get("memory", false)
-        EmptyDirV = emptyDirVolume(  mountPath: mountPath,
+        def mountPath = vol.get("mountPath")
+        def memoryFlag = vol.get("memory", false)
+        def EmptyDirV = emptyDirVolume(  mountPath: mountPath,
                                      memory: memoryFlag)
         listV.add(EmptyDirV)
     }
@@ -786,12 +822,35 @@ def parseEmptyDirV(volumes) {
 def parseListA(annotations) {
     def listA = []
     annotations.each { an ->
-        key = an.get("key")
-        value = an.get("value")
-        pan = podAnnotation(key: key, value: value)
+        def key = an.get("key")
+        def value = an.get("value")
+        def pan = podAnnotation(key: key, value: value)
         listA.add(pan)
     }
     return listA
+}
+
+def parseImagePullSecrets(secretsInput) {
+    // If it's already a list, return it
+    if (secretsInput instanceof List) {
+        return secretsInput
+    }
+    // If it's a string, parse it as a Groovy list
+    if (secretsInput instanceof String) {
+        try {
+            def parsed = Eval.me(secretsInput)
+            if (parsed instanceof List) {
+                return parsed
+            }
+            // If parsing succeeds but doesn't return a list, fail
+            reportFail('config', "imagePullSecrets must be a list, got: ${parsed.getClass().getName()}")
+        } catch (Exception e) {
+            // If parsing fails, report the error
+            reportFail('config', "Failed to parse imagePullSecrets='${secretsInput}': ${e.message}")
+        }
+    }
+    // If it's neither a list nor a string, fail
+    reportFail('config', "imagePullSecrets must be a List or String, got: ${secretsInput.getClass().getName()}")
 }
 
 def runK8(image, branchName, config, axis, steps=config.steps) {
@@ -840,6 +899,7 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     def service_account = getConfigVal(config, ['kubernetes', 'serviceAccount'], "default")
     def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
+    def imagePullSecrets = parseImagePullSecrets(getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]"))
     def yaml = """
 spec:
   containers:
@@ -873,7 +933,8 @@ spec:
             containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
             containerTemplate(privileged: privileged, name: cname, image: image.url, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
         ],
-        volumes: listV
+        volumes: listV,
+        imagePullSecrets: imagePullSecrets
     )
     {
         retry(count: 2, conditions: [kubernetesAgent(), nonresumable()]) {
@@ -934,7 +995,7 @@ def getDockerOpt(config) {
     if (config.get("volumes")) {
         for (int i=0; i<config.volumes.size(); i++) {
             def vol = config.volumes[i]
-            hostPath = vol.get("hostPath")? vol.hostPath : vol.mountPath
+            def hostPath = vol.get("hostPath")? vol.hostPath : vol.mountPath
             opts += " -v ${vol.mountPath}:${hostPath}"
         }
     }
@@ -948,7 +1009,7 @@ def runAgent(image, config, branchName=null, axis=null, Closure func, runInDocke
 
     node(nodeName) {
         forceCleanupWS()
-        unstash getStashName()
+        unstashWS(getStashName(), config)
         onUnstash()
         stage(branchName) {
             env.WORKSPACE = pwd()
@@ -979,7 +1040,7 @@ Map getTasks(axes, image, config, include, exclude) {
     for (int i = 0; i < axes.size(); i++) {
         Map axis = axes[i]
 
-        if (axis.arch != image.arch) {
+        if (axis.arch != null && axis.arch != image.arch) {
             config.logger.debug("getTasks: skipping axis=" + axis + " as its arch does not match image=" + image)
             continue
         }
@@ -1046,7 +1107,7 @@ Map getTasks(axes, image, config, include, exclude) {
                     reportFail('config', "Please define cloud or nodeLabel in yaml config file or define nodeLabel for docker")
                 }
                 if (image.nodeLabel) {
-                    runBareMetal = true
+                    def runBareMetal = true
                     if (image.url == null) {
                         runBareMetal = false
                     }
@@ -1067,6 +1128,24 @@ Map getTasks(axes, image, config, include, exclude) {
     return tasks
 }
 
+@NonCPS
+def resolveIncludeExcludeTemplates(filters, config) {
+    def resolvedFilters = []
+    for (int i = 0; i < filters.size(); i++) {
+        def filter = filters[i]
+        def resolvedFilter = [:]
+
+        // Apply template resolution to each key-value pair in the filter
+        filter.each { key, value ->
+            def resolvedValue = resolveTemplate([:], value, config)
+            resolvedFilter[key] = resolvedValue
+        }
+
+        resolvedFilters.add(resolvedFilter)
+    }
+    return resolvedFilters
+}
+
 def getMatrixTasks(image, config) {
 
     def include = [], exclude = [], axes = []
@@ -1076,6 +1155,10 @@ def getMatrixTasks(image, config) {
         axes = getMatrixAxes(config.matrix.axes).findAll()
         exclude = getConfigVal(config, ['matrix', 'exclude'], [], false)
         include = getConfigVal(config, ['matrix', 'include'], [], false)
+
+        // Apply template resolution to include/exclude values to support job parameters
+        include = resolveIncludeExcludeTemplates(include, config)
+        exclude = resolveIncludeExcludeTemplates(exclude, config)
     } else {
         axes.add(image)
     }
@@ -1187,6 +1270,46 @@ String getChangedFilesList(config) {
     return []
 }
 
+/**
+ * Check if a Docker image exists in the registry without pulling it.
+ * Uses podman manifest inspect (fast, fetches manifest only); otherwise falls back to docker pull.
+ * Returns true if image exists (no build needed), false if missing or check failed.
+ */
+def imageExistsInRegistry(String img, config) {
+    def quotedImg = "'" + img.replaceAll("'", "'\\\\''") + "'"
+
+    // Try docker/podman manifest inspect
+    def result = run_shell("docker manifest inspect ${quotedImg}", "Check if image exists in registry", false)
+    if (result.rc == 0) {
+        config.logger.info("Image found in registry (docker/podman manifest) - ${img}")
+        return true
+    }
+    config.logger.debug("Podman manifest check failed (rc=${result.rc}), trying podman search")
+
+    // Try podman search --list-tags
+    def parts = img.split(':')
+    if (parts.size() >= 1) {
+        def quotedRepo = "'" + parts[0].replaceAll("'", "'\\\\''") + "'"
+        def tag = parts.size() == 2 ? parts[1] : "latest"
+        def quotedTag = "'" + tag.replaceAll("'", "'\\\\''") + "'"
+        result = run_shell("podman search --list-tags --format \"{{.Tag}}\" ${quotedRepo} 2> /dev/null | grep ${quotedTag}", "Check tag via podman search", false)
+        if (result.rc == 0) {
+            config.logger.info("Image found in registry (podman search) - ${img}")
+            return true
+        }
+        config.logger.debug("Podman search check failed (rc=${result.rc}), trying docker pull")
+    }
+
+    // Last resort: docker pull
+    try {
+        config.logger.info("Pulling image - ${img}")
+        docker.image(img).pull()
+        return true
+    } catch (exception) {
+        return false
+    }
+}
+
 def buildImage(config, image) {
 
     // Vasily Ryabov: we need .toString() to make changed_files.contains(filename) work correctly
@@ -1197,25 +1320,13 @@ def buildImage(config, image) {
     def need_build = 0
     def img = image.url
 
-    try {
-        config.logger.info("Pulling image - ${img}")
-        docker.image(img).pull()
-    } catch (exception) {
-        config.logger.info("Image NOT found - ${img} - will build ${filename} ...")
-        need_build++
-    }
-
     if ("${env.build_dockers}" == "true") {
         config.logger.info("Forcing building file per user request: ${filename} ... ")
         need_build++
-    }
-    config.logger.debug("Changed files: ${changed_files}")
-    if (changed_files.contains(filename)) {
+    } else if (changed_files.contains(filename)) {
         config.logger.info("Forcing building, by modified file: ${filename} ... ")
         need_build++
-    }
-
-    if (image.deps) {
+    } else if (image.deps) {
         for (int i=0; i<image.deps.size(); i++) {
             def oneDep = image.deps[i]
             config.logger.debug("Checking " + oneDep)
@@ -1223,6 +1334,12 @@ def buildImage(config, image) {
                 config.logger.info("Forcing building by dependency on changed file: ${oneDep} ... ")
                 need_build++
             }
+        }
+    } else {
+        def imageExists = imageExistsInRegistry(img, config)
+        if (!imageExists) {
+            config.logger.info("Image NOT found in registry - ${img} - will build ${filename} ...")
+            need_build++
         }
     }
 
@@ -1306,6 +1423,7 @@ def build_docker_on_k8(image, config) {
     def service_account = getConfigVal(config, ['kubernetes', 'serviceAccount'], "default")
     def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
+    def imagePullSecrets = parseImagePullSecrets(getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]"))
     def yaml = """
 spec:
   containers:
@@ -1333,12 +1451,13 @@ spec:
             containerTemplate(name: 'jnlp', image: k8sArchConf.jnlpImage, args: '${computer.jnlpmac} ${computer.name}'),
             containerTemplate(privileged: privileged, name: 'docker', image: k8sArchConf.dockerImage, ttyEnabled: true, alwaysPullImage: true, command: 'cat')
         ],
-        volumes: listV
+        volumes: listV,
+        imagePullSecrets: imagePullSecrets
     )
     {
         retry(count: 2, conditions: [kubernetesAgent(), nonresumable()]) {
             node(POD_LABEL) {
-                unstash getStashName()
+                unstashWS(getStashName(), config)
                 onUnstash()
 
                 container('docker') {
@@ -1348,8 +1467,12 @@ spec:
                         // This is much slower on the kubernetes agent then using overlay storage driver.
                         // So we need to remove the storage.conf file and reset the podman system.
                         // Also, for rare cases or none podman runs we dont fail the build.
-                        sh 'rm /etc/containers/storage.conf ; podman system reset -f || true'
+                        sh 'rm -f /etc/containers/storage.conf; rm -f /usr/share/containers/storage.conf'
+                        sh 'podman system reset -f || true'
                         sh 'type -p docker || ln -sfT $(type -p podman) /usr/bin/docker'
+                        if (isDebugMode()) {
+                            sh 'podman info'
+                        }
                         buildDocker(image, config)
                     }
                 }
@@ -1408,7 +1531,7 @@ def String getStashName() {
 def startPipeline(String label) {
     node(label) {
 
-        logger = new Logger(this)
+        def logger = new Logger(this)
 
         stage("Checkout source code") {
             forceCleanupWS()
@@ -1431,6 +1554,7 @@ def startPipeline(String label) {
             stash includes: "scm-repo.tar", name: getStashName()
         }
 
+        def files
         if (fileExists("${env.conf_file}")) {
             files = [ "${env.conf_file}".toString() ]
         } else {
