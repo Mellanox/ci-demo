@@ -21,7 +21,26 @@ int call(ctx, oneStep, config) {
     }
 
     for (def entry in ctx.entrySet(args)) {
-        args[entry.key] = ctx.resolveTemplate(['env': env], entry.value.toString(), config)
+        def original = entry.value.toString()
+        def resolved = ctx.resolveTemplate(['env': env], original, config)
+        // resolveTemplate is @NonCPS and cannot see withEnv-set axis vars (e.g. ucx_version, arch)
+        // via env.getEnvironment(). Do a second pass here in CPS context where env property
+        // access DOES include withEnv vars.
+        def pass2 = resolved
+        def safety = 0
+        while (pass2.contains('${') && safety++ < 20) {
+            def start = pass2.indexOf('${')
+            def end = pass2.indexOf('}', start)
+            if (end == -1) break
+            def varName = pass2.substring(start + 2, end)
+            def val = env."${varName}"
+            if (val != null) {
+                pass2 = pass2.substring(0, start) + val + pass2.substring(end + 1)
+            } else {
+                break
+            }
+        }
+        args[entry.key] = pass2
     }
     def stepRun = oneStep.run
     def allowedOps = ['allocation', 'run', 'stop', 'stopAllForBuild'] as Set
