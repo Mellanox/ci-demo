@@ -1234,12 +1234,43 @@ String getChangedFilesList(config) {
         if (isEnvVarSet(env.ghprbTargetBranch)) {
             br = env.ghprbTargetBranch
         } else {
-            def ret = run_shell('git ls-remote -q | grep -q refs/heads/master', 'detecting branch name')
+            // Probe default branch (master vs main). Capture stderr so a failure
+            // here (e.g. SSH auth to the default remote) shows up alongside diagnostics.
+            def probeCmd = 'git ls-remote -q 2>&1 | tee /tmp/git-ls-remote.out | grep -q refs/heads/master'
+            def ret = run_shell(probeCmd, 'detecting branch name')
+
+            def diagCmd = '''set +e
+echo "=== git ls-remote output (stdout+stderr) ==="
+cat /tmp/git-ls-remote.out 2>/dev/null || echo "(no output captured)"
+echo "=== git remotes ==="
+git remote -v
+echo "=== identity ==="
+echo "whoami=$(whoami) uid=$(id -u) HOME=$HOME PWD=$PWD"
+echo "=== GIT_SSH_COMMAND ==="
+echo "GIT_SSH_COMMAND=${GIT_SSH_COMMAND:-<UNSET>}"
+echo "=== other ssh env ==="
+env | grep -E '^(GIT_SSH|SSH_AUTH_SOCK|SSH_AGENT_PID|GIT_TERMINAL_PROMPT)=' || echo "(none)"
+echo "=== /var/.ssh-jenkins ==="
+ls -la /var/.ssh-jenkins/ 2>&1 || echo "(directory missing)"
+stat -c '%n mode=%a owner=%U:%G size=%s' /var/.ssh-jenkins/id_rsa 2>&1 || true
+echo "=== ssh test using GIT_SSH_COMMAND ==="
+if [ -n "$GIT_SSH_COMMAND" ]; then
+  $GIT_SSH_COMMAND -v -T git@github.com 2>&1 | sed -n '1,40p'
+else
+  echo "GIT_SSH_COMMAND not set in this shell -- THIS IS LIKELY THE ROOT CAUSE"
+  ssh -o BatchMode=yes -o StrictHostKeyChecking=no -T git@github.com 2>&1 || true
+fi
+echo "=== end branch-detection diagnostics ==="
+exit 0
+'''
+            run_shell(diagCmd, 'branch detection diagnostics')
+
             // master or main?
             if (ret.rc == 0) {
                 br = 'master'
             } else {
                 br = 'main'
+                logger.warn("Default-branch probe failed (rc=${ret.rc}); falling back to '${br}'. See 'branch detection diagnostics' step above.")
             }
         }
         def sha = "HEAD"
@@ -1727,6 +1758,7 @@ def main() {
         label = "worker-${UUID.randomUUID().toString()}"
         println("Cloud launch on ${label}")
 
+        // Non-root JNLP needs permissions to Jenkins user (GID 1000) to read the SSH key in secret volume
         podTemplate(label: label) {
             startPipeline(label)
         }
