@@ -1727,7 +1727,12 @@ def main() {
         label = "worker-${UUID.randomUUID().toString()}"
         println("Cloud launch on ${label}")
 
-        podTemplate(label: label) {
+        // Non-root JNLP needs permissions to Jenkins user (GID 1000) to read the SSH key in secret volume
+        podTemplate(label: label, yamlMergeStrategy: merge(), yaml: """spec:
+  securityContext:
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+""") {
             startPipeline(label)
         }
         return
