@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 
 int call(ctx, oneStep, config) {
-    def args = oneStep.args ?: [:]
+    def args = (oneStep.args ?: [:]).clone()
 
     // Load the shared Slurm helper library from the pipeline shared library.
     // refer to this doc for more details: https://www.jenkins.io/doc/book/pipeline/shared-libraries/#using-libraries
