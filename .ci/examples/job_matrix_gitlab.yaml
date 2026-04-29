@@ -1,0 +1,47 @@
+---
+job: gitlab-status-example
+
+# GitLab connection used by `gitlabStatus: true` step flags and the
+# standalone `module: gitlabStatus` action. Each field falls back to the env
+# var noted in vars/gitlabStatus.groovy if omitted here.
+#    Important: if you are using Jenkins plugin Gitlab,
+#    you need to use projectId as ${gitlabMergeRequestTargetProjectId} and
+#    sha as ${gitlabMergeRequestLastCommit}
+gitlab:
+  apiUrl: 'https://gitlab.com/api/v4'
+  projectId: '${gitlabMergeRequestTargetProjectId}'
+  sha: '${gitlabMergeRequestLastCommit}'
+  credentialsId: 'gitlab-token'
+
+runs_on_agents:
+  - {nodeLabel: master}
+
+steps:
+  # Per-step flag: posts "running" before the step, then
+  # "success" or "failed" depending on exit code. Step name
+  # is used as the GitLab status context (override via map form).
+  - name: Generate failures
+    run: |
+      env > myenv.log
+      exit 1
+    onfail: env > onfail_myenv.log
+    always: env > always_myenv.log
+    archiveArtifacts: 'onfail_myenv.log,always_myenv.log'
+    gitlabStatus: true
+
+  # Map form: override the displayed name / description.
+  - name: Build
+    run: make
+    gitlabStatus:
+      name: 'jenkins/build'
+      description: 'matrix build'
+
+  # Standalone module: post a final aggregate status explicitly.
+  - name: Mark pipeline success
+    shell: action
+    module: gitlabStatus
+    run: updateCommitStatus
+    args:
+      state: success
+      name: 'jenkins/pipeline'
+      description: 'all stages passed'
