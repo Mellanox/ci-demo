@@ -1030,10 +1030,10 @@ def runAgent(image, config, branchName=null, axis=null, Closure func, runInDocke
 }
 
 
-Map getTasks(axes, image, config, include, exclude) {
+Map getTasks(axes, image, config, include, exclude, stageName=null) {
 
 
-    config.logger.trace(3, "getTasks() --> image=" + image)
+    config.logger.trace(3, "getTasks() --> image=" + image + " stage=" + stageName)
 
     int serialNum = 1
     Map tasks = [:]
@@ -1059,7 +1059,8 @@ Map getTasks(axes, image, config, include, exclude) {
             continue
         }
 
-        if (!config.steps) {
+        def stepsToCheck = stageName ? getStepsForStage(config, stageName) : config.steps
+        if (!stepsToCheck) {
             continue
         }
 
@@ -1073,8 +1074,8 @@ Map getTasks(axes, image, config, include, exclude) {
         def branchName = resolveTemplate(axis, tmpl, config)
 
         def canSkip = true
-        for (int j = 0; j < config.steps.size(); j++) {
-            def oneStep = config.steps[j]
+        for (int j = 0; j < stepsToCheck.size(); j++) {
+            def oneStep = stepsToCheck[j]
             if (!check_skip_stage(image, config, branchName, oneStep, axis)) {
                 canSkip = false
                 break
@@ -1098,6 +1099,7 @@ Map getTasks(axes, image, config, include, exclude) {
         }
 
         config.logger.trace(5, "task name " + branchName)
+        def taskSteps = stageName ? getStepsForStage(config, stageName) : config.steps
         tasks[branchName] = { ->
             withEnv(axisEnv) {
                 if ((config.get("kubernetes") == null) &&
@@ -1112,11 +1114,11 @@ Map getTasks(axes, image, config, include, exclude) {
                         runBareMetal = false
                     }
                     def callback = {pimage, pconfig, pname, paxis, pruntime ->
-                        runSteps(pimage, pconfig, pname, paxis, pruntime)
+                        runSteps(pimage, pconfig, pname, paxis, taskSteps, pruntime)
                     }
                     runAgent(image, config, branchName, axis, callback, runBareMetal)
                 } else {
-                    runK8(image, branchName, config, axis)
+                    runK8(image, branchName, config, axis, taskSteps)
                 }
             }
         }
@@ -1146,10 +1148,31 @@ def resolveIncludeExcludeTemplates(filters, config) {
     return resolvedFilters
 }
 
-def getMatrixTasks(image, config) {
+@NonCPS
+def getUniqueStages(config) {
+    // generate a uniq list of stages from the steps, if no stage is defined, add a default stage
+    def stages = config.steps.collect { it.stage ?: "default" }.unique()
+    return stages
+}
+
+def getStepsForStage(config, stageName) {
+    // generate a list of steps for a given stage
+    def stageSteps = []
+    if (config.steps) {
+        for (step in config.steps) {
+            def stepStage = step.get("stage", "default")
+            if (stepStage == stageName) {
+                stageSteps.add(step)
+            }
+        }
+    }
+    return stageSteps
+}
+
+def getMatrixTasks(image, config, stageName=null) {
 
     def include = [], exclude = [], axes = []
-    config.logger.debug("getMatrixTasks() --> image=" + image)
+    config.logger.debug("getMatrixTasks() --> image=" + image + " stage=" + stageName)
 
     if (config.get("matrix")) {
         axes = getMatrixAxes(config.matrix.axes).findAll()
@@ -1169,7 +1192,7 @@ def getMatrixTasks(image, config) {
                             exclude.size() +
                             "] = " + exclude
                             )
-    return getTasks(axes, image, config, include, exclude)
+    return getTasks(axes, image, config, include, exclude, stageName)
 }
 
 def buildImage(img, filename, extra_args, config, image) {
@@ -1481,7 +1504,7 @@ spec:
     }
 }
 
-def run_parallel_in_chunks(config, myTasks, depth) {
+def run_parallel_in_chunks(config, myTasks, depth, stageName=null) {
 
     if (myTasks.size() == 0) {
         return
@@ -1496,11 +1519,22 @@ def run_parallel_in_chunks(config, myTasks, depth) {
     def val = getConfigVal(config, ['failFast'], false)
 
     config.logger.trace(3, "run_parallel_in_chunks: batch size is ${bSize}")
-    (myTasks.keySet() as List).collate(bSize).each {
-        def batchMap = myTasks.subMap(it)
-        batchMap['failFast'] = val
-        parallel batchMap
+    if (stageName) {
+        stage(stageName) {
+            (myTasks.keySet() as List).collate(bSize).each {
+                def batchMap = myTasks.subMap(it)
+                batchMap['failFast'] = val
+                parallel batchMap
+            }
+        }
+    } else {
+        (myTasks.keySet() as List).collate(bSize).each {
+                def batchMap = myTasks.subMap(it)
+                batchMap['failFast'] = val
+                parallel batchMap
+            }
     }
+
 }
 
 
@@ -1667,7 +1701,45 @@ def startPipeline(String label) {
                                 run_step(null, config, "pipeline start", config.pipeline_start, null)
                             }
                         }
-                        run_parallel_in_chunks(config, branches, bSize)
+
+                        def stage_arch_distro_map = gen_image_map(config)
+                         // Get unique stages and execute sequentially
+                        def stages = getUniqueStages(config)
+                        if (stages.size() > 1) {
+                            config.logger.debug("Unique stages identified: " + stages)
+                            for (stageName in stages) {
+                                config.logger.info("Starting stage: ${stageName}")
+                                
+                                def stageBranches = [:]
+                                                                
+                                for (def entry in entrySet(stage_arch_distro_map)) {
+                                    def images = entry.value
+                                    for (int j=0; j<images.size(); j++) {
+                                        def image = images[j]
+                                        stageBranches += getMatrixTasks(image, config, stageName)
+                                    }
+                                }
+                                
+                                if (config.runs_on_agents) {
+                                    for (int a=0; a<config.runs_on_agents.size();a++) {
+                                        def image = config.runs_on_agents[a]
+                                        image.name = image.nodeLabel
+                                        image.arch = 'x86_64'
+                                        stageBranches += getMatrixTasks(image, config, stageName)
+                                    }
+                                }
+                                
+                                // Run all tasks for this stage in parallel
+                                if (stageBranches.size() > 0) {
+                                    run_parallel_in_chunks(config, stageBranches, bSize,stageName)
+                                }
+                                
+                                config.logger.info("Completed stage: ${stageName}")
+                            }
+                        } else {
+                            // Fallback if no stages defined
+                            run_parallel_in_chunks(config, branches, bSize)
+                        }
                     }
                 }
                 config.env.pipeline_status = 'SUCCESS'
