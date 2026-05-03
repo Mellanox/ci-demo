@@ -130,7 +130,11 @@ def run_step_shell(image, cmd, title, oneStep, config) {
             if (ret.exception != null) {
                 msg += " exception=${ret.exception}"
             }
-            reportFail(title, msg)
+            if (getConfigVal(config, ['unstable'], false, true, oneStep, true).toBoolean()) {
+                reportUnstable(title, msg)
+            } else {
+                reportFail(title, msg)
+            }
         }
     }
 }
@@ -574,6 +578,12 @@ void reportFail(String stage, String msg) {
     error(stage + " failed with msg: " + msg)
 }
 
+void reportUnstable(String stage, String msg) {
+    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+        error(stage + " failed with msg: " + msg)
+    }
+}
+
 def toEnvVars(config, vars) {
     def map = []
     if (vars) {
@@ -617,7 +627,12 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
             config.logger.trace(4, "Running step action module=" + oneStep.module + " args=" + oneStep.args + " run=" + oneStep.run)
             int rc = this."${oneStep.module}"(this, oneStep, config)
             if (rc != 0) {
-                reportFail(oneStep.name, "exit with error code=${rc}")
+                def msg = "exit with error code=${rc}"
+                if (getConfigVal(config, ['unstable'], false, true, oneStep, true).toBoolean()) {
+                    reportUnstable(oneStep.name, msg)
+                } else {
+                    reportFail(oneStep.name, msg)
+                }
             }
         } else {
             def String cmd = shell + "\n" + oneStep.run
