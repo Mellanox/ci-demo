@@ -108,6 +108,11 @@ def run_step_shell(image, cmd, title, oneStep, config) {
     def timeout_minutes = getConfigVal(config, ['timeout'], null, true, oneStep, true)
 
     withEnv(vars) {
+        if (oneStep.gitlabStatus) {
+            try { gitlabStatus.notify(this, config, oneStep, 'running') }
+            catch (Throwable t) { echo "gitlabStatus(running) skipped: ${t.message}" }
+        }
+
         def ret = run_shell(cmd, title, false, timeout_minutes)
 
         config.logger.trace(2, "run_step_shell ${title}: rc=${ret.rc}, err=${ret.exception}")
@@ -120,6 +125,12 @@ def run_step_shell(image, cmd, title, oneStep, config) {
 
         if (oneStep["always"] != null) {
             run_shell(oneStep.always, "always command for ${title}")
+        }
+
+        if (oneStep.gitlabStatus) {
+            def finalState = (ret.rc == 0) ? 'success' : 'failed'
+            try { gitlabStatus.notify(this, config, oneStep, finalState) }
+            catch (Throwable t) { echo "gitlabStatus(${finalState}) skipped: ${t.message}" }
         }
 
         attachResults(config, oneStep, ret)
