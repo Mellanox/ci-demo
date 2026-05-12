@@ -693,6 +693,16 @@ def runSteps(image, config, branchName, axis, steps=config.steps, runtime) {
     unstashWS(getStashName(), config)
     onUnstash()
 
+    // sampleResources: deliver the cgroup sampler into this container's
+    // workspace once, after unstash. The synthetic step injection in
+    // loadConfigFile() expects it at .ci/actions/resource_sampler.sh.
+    if (config.sampleResources == true) {
+        def script = libraryResource('actions/resource_sampler.sh')
+        sh(script: 'mkdir -p .ci/actions', label: 'Create sampler dir', returnStatus: true)
+        writeFile(file: '.ci/actions/resource_sampler.sh', text: script)
+        sh(script: 'chmod +x .ci/actions/resource_sampler.sh', label: 'chmod sampler', returnStatus: true)
+    }
+
     def parallelNestedSteps = [:]
     for (int i = 0; i < steps.size(); i++) {
         def one = steps[i]
@@ -1519,7 +1529,35 @@ def loadConfigFile(filepath, logger) {
             reportFail('config', "matrix.include and matrix.exclude sections in config file=${filepath} are mutually exclusive. Please keep only one.")
         }
     }
+    if (config.sampleResources == true) {
+        instrumentResourceSampling(config, logger)
+    }
     return config
+}
+
+// Rewrite config.steps in place when sampleResources is enabled: prepend a
+// sampler-start invocation to every shell step's run-block and append a
+// synthetic "Resource report" step that runs in every container, stops the
+// sampler, archives the CSV and summary. The script itself is delivered into
+// each container's workspace by runSteps() via libraryResource.
+def instrumentResourceSampling(config, logger) {
+    def starter = 'bash ${WORKSPACE}/.ci/actions/resource_sampler.sh start "${name}" || true'
+    config.steps?.each { step ->
+        if (step.shell == 'action') { return }   // groovy modules: skip
+        if (step.run == null) { return }
+        step.run = starter + "\n" + step.run
+    }
+    if (config.runs_on_dockers) {
+        def selectors = config.runs_on_dockers.collect { "{name:\"${it.name}\"}" }
+        def report = [
+            name: 'Resource report',
+            containerSelector: selectors,
+            run: 'bash ${WORKSPACE}/.ci/actions/resource_sampler.sh report "${name}" || true',
+        ]
+        report.put('archiveArtifacts', 'resource_samples_*.csv,resource_summary_*.txt')
+        config.steps = (config.steps ?: []) + report
+        logger.debug("sampleResources: appended synthetic 'Resource report' step covering ${selectors.size()} containers")
+    }
 }
 
 def String getStashName() {
