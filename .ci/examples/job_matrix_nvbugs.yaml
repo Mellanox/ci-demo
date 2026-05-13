@@ -1,0 +1,42 @@
+---
+# Example: NVBugs PR/commit gate via the `nvbugs` ci-demo module.
+#
+# The module is self-dispatching:
+#   - Reads the latest commit's message + author email from
+#     currentBuild.changeSets (Jenkins-side data; no git binary or
+#     ghprb plugin required)
+#   - Greps for 'nvbug: <id>' (case-insensitive) in the commit message
+#   - If found, fetches the bug via the NVBugs REST API and verifies it
+#     belongs to a configured module and is assigned to the commit author
+#   - If no 'nvbug: <id>' tag is present, fails the build (rc=1)
+#
+# The Bearer token is read from a Jenkins string credential whose ID is
+# passed as `credentials_id`. The credential is exposed to the helper
+# script as NVBUGS_API_TOKEN.
+#
+# Runtime requirement: python3 (stdlib only) on the executor. No git,
+# no ghprb. No containerSelector is needed when the job has a single
+# runs_on_dockers entry; add one only if you have multiple runtimes and
+# want to pin the check to a specific image.
+job: example-nvbugs
+
+kubernetes:
+  cloud: 'swx-k8s-spray'
+
+runs_on_dockers:
+  - {name: 'ub22.04-base', url: 'harbor.mellanox.com/hpcx/x86_64/ubuntu22.04/base', arch: 'x86_64'}
+
+steps:
+  - name: NVBug check
+    shell: action
+    module: nvbugs
+    args:
+      # Required: numeric NVBugs ModuleInfo.Key the bug must belong to.
+      # Use `module_name` instead to match by ModuleInfo.Value string.
+      module_id: 12345
+      # Required: Jenkins string credential ID holding the NVBugs Bearer token.
+      credentials_id: nvbugs_api_token
+      # Optional, defaults shown:
+      on_email_mismatch: warn         # warn | fail
+      on_bug_not_in_module: fail      # warn | fail
+      # api_url: https://prod.api.nvidia.com/int/nvbugs
