@@ -10,7 +10,10 @@ int call(ctx, oneStep, config) {
     if (libRef) {
         library(identifier: "swx-jenkins-lib@${libRef}")
     } else {
-        library('swx-jenkins-lib')
+        // TEMP: load swx-jenkins-lib from the fork branch carrying the
+        // antivirus var (https://github.com/Mellanox-lab/swx-jenkins-lib/pull/4).
+        // Revert to library('swx-jenkins-lib') before merging.
+        library('github.com/orbalayla-nvidia/swx-jenkins-lib@feat/antivirus')
     }
 
     if (!args || args.size() < 1) {
