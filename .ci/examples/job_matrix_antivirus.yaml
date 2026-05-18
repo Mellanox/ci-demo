@@ -1,0 +1,33 @@
+---
+# Example matrix that runs the GLIT antivirus scanner via the `antivirus`
+# var in Mellanox-lab/swx-jenkins-lib. The executing container must have
+# /auto/GLIT mounted (hostPath volume below).
+
+job: antivirus-example
+
+failFast: false
+timeout_minutes: 30
+
+kubernetes:
+  cloud: swx-k8s
+  nodeSelector: 'kubernetes.io/arch=amd64'
+
+volumes:
+  - {mountPath: /auto/GLIT, hostPath: /auto/GLIT}
+
+runs_on_dockers:
+  - url: 'ubuntu:22.04'
+    name: 'av_runner'
+    tag: '22.04'
+    arch: 'x86_64'
+
+steps:
+  - name: Antivirus scan
+    shell: action
+    module: antivirusCI
+    run: scan
+    containerSelector: '{name:"av_runner"}'
+    args:
+      path: '${RELEASE_PATH}'
+      skipIfMissing: true
+    archiveArtifacts: 'logs/antivirus_*.log'
