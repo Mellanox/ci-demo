@@ -1187,6 +1187,28 @@ def buildImage(img, filename, extra_args, config, image) {
     }
     customImage = docker.build("${img}", "-f ${filename} ${extra_args} . ")
     customImage.push()
+    verifyImageInRegistry(img, config)
+}
+
+def verifyImageInRegistry(String img, config) {
+    def quotedImg = "'" + img.replaceAll("'", "'\\\\''") + "'"
+    def attempts = 6
+    def delaySeconds = 10
+
+    for (int i=1; i<=attempts; i++) {
+        def result = run_shell("docker manifest inspect ${quotedImg}", "Verify pushed image in registry", false)
+        if (result.rc == 0) {
+            config.logger.info("Verified pushed image in registry - ${img}")
+            return
+        }
+
+        if (i < attempts) {
+            config.logger.warn("Pushed image is not visible in registry yet - ${img} - retry ${i}/${attempts}")
+            sleep(time: delaySeconds, unit: 'SECONDS')
+        }
+    }
+
+    reportFail('docker push', "Pushed image ${img} is not visible in registry after ${attempts} attempts")
 }
 
 Boolean isEnvVarSet(var) {
