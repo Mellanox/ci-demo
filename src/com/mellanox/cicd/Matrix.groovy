@@ -1186,7 +1186,27 @@ def buildImage(img, filename, extra_args, config, image) {
         run_shell(preBuild, "Image preparation script")
     }
     customImage = docker.build("${img}", "-f ${filename} ${extra_args} . ")
-    customImage.push()
+    pushAndVerify(customImage, img, config)
+}
+
+def pushAndVerify(customImage, String img, config) {
+    def attempts = 6
+    def delaySeconds = 10
+
+    for (int i=1; i<=attempts; i++) {
+        customImage.push()
+        if (imageExistsInRegistry(img, config)) {
+            config.logger.info("Verified pushed image in registry - ${img}")
+            return
+        }
+
+        if (i < attempts) {
+            config.logger.warn("Pushed image is not visible in registry yet - ${img} - retry ${i}/${attempts}")
+            sleep(time: delaySeconds, unit: 'SECONDS')
+        }
+    }
+
+    reportFail('docker push', "Pushed image ${img} is not visible in registry after ${attempts} attempts")
 }
 
 Boolean isEnvVarSet(var) {
