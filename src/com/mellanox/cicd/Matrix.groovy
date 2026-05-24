@@ -615,7 +615,15 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
             }
 
             config.logger.trace(4, "Running step action module=" + oneStep.module + " args=" + oneStep.args + " run=" + oneStep.run)
-            int rc = this."${oneStep.module}"(this, oneStep, config)
+            def timeout_minutes = getConfigVal(config, ['timeout'], null, true, oneStep, true)
+            def rc
+            if (timeout_minutes) {
+                timeout(time: timeout_minutes, unit: 'MINUTES') {
+                    rc = this."${oneStep.module}"(this, oneStep, config)
+                }
+            } else {
+                rc = this."${oneStep.module}"(this, oneStep, config)
+            }
             if (rc != 0) {
                 reportFail(oneStep.name, "exit with error code=${rc}")
             }
