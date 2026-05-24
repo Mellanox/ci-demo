@@ -1190,18 +1190,27 @@ def buildImage(img, filename, extra_args, config, image) {
 }
 
 def pushAndVerify(customImage, String img, config) {
-    def attempts = 6
+    def attempts = 3
     def delaySeconds = 10
 
     for (int i=1; i<=attempts; i++) {
-        customImage.push()
-        if (imageExistsInRegistry(img, config)) {
+        def pushed = false
+        try {
+            customImage.push()
+            pushed = true
+        } catch (Exception e) {
+            config.logger.warn("docker push failed - ${img} - attempt ${i}/${attempts}: ${e.message}")
+        }
+
+        if (pushed && imageExistsInRegistry(img, config)) {
             config.logger.info("Verified pushed image in registry - ${img}")
             return
         }
 
         if (i < attempts) {
-            config.logger.warn("Pushed image is not visible in registry yet - ${img} - retry ${i}/${attempts}")
+            if (pushed) {
+                config.logger.warn("Pushed image is not visible in registry yet - ${img} - retry ${i}/${attempts}")
+            }
             sleep(time: delaySeconds, unit: 'SECONDS')
         }
     }
