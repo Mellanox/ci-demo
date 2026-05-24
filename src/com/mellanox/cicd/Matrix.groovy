@@ -1193,8 +1193,22 @@ def buildImage(img, filename, extra_args, config, image) {
     if (preBuild) {
         run_shell(preBuild, "Image preparation script")
     }
-    customImage = docker.build("${img}", "-f ${filename} ${extra_args} . ")
-    customImage.push()
+
+    def customImage = docker.build("${img}", "-f ${filename} ${extra_args} . ")
+    def maxAttempts = 3
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            customImage.push()
+            break
+        } catch (Exception e) {
+            if (attempt < maxAttempts) {
+                config.logger.warn("Docker push attempt ${attempt}/${maxAttempts} failed for ${img}: ${e.message}. Retrying...")
+                sleep(time: 10, unit: 'SECONDS')
+            } else {
+                reportFail('docker push', "Failed to push '${img}' after ${maxAttempts} attempts. Last error: ${e.message}")
+            }
+        }
+    }
 }
 
 Boolean isEnvVarSet(var) {
