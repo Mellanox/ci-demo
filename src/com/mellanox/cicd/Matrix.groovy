@@ -1192,30 +1192,30 @@ def buildImage(img, filename, extra_args, config, image) {
 def pushAndVerify(customImage, String img, config) {
     def attempts = 3
     def delaySeconds = 10
+    def lastPushError = null
 
     for (int i=1; i<=attempts; i++) {
-        def pushed = false
         try {
             customImage.push()
-            pushed = true
+            lastPushError = null
         } catch (Exception e) {
+            lastPushError = e
             config.logger.warn("docker push failed - ${img} - attempt ${i}/${attempts}: ${e.message}")
         }
 
-        if (pushed && imageExistsInRegistry(img, config)) {
+        if (imageExistsInRegistry(img, config)) {
             config.logger.info("Verified pushed image in registry - ${img}")
             return
         }
 
         if (i < attempts) {
-            if (pushed) {
-                config.logger.warn("Pushed image is not visible in registry yet - ${img} - retry ${i}/${attempts}")
-            }
+            config.logger.warn("Pushed image is not visible in registry yet - ${img} - retry ${i}/${attempts}")
             sleep(time: delaySeconds, unit: 'SECONDS')
         }
     }
 
-    reportFail('docker push', "Pushed image ${img} is not visible in registry after ${attempts} attempts")
+    def suffix = lastPushError ? " Last push error: ${lastPushError.message}" : ""
+    reportFail('docker push', "Pushed image ${img} is not visible in registry after ${attempts} attempts.${suffix}")
 }
 
 Boolean isEnvVarSet(var) {
