@@ -74,6 +74,14 @@ sample_once() {
 }
 
 start_daemon() {
+    # Parallel steps share a container, so the check/start/write below is a
+    # TOCTOU pair. Guard it with an atomic mkdir lock so start stays idempotent.
+    if ! mkdir "${PIDFILE}.lock" 2>/dev/null; then
+        echo "[sampler] start already in progress for $CONTAINER"
+        return 0
+    fi
+    trap 'rmdir "${PIDFILE}.lock" 2>/dev/null || true' RETURN
+
     if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE" 2>/dev/null)" 2>/dev/null; then
         echo "[sampler] already running pid=$(cat "$PIDFILE")"
         return 0
