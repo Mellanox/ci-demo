@@ -8,6 +8,10 @@ job: antivirus-example
 failFast: false
 timeout_minutes: 30
 
+env:
+  # Default keeps the example self-contained; override for a real release path.
+  RELEASE_PATH: '/auto/GLIT'
+
 kubernetes:
   cloud: swx-k8s
   nodeSelector: 'kubernetes.io/arch=amd64'

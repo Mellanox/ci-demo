@@ -16,8 +16,8 @@ int call(ctx, oneStep, config) {
         library('github.com/orbalayla-nvidia/swx-jenkins-lib@feat/antivirus')
     }
 
-    if (!args || args.size() < 1) {
-        ctx.reportFail(oneStep.name, 'antivirusCI: at least one arg required (path or paths)')
+    if (!(args?.containsKey('path') || args?.containsKey('paths'))) {
+        ctx.reportFail(oneStep.name, "antivirusCI: 'path' or 'paths' arg required")
         return 1
     }
 
@@ -47,8 +47,10 @@ int call(ctx, oneStep, config) {
     withEnv(vars) {
         try {
             antivirus.scan(args)
-        } catch (Throwable t) {
-            ctx.reportFail(oneStep.name, "antivirus.scan failed: ${t.message}")
+        } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException fie) {
+            throw fie
+        } catch (Exception e) {
+            ctx.reportFail(oneStep.name, "antivirus.scan failed: ${e.message}")
             rc = 1
         }
     }
