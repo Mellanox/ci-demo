@@ -95,7 +95,11 @@ int call(ctx, oneStep, config) {
             if (!jobIdFile || !containerName) {
                 echo "archiveImage: skipping export — jobIdFile or containerName is null (step '${oneStep.name}')"
             } else {
-                def jobId = sh(script: "cat '${jobIdFile}'", returnStdout: true).trim()
+                def jobId = ''
+                withEnv(["ARCHIVE_JOB_ID_FILE=${jobIdFile}"]) {
+                    jobId = sh(script: 'cat "$ARCHIVE_JOB_ID_FILE"', returnStdout: true).trim()
+                }
+                jobId = jobId.replaceAll(/[^0-9]/, '')
                 if (resolvedOutputPath.contains('${')) {
                     echo "archiveImage: skipping export — outputPath contains unresolved variables: ${resolvedOutputPath}"
                 } else {
