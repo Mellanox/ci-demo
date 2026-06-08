@@ -108,16 +108,15 @@ int call(ctx, oneStep, config) {
                             "ARCHIVE_CONTAINER=${containerName}",
                             "ARCHIVE_OUTPUT=${resolvedOutputPath}",
                             "ARCHIVE_JOB_ID=${jobId}",
+                            "ARCHIVE_ENROOT_DATA_PATH=${env.ENROOT_DATA_PATH ?: ''}",
                         ]) {
                             sh(label: "archiveImage: export '${containerName}' -> ${resolvedOutputPath}", script: '''
 #!/bin/bash
 set -euo pipefail
 mkdir -p "$(dirname "$ARCHIVE_OUTPUT")"
-# TODO: replace with actual enroot export command from cluster admin.
-# Must run on the compute node without container flags.
-scctl --raw-errors client connect -- srun --jobid="$ARCHIVE_JOB_ID" --ntasks=1 --oversubscribe enroot export --container "$ARCHIVE_CONTAINER" --output "$ARCHIVE_OUTPUT"
+scctl --raw-errors client connect -- srun --jobid="$ARCHIVE_JOB_ID" --ntasks=1 --oversubscribe env ENROOT_DATA_PATH="$ARCHIVE_ENROOT_DATA_PATH" enroot export --output "$ARCHIVE_OUTPUT" "pyxis_$ARCHIVE_CONTAINER"
 echo "Export complete: $ARCHIVE_OUTPUT"
-echo "To debug: .ci/scripts/debug_run.sh $ARCHIVE_OUTPUT [core_file]"
+echo "To debug: see docs/ci/crash-debug.md"
 ''')
                         }
                     } catch (e) {
