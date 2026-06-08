@@ -90,20 +90,37 @@ int call(ctx, oneStep, config) {
     if (archiveImage && resolvedOutputPath) {
         def onFailOnly = archiveImage.onFailOnly != null ? archiveImage.onFailOnly.toBoolean() : true
         if (!onFailOnly || exitCode != 0) {
-            def jobIdFile    = args.jobIdFile
+            def jobIdFile     = args.jobIdFile
             def containerName = args.containerName
-            def jobId = sh(script: "cat '${jobIdFile}'", returnStdout: true).trim()
-            def exportScript = [
-                '#!/bin/bash',
-                'set -euo pipefail',
-                "mkdir -p \"\$(dirname '${resolvedOutputPath}')\"",
-                '# TODO: replace with actual enroot export command from cluster admin.',
-                '# Must run on the compute node without container flags.',
-                "scctl --raw-errors client connect -- srun --jobid='${jobId}' --ntasks=1 --oversubscribe enroot export --container '${containerName}' --output '${resolvedOutputPath}'",
-                "echo \"Export complete: ${resolvedOutputPath}\"",
-                "echo \"To debug: .ci/scripts/debug_run.sh ${resolvedOutputPath} [core_file]\"",
-            ].join('\n')
-            sh(label: "archiveImage: export '${containerName}' → ${resolvedOutputPath}", script: exportScript)
+            if (!jobIdFile || !containerName) {
+                echo "archiveImage: skipping export — jobIdFile or containerName is null (step '${oneStep.name}')"
+            } else {
+                def jobId = sh(script: "cat '${jobIdFile}'", returnStdout: true).trim()
+                if (resolvedOutputPath.contains('${')) {
+                    echo "archiveImage: skipping export — outputPath contains unresolved variables: ${resolvedOutputPath}"
+                } else {
+                    try {
+                        withEnv([
+                            "ARCHIVE_CONTAINER=${containerName}",
+                            "ARCHIVE_OUTPUT=${resolvedOutputPath}",
+                            "ARCHIVE_JOB_ID=${jobId}",
+                        ]) {
+                            sh(label: "archiveImage: export '${containerName}' -> ${resolvedOutputPath}", script: '''
+#!/bin/bash
+set -euo pipefail
+mkdir -p "$(dirname "$ARCHIVE_OUTPUT")"
+# TODO: replace with actual enroot export command from cluster admin.
+# Must run on the compute node without container flags.
+scctl --raw-errors client connect -- srun --jobid="$ARCHIVE_JOB_ID" --ntasks=1 --oversubscribe enroot export --container "$ARCHIVE_CONTAINER" --output "$ARCHIVE_OUTPUT"
+echo "Export complete: $ARCHIVE_OUTPUT"
+echo "To debug: .ci/scripts/debug_run.sh $ARCHIVE_OUTPUT [core_file]"
+''')
+                        }
+                    } catch (e) {
+                        echo "archiveImage: export failed (non-fatal): ${e.message}"
+                    }
+                }
+            }
         }
     }
 
