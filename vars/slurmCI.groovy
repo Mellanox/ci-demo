@@ -94,23 +94,22 @@ int call(ctx, oneStep, config) {
             def containerName = args.containerName
             if (!jobIdFile || !containerName) {
                 echo "archiveImage: skipping export — jobIdFile or containerName is null (step '${oneStep.name}')"
+            } else if (resolvedOutputPath.contains('${')) {
+                echo "archiveImage: skipping export — outputPath contains unresolved variables: ${resolvedOutputPath}"
             } else {
-                def jobId = ''
-                withEnv(["ARCHIVE_JOB_ID_FILE=${jobIdFile}"]) {
-                    jobId = sh(script: 'cat "$ARCHIVE_JOB_ID_FILE"', returnStdout: true).trim()
-                }
-                jobId = jobId.replaceAll(/[^0-9]/, '')
-                if (resolvedOutputPath.contains('${')) {
-                    echo "archiveImage: skipping export — outputPath contains unresolved variables: ${resolvedOutputPath}"
-                } else {
-                    try {
-                        withEnv([
-                            "ARCHIVE_CONTAINER=${containerName}",
-                            "ARCHIVE_OUTPUT=${resolvedOutputPath}",
-                            "ARCHIVE_JOB_ID=${jobId}",
-                            "ARCHIVE_ENROOT_DATA_PATH=${env.ENROOT_DATA_PATH ?: ''}",
-                        ]) {
-                            sh(label: "archiveImage: export '${containerName}' -> ${resolvedOutputPath}", script: '''
+                try {
+                    def jobId = ''
+                    withEnv(["ARCHIVE_JOB_ID_FILE=${jobIdFile}"]) {
+                        jobId = sh(script: 'cat "$ARCHIVE_JOB_ID_FILE"', returnStdout: true).trim()
+                    }
+                    jobId = jobId.replaceAll(/[^0-9]/, '')
+                    withEnv([
+                        "ARCHIVE_CONTAINER=${containerName}",
+                        "ARCHIVE_OUTPUT=${resolvedOutputPath}",
+                        "ARCHIVE_JOB_ID=${jobId}",
+                        "ARCHIVE_ENROOT_DATA_PATH=${env.ENROOT_DATA_PATH ?: ''}",
+                    ]) {
+                        sh(label: "archiveImage: export '${containerName}' -> ${resolvedOutputPath}", script: '''
 #!/bin/bash
 set -euo pipefail
 mkdir -p "$(dirname "$ARCHIVE_OUTPUT")"
@@ -118,10 +117,9 @@ scctl --raw-errors client connect -- srun --jobid="$ARCHIVE_JOB_ID" --ntasks=1 -
 echo "Export complete: $ARCHIVE_OUTPUT"
 echo "To debug: see docs/ci/crash-debug.md"
 ''')
-                        }
-                    } catch (e) {
-                        echo "archiveImage: export failed (non-fatal): ${e.message}"
                     }
+                } catch (e) {
+                    echo "archiveImage: export failed (non-fatal): ${e.message}"
                 }
             }
         }
