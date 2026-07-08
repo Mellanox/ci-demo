@@ -296,8 +296,8 @@ jenkins_script() {
 save_jenkins_artifacts() {
   local prefix="$1"
   local build_number
-  build_number=$(docker exec "${JENKINS_NAME}" sh -lc "curl -sf http://localhost:8080/job/ci-demo/lastBuild/api/json" 2>/dev/null \
-    | sed -n 's/.*"number":[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -n1 || true)
+  build_number=$(docker exec "${JENKINS_NAME}" sh -lc "curl -sf 'http://localhost:8080/job/ci-demo/lastBuild/api/json?tree=number'" 2>/dev/null \
+    | grep -o '"number":[[:space:]]*[0-9][0-9]*' | grep -o '[0-9][0-9]*' | head -n1 || true)
 
   if [[ -n "${build_number}" ]]; then
     docker exec "${JENKINS_NAME}" sh -lc "curl -sf http://localhost:8080/job/ci-demo/${build_number}/consoleText" > "${LOG_DIR}/${prefix}.jenkins-console.log" 2>/dev/null || true
@@ -636,7 +636,7 @@ for conf in "${conf_files[@]}"; do
       fail_count=$((fail_count + 1))
     else
       echo "PASS ${conf_rel} TARGET_ARCH=${target_arch}"
-      if ! assert_stage_order "${conf}" "${LOG_DIR}/${output_prefix}.jenkins-console.log" "${conf_base} TARGET_ARCH=${target_arch}"; then
+      if ! assert_stage_order "${conf}" "${job_output_log}" "${conf_base} TARGET_ARCH=${target_arch}"; then
         fail_count=$((fail_count + 1))
       fi
     fi
