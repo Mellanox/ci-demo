@@ -22,6 +22,8 @@ JENKINS_K8S_DNS_NAME=${JENKINS_K8S_DNS_NAME:-${JENKINS_NETWORK_ALIAS}.default.sv
 KEEP_JENKINS=${KEEP_JENKINS:-true}
 
 CI_K8_FILE=${CI_K8_FILE:-.ci/job_matrix_gha_k8.yaml}
+# Accept one or more config files (space/comma separated). Falls back to CI_K8_FILE.
+CI_K8_FILES=${CI_K8_FILES:-${CI_K8_FILE}}
 TARGET_ARCHES=${TARGET_ARCHES:-${TARGET_ARCH:-}}
 SKIP_REGEX=${SKIP_REGEX:-}
 AGENT_EXECUTORS=${AGENT_EXECUTORS:-8}
@@ -119,12 +121,22 @@ fi
 
 mkdir -p "${LOG_DIR}"
 
-echo "[1/9] Using static workflow config ${CI_K8_FILE}"
-if [[ ! -f "${CI_K8_FILE}" ]]; then
-  echo "ERROR: Config file not found: ${CI_K8_FILE}" >&2
+conf_files=()
+while IFS= read -r conf; do
+  [[ -n "${conf}" ]] && conf_files+=("${conf}")
+done < <(echo "${CI_K8_FILES}" | tr ', ' '\n' | awk 'NF')
+if [[ "${#conf_files[@]}" -eq 0 ]]; then
+  echo "ERROR: No config files specified (set CI_K8_FILES or CI_K8_FILE)" >&2
   exit 1
 fi
-conf_files=("${CI_K8_FILE}")
+
+echo "[1/9] Using static workflow config(s): ${conf_files[*]}"
+for conf in "${conf_files[@]}"; do
+  if [[ ! -f "${conf}" ]]; then
+    echo "ERROR: Config file not found: ${conf}" >&2
+    exit 1
+  fi
+done
 
 target_arch_list=()
 while IFS= read -r arch; do
@@ -295,6 +307,55 @@ save_jenkins_artifacts() {
   fi
 
   docker logs "${JENKINS_NAME}" > "${LOG_DIR}/${prefix}.jenkins-container.log" 2>&1 || true
+}
+
+# Extract declared stage names from a matrix YAML in first-appearance order (deduped).
+extract_declared_stages() {
+  local file="$1"
+  awk '
+    /^[[:space:]]*stage:[[:space:]]*/ {
+      line=$0
+      sub(/^[[:space:]]*stage:[[:space:]]*/, "", line)
+      sub(/[[:space:]]*(#.*)?$/, "", line)
+      gsub(/["'\'']/, "", line)
+      if (line != "" && !(line in seen)) { seen[line]=1; order[++n]=line }
+    }
+    END { for (i=1;i<=n;i++) print order[i] }
+  ' "${file}"
+}
+
+# Extract stage names in the order they were entered from a Jenkins console log (deduped).
+extract_console_stages() {
+  local logf="$1"
+  grep -a 'Starting stage:' "${logf}" 2>/dev/null \
+    | sed -E 's/.*Starting stage:[[:space:]]*//' \
+    | sed -E 's/[^A-Za-z0-9_.-].*$//' \
+    | awk 'NF && !seen[$0]++'
+}
+
+# Assert stages ran sequentially in declared order. Self-activating: no-op unless
+# the config declares >= 2 stages. Returns non-zero on mismatch.
+assert_stage_order() {
+  local conf_file="$1" console_log="$2" label="$3"
+  local expected actual nstages
+  expected=$(extract_declared_stages "${conf_file}")
+  nstages=$(printf '%s\n' "${expected}" | awk 'NF' | wc -l | tr -d ' ')
+  if [[ "${nstages}" -lt 2 ]]; then
+    return 0
+  fi
+  if [[ ! -f "${console_log}" ]]; then
+    echo "STAGE-ORDER FAIL ${label}: console log not found (${console_log})"
+    return 1
+  fi
+  actual=$(extract_console_stages "${console_log}")
+  if [[ "${expected}" == "${actual}" ]]; then
+    echo "STAGE-ORDER PASS ${label}: $(echo ${expected} | tr '\n' ' ')"
+    return 0
+  fi
+  echo "STAGE-ORDER FAIL ${label}"
+  echo "  expected: $(echo ${expected} | tr '\n' ' ')"
+  echo "  actual:   $(echo ${actual} | tr '\n' ' ')"
+  return 1
 }
 
 echo "Waiting for Jenkins CLI readiness"
@@ -575,6 +636,9 @@ for conf in "${conf_files[@]}"; do
       fail_count=$((fail_count + 1))
     else
       echo "PASS ${conf_rel} TARGET_ARCH=${target_arch}"
+      if ! assert_stage_order "${conf}" "${LOG_DIR}/${output_prefix}.jenkins-console.log" "${conf_base} TARGET_ARCH=${target_arch}"; then
+        fail_count=$((fail_count + 1))
+      fi
     fi
   done
 done
