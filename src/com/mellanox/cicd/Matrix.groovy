@@ -871,7 +871,7 @@ def parseImagePullSecrets(secretsInput) {
     reportFail('config', "imagePullSecrets must be a List or String, got: ${secretsInput.getClass().getName()}")
 }
 
-def runK8(image, branchName, config, axis, steps=config.steps) {
+def runK8(image, branchName, config, axis, steps=config.steps, wrapStage=true) {
 
     def cloudName = image.cloud ?: getConfigVal(config, ['kubernetes', 'cloud'], null)
     if (!cloudName) {
@@ -957,7 +957,13 @@ spec:
     {
         retry(count: 2, conditions: [kubernetesAgent(), nonresumable()]) {
             node(POD_LABEL) {
-                stage (branchName) {
+                if (wrapStage) {
+                    stage (branchName) {
+                        container(cname) {
+                            runSteps(image, config, branchName, axis, steps, 'k8')
+                        }
+                    }
+                } else {
                     container(cname) {
                         runSteps(image, config, branchName, axis, steps, 'k8')
                     }
@@ -1695,8 +1701,8 @@ def startPipeline(String label) {
                         if (config.pipeline_start) {
                             if (config.pipeline_start.image) {
                                 image = config.pipeline_start.image
-                                config.pipeline_start.name = "pipeline_start"
-                                runK8(image, "pipline start on ${image.name}", config, image, [config.pipeline_start])
+                                config.pipeline_start.name = "pipeline start on ${image.name}"
+                                runK8(image, config.pipeline_start.name, config, image, [config.pipeline_start], false)
                             } else {
                                 run_step(null, config, "pipeline start", config.pipeline_start, null)
                             }
@@ -1714,8 +1720,8 @@ def startPipeline(String label) {
                 if (config.pipeline_stop) {
                     if (config.pipeline_stop.image) {
                         image = config.pipeline_stop.image
-                        config.pipeline_stop.name = "pipeline_stop"
-                        runK8(image, "pipline stop on ${image.name}", config, image, [config.pipeline_stop])
+                        config.pipeline_stop.name = "pipeline stop on ${image.name}"
+                        runK8(image, config.pipeline_stop.name, config, image, [config.pipeline_stop], false)
                     } else {
                         run_step(null, config, "pipeline stop", config.pipeline_stop, null)
                     }
