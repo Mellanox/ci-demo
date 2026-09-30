@@ -584,6 +584,70 @@ def toEnvVars(config, vars) {
     return map
 }
 
+// Resolve a step/image `credentialsId` (string or list) against the yaml
+// `credentials:` block into withCredentials() bindings. Empty when unset.
+def resolveCredentials(config, title, credentialsId) {
+    def credentials = []
+    if (!credentialsId) {
+        return credentials
+    }
+    def defined = config.credentials ?: []
+    def credentialsIdList = []
+    // credentialsId can be string or list of strings
+    if (credentialsId instanceof List) {
+        credentialsIdList.addAll(credentialsId)
+    } else if (credentialsId instanceof String) {
+        credentialsIdList.add(credentialsId)
+    } else {
+        reportFail(title, "credentialsId should be either a List or a String")
+    }
+    def foundList = []
+    for (def id in credentialsIdList) {
+        def found = false
+        for (int i=0; i<defined.size(); i++) {
+            Map entry = defined[i]
+            if (entry.credentialsId == id) {
+                foundList.add(entry)
+                found = true
+                break
+            }
+        }
+        if (!found) {
+            reportFail(title, "credentialsId '${id}' requested but undefined in yaml file ")
+        }
+    }
+    for (Map found in foundList) {
+        if (found.get('type') && found.get('type') != 'usernamePassword') {
+            if (found.type == 'sshUserPrivateKey') {
+                credentials.add(sshUserPrivateKey(credentialsId: found.credentialsId,
+                                keyFileVariable: found.keyFileVariable,
+                                passphraseVariable: found.get('passphraseVariable'),
+                                usernameVariable: found.get('usernameVariable')))
+            }
+            if (found.type == 'file') {
+                credentials.add(file(credentialsId: found.credentialsId,
+                                variable: found.variable))
+            }
+            if (found.type == 'string') {
+                if (!found.variable) {
+                    reportFail(title, "credentialsId '${found.credentialsId}' has unsupported format (${found})! Missing 'variable' field.")
+                }
+                credentials.add(string(credentialsId: found.credentialsId,
+                                variable: found.variable))
+            }
+        } else {
+            // usernamePassword by default
+            if (!found.usernameVariable || !found.passwordVariable) {
+                reportFail(title, "credentialsId '${found.credentialsId}' has unsupported format (${found})!")
+            }
+            credentials.add(usernamePassword(credentialsId: found.credentialsId,
+                            passwordVariable: found.passwordVariable,
+                            usernameVariable: found.usernameVariable))
+        }
+    }
+    return credentials
+}
+
 def run_step(image, config, title, oneStep, axis, runtime=null) {
 
     if ((image != null) &&
@@ -631,61 +695,7 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
             def String cmd = shell + "\n" + oneStep.run
             config.logger.trace(4, "Running step script=" + cmd)
             if (oneStep.credentialsId) {
-                def credentialsIdList = []
-                // credentialsId can be string or list of strings
-                if (oneStep.credentialsId instanceof List) {
-                    credentialsIdList.addAll(oneStep.credentialsId)
-                } else if (oneStep.credentialsId instanceof String) {
-                    credentialsIdList.add(oneStep.credentialsId)
-                } else {
-                    reportFail(title, "credentialsId should be either a List or a String")
-                }
-                def foundList = []
-                for (def credentialsId in credentialsIdList) {
-                    def found = false
-                    for (int i=0; i<config.credentials.size(); i++) {
-                        Map entry = config.credentials[i]
-                        if (entry.credentialsId == credentialsId) {
-                            foundList.add(entry)
-                            found = true
-                            break
-                        }
-                    }
-                    if (!found) {
-                        reportFail(title, "credentialsId '${credentialsId}' requested but undefined in yaml file ")
-                    }
-                }
-                def credentials = []
-                for (Map found in foundList) {
-                    if (found.get('type') && found.get('type') != 'usernamePassword') {
-                        if (found.type == 'sshUserPrivateKey') {
-                            credentials.add(sshUserPrivateKey(credentialsId: found.credentialsId,
-                                            keyFileVariable: found.keyFileVariable,
-                                            passphraseVariable: found.get('passphraseVariable'),
-                                            usernameVariable: found.get('usernameVariable')))
-                        }
-                        if (found.type == 'file') {
-                            credentials.add(file(credentialsId: found.credentialsId,
-                                            variable: found.variable))
-                        }
-                        if (found.type == 'string') {
-                            if (!found.variable) {
-                                reportFail(title, "credentialsId '${found.credentialsId}' has unsupported format (${found})! Missing 'variable' field.")
-                            }
-                            credentials.add(string(credentialsId: found.credentialsId,
-                                            variable: found.variable))
-                        }
-                    } else {
-                        // usernamePassword by default
-                        if (!found.usernameVariable || !found.passwordVariable) {
-                            reportFail(title, "credentialsId '${found.credentialsId}' has unsupported format (${found})!")
-                        }
-                        credentials.add(usernamePassword(credentialsId: found.credentialsId,
-                                        passwordVariable: found.passwordVariable,
-                                        usernameVariable: found.usernameVariable))
-                    }
-                }
-                withCredentials(credentials) {
+                withCredentials(resolveCredentials(config, title, oneStep.credentialsId)) {
                     run_step_shell(image, cmd, title, oneStep, config)
                 }
             } else {
@@ -1377,18 +1387,20 @@ def buildDocker(image, config) {
     vars += toEnvVars(config, config.env)
 
     withEnv(vars) {
-        if (config.registry_host && image.url.contains(config.registry_host)) {
-            if (config.registry_auth) {
-                docker.withRegistry("https://${config.registry_host}", config.registry_auth) {
-                    buildImage(config, image)
+        withCredentials(resolveCredentials(config, "Build Docker ${image.name}", image.credentialsId)) {
+            if (config.registry_host && image.url.contains(config.registry_host)) {
+                if (config.registry_auth) {
+                    docker.withRegistry("https://${config.registry_host}", config.registry_auth) {
+                        buildImage(config, image)
+                    }
+                } else {
+                    docker.withRegistry("https://${config.registry_host}") {
+                        buildImage(config, image)
+                    }
                 }
             } else {
-                docker.withRegistry("https://${config.registry_host}") {
-                    buildImage(config, image)
-                }
+                buildImage(config, image)
             }
-        } else {
-            buildImage(config, image)
         }
     }
 }
