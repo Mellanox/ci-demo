@@ -68,6 +68,7 @@ If only `file:` is set, `url` is composed from `registry_host` + `registry_path`
 | `build_args` | string | Extra arguments passed to `docker build`, e.g. `'FOO=bar BAZ=$var2'`. Templated against the image entry, `env:`, and Jenkins env ([Matrix.groovy:281](../src/com/mellanox/cicd/Matrix.groovy#L281)). |
 | `deps` | list of strings | Repo-relative file paths. If **any** is in the PR / commit's changed-files list, force a rebuild. See *Rebuild logic* below. |
 | `on_image_build` | string | Shell snippet run **before** `docker build` (per-image hook). Overrides the file-wide `pipeline_on_image_build.run` ([Matrix.groovy:1182-1186](../src/com/mellanox/cicd/Matrix.groovy#L1182-L1186)). |
+| `credentialsId` | string or list of strings | Credentials from the top-level `credentials:` block to bind while this image is built, exactly as a step's `credentialsId` does. The bindings wrap the whole build, so they are visible to `on_image_build` and to the `docker build` process. A `file`-type credential can be handed to the build as a secret, e.g. `build_args: '--secret id=mysecret,src=$MY_SECRET_FILE'` — `$MY_SECRET_FILE` is left untouched by templating and expanded by the shell that runs `docker build`, when the binding exists. Pick a variable name that is not prefixed by another Jenkins or `env:` name, since templating substitutes `$NAME` by plain string replacement. Unset means no bindings. |
 
 ### Run-time placement — pick one
 
