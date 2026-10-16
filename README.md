@@ -134,6 +134,12 @@ TARGET_ARCHES=aarch64 KEEP_JENKINS=false KEEP_K8S=false make -C .ci local-gha-ci
 CI_K8_FILE=.ci/job_matrix_debug.yaml make -C .ci local-gha-ci
 ```
 
+Run several matrix files in a single Jenkins/k3s setup:
+
+```bash
+CI_K8_FILES=".ci/job_matrix_gha_k8.yaml .ci/job_matrix_stages_k8.yaml" make -C .ci local-gha-ci
+```
+
 ## Matrix YAML Essentials
 
 A matrix config must include:
