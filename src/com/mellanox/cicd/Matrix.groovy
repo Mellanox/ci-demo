@@ -93,7 +93,7 @@ def run_shell(cmd, title, retOut=false, timeout_minutes=null) {
     return ['text': text, 'rc': rc, 'exception': err]
 }
 
-def run_step_shell(image, cmd, title, oneStep, config) {
+def run_step_shell(image, cmd, title, oneStep, config, axis=null) {
 
     def vars = []
     vars += toEnvVars(config, config.env)
@@ -123,7 +123,7 @@ def run_step_shell(image, cmd, title, oneStep, config) {
         }
 
         attachResults(config, oneStep, ret)
-        attachHTML(image, config, oneStep)
+        attachHTML(axis ?: image, config, oneStep)
 
         if (ret.rc != 0) {
             def msg = "Step ${title} failed with exit code=${ret.rc}"
@@ -378,14 +378,14 @@ def attachTap(config, args) {
 }
 
 
-def attachHTML(image, config, oneStep) {
+def attachHTML(vars, config, oneStep) {
 
     def reportDir, reportFiles, reportName, allowMissing
 
     if (oneStep.publishHTML) {
-        reportDir = resolveTemplate(image, oneStep.publishHTML.reportDir, config)
-        reportFiles = resolveTemplate(image, oneStep.publishHTML.reportFiles, config)
-        reportName = resolveTemplate(image, oneStep.publishHTML.reportName, config)
+        reportDir = resolveTemplate(vars, oneStep.publishHTML.reportDir, config)
+        reportFiles = resolveTemplate(vars, oneStep.publishHTML.reportFiles, config)
+        reportName = resolveTemplate(vars, oneStep.publishHTML.reportName, config)
         allowMissing = oneStep.publishHTML.allowMissing
     } else if (oneStep.run == 'coverity.sh' || oneStep.resource == 'actions/coverity.sh') {
         reportDir = 'cov_build/output/errors/'
@@ -696,10 +696,10 @@ def run_step(image, config, title, oneStep, axis, runtime=null) {
             config.logger.trace(4, "Running step script=" + cmd)
             if (oneStep.credentialsId) {
                 withCredentials(resolveCredentials(config, title, oneStep.credentialsId)) {
-                    run_step_shell(image, cmd, title, oneStep, config)
+                    run_step_shell(image, cmd, title, oneStep, config, axis)
                 }
             } else {
-                run_step_shell(image, cmd, title, oneStep, config)
+                run_step_shell(image, cmd, title, oneStep, config, axis)
             }
         }
     }
