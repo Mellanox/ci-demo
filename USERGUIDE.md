@@ -153,6 +153,7 @@ All are optional in schema.
 | `credentialsId` | `str/list(str)` |
 | `args` | `list/map/str` |
 | `env` | `map` |
+| `stage` | `str` |
 
 ## Minimal Valid Example
 
@@ -193,6 +194,44 @@ steps:
   - name: Verify
     run: uname -m
 ```
+
+## Stages
+
+Steps can be grouped into named stages with the optional `stage` key in `step_conf`.
+This lets you define sequential phases (for example build, then test, then deploy)
+while running the work inside each phase in parallel.
+
+Behavior:
+
+- Stage names are collected from the `stage` field of each step, in the order they
+  first appear. Steps without a `stage` fall into a stage named `default`.
+- Stages execute sequentially in that first-seen order; every task in a stage
+  finishes before the next stage starts (each is rendered as a Jenkins stage block).
+- Within a stage, tasks for all matching images/agents run in parallel (subject to
+  `batchSize` and `failFast`). Multiple steps of the same stage on a single image run
+  in their defined order unless the step sets `parallel: true`.
+- Stage grouping only takes effect when more than one distinct stage is present. If
+  every step resolves to the same stage (for example when none define `stage`), all
+  tasks run together in parallel, as before.
+
+```yaml
+steps:
+  - name: Build lib
+    run: echo build lib
+    stage: build
+  - name: Build tools
+    run: echo build tools
+    stage: build
+  - name: Unit tests
+    run: echo unit
+    stage: test
+  - name: Publish
+    run: echo publish
+    stage: publish
+```
+
+Here `build` runs first (both build steps in parallel across images), then `test`,
+then `publish`. See `.ci/examples/job_matrix_stages.yaml` for a complete example.
 
 ## Validation
 

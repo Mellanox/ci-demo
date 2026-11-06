@@ -30,7 +30,7 @@ jobs:
           BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
           REPO_URL: "https://github.com/${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}.git"
           TARGET_ARCHES: ${{ env.TARGET_ARCH }}
-          CI_K8_FILE: .ci/job_matrix_gha_k8.yaml
+          CI_K8_FILES: ".ci/job_matrix_gha_k8.yaml .ci/job_matrix_stages_k8.yaml"
           KEEP_JENKINS: "false"
           KEEP_K8S: "false"
         run: |
