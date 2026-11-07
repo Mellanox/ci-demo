@@ -475,12 +475,72 @@ def getDefaultShell(config=null, step=null, shell=null) {
 }
 
 
-Map toStringMap(String param) {
+// Parses a selector such as "{name: 'ubuntu', variant: 1}" as data (it is never
+// evaluated). Keys are names; values are single- or double-quoted strings,
+// integers or true/false. Returns the map, or an error message.
+@NonCPS
+def parseSelector(String text) {
+    String body = text.trim()
+    if (body.startsWith('{') && body.endsWith('}')) {
+        body = body.substring(1, body.length() - 1)
+    }
     Map ret = [:]
-    String strMap = param
-    if (strMap != null) {
-        strMap = '[' + strMap.replaceAll('[\\{\\}]', ' ') + ']'
-        ret = evaluate(strMap)
+    int pos = 0
+    def entry = body =~ /\G\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|-?(?:0|[1-9][0-9]*)|true|false)\s*(?:,|\z)/
+    while (entry.find()) {
+        String raw = entry.group(2)
+        def value
+        if (raw == 'true' || raw == 'false') {
+            value = raw.toBoolean()
+        } else if (raw.startsWith("'") || raw.startsWith('"')) {
+            value = unquoteSelectorValue(raw)
+            if (value == null) {
+                return ("Invalid selector '${text}': value ${raw} has an unsupported escape or an unescaped " +
+                        '$ (allowed escapes: \\\\ \\\' \\" \\$)').toString()
+            }
+        } else {
+            value = raw.isInteger() ? raw.toInteger() : (raw.isLong() ? raw.toLong() : raw.toBigInteger())
+        }
+        ret[entry.group(1)] = value
+        pos = entry.end()
+    }
+    if (ret.isEmpty() || body.substring(pos).trim()) {
+        return ("Invalid selector '${text}': expected key: value pairs such as {name: 'ubuntu', variant: 1}, " +
+                "with quoted string or integer values").toString()
+    }
+    return ret
+}
+
+// Returns the text of a quoted selector value, or null on an escape other than
+// \\ \' \" \$ or on an unescaped $ inside double quotes.
+@NonCPS
+def unquoteSelectorValue(String literal) {
+    boolean doubleQuoted = literal.startsWith('"')
+    String body = literal.substring(1, literal.length() - 1)
+    StringBuilder sb = new StringBuilder()
+    int i = 0
+    while (i < body.length()) {
+        String c = body.substring(i, i + 1)
+        if (c == '\\') {
+            // the selector regex guarantees a character after each backslash
+            i++
+            c = body.substring(i, i + 1)
+            if (!['\\', "'", '"', '$'].contains(c)) {
+                return null
+            }
+        } else if (doubleQuoted && c == '$') {
+            return null
+        }
+        sb.append(c)
+        i++
+    }
+    return sb.toString()
+}
+
+Map toStringMap(String param) {
+    def ret = (param == null) ? [:] : parseSelector(param)
+    if (!(ret instanceof Map)) {
+        reportFail('config', ret)
     }
     return ret
 }
@@ -848,27 +908,62 @@ def parseListA(annotations) {
     return listA
 }
 
-def parseImagePullSecrets(secretsInput) {
-    // If it's already a list, return it
+// Kubernetes secret names are DNS-1123 subdomains.
+@NonCPS
+def isK8sSecretName(name) {
+    return (name instanceof String) && name.length() <= 253 &&
+        (name ==~ /[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)
+}
+
+// Parses kubernetes.imagePullSecrets as data (it is never evaluated): a list of
+// secret names, or a string holding "[]", "['a', 'b']" (quotes optional) or a
+// single name. getConfigVal() turns a one-item YAML list into that single name.
+// Returns the list of names, or an error message.
+@NonCPS
+def parseImagePullSecretNames(secretsInput) {
+    List names = []
     if (secretsInput instanceof List) {
-        return secretsInput
-    }
-    // If it's a string, parse it as a Groovy list
-    if (secretsInput instanceof String) {
-        try {
-            def parsed = Eval.me(secretsInput)
-            if (parsed instanceof List) {
-                return parsed
+        names.addAll(secretsInput)
+    } else if (secretsInput instanceof CharSequence) {
+        String text = secretsInput.toString().trim()
+        if (text.startsWith('[') && text.endsWith(']')) {
+            String inner = text.substring(1, text.length() - 1)
+            if (inner.trim()) {
+                String[] items = inner.split(',', -1)
+                int count = items.length
+                if (count > 1 && !items[count - 1].trim()) {
+                    count-- // trailing comma
+                }
+                for (int i = 0; i < count; i++) {
+                    String name = items[i].trim()
+                    if (name.length() >= 2 && (name.startsWith("'") || name.startsWith('"')) &&
+                            name.endsWith(name.substring(0, 1))) {
+                        name = name.substring(1, name.length() - 1)
+                    }
+                    names.add(name)
+                }
             }
-            // If parsing succeeds but doesn't return a list, fail
-            reportFail('config', "imagePullSecrets must be a list, got: ${parsed.getClass().getName()}")
-        } catch (Exception e) {
-            // If parsing fails, report the error
-            reportFail('config', "Failed to parse imagePullSecrets='${secretsInput}': ${e.message}")
+        } else if (text) {
+            names.add(text)
+        }
+    } else if (secretsInput != null) {
+        return "imagePullSecrets must be a list of secret names, got ${secretsInput.getClass().getName()}".toString()
+    }
+    for (int i = 0; i < names.size(); i++) {
+        if (!isK8sSecretName(names[i])) {
+            return ("Invalid imagePullSecrets '${secretsInput}': '${names[i]}' is not a Kubernetes secret name. " +
+                    "Use a YAML list of names, or a string such as \"['secret-a', 'secret-b']\"").toString()
         }
     }
-    // If it's neither a list nor a string, fail
-    reportFail('config', "imagePullSecrets must be a List or String, got: ${secretsInput.getClass().getName()}")
+    return names
+}
+
+def parseImagePullSecrets(secretsInput) {
+    def names = parseImagePullSecretNames(secretsInput)
+    if (!(names instanceof List)) {
+        reportFail('config', names)
+    }
+    return names
 }
 
 def runK8(image, branchName, config, axis, steps=config.steps) {

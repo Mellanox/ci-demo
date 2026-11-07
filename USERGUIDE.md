@@ -78,6 +78,8 @@ When using Kubernetes, the Jenkins server must have the Kubernetes cloud(s) refe
 | `imagePullSecrets` | `str/list` |
 | `arch_table` | `map` |
 
+`imagePullSecrets` is a YAML list of Kubernetes secret names, or a string holding `[]`, a bracketed list such as `"['secret-a', 'secret-b']"` (quotes around names are optional) or a single name. Each name must be a valid Kubernetes secret name: lowercase letters, digits, `-` and `.`. The value is parsed as data, never evaluated as Groovy; anything else fails the build with a config error.
+
 ### Volume Objects
 
 `host_volume`
@@ -153,6 +155,19 @@ All are optional in schema.
 | `credentialsId` | `str/list(str)` |
 | `args` | `list/map/str` |
 | `env` | `map` |
+
+### Selectors
+
+`containerSelector` and `agentSelector` take a map written as a string, or a list of such strings; a step runs where any of them matches:
+
+```yaml
+containerSelector: "{name: 'ubuntu2204', variant: 1}"
+agentSelector:
+  - "{nodeLabel: 'hpc-test-node-inbox'}"
+  - "{nodeLabel: 'hpc-.*'}"
+```
+
+Keys are plain names. Values are single- or double-quoted strings, matched as regular expressions, or integers. Inside quotes, only `\\`, `\'`, `\"` and `\$` are escapes, and `$` must be escaped in double quotes. Selectors are parsed as data, never evaluated as Groovy; anything else fails the build with a config error. See `.ci/examples/job_matrix_k8_selectors.yaml`.
 
 ## Minimal Valid Example
 

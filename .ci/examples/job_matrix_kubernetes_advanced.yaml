@@ -40,6 +40,8 @@ kubernetes:
   imagePullSecrets: "['my-registry-secret']"
   # Or multiple secrets:
   # imagePullSecrets: "['secret-1', 'secret-2', 'secret-3']"
+  # Or a YAML list:
+  # imagePullSecrets: [secret-1, secret-2, secret-3]
 
   # Optional: run pods with specific user/group IDs
   runAsUser: "1000"

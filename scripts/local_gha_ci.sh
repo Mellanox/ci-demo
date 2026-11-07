@@ -119,12 +119,21 @@ fi
 
 mkdir -p "${LOG_DIR}"
 
-echo "[1/9] Using static workflow config ${CI_K8_FILE}"
-if [[ ! -f "${CI_K8_FILE}" ]]; then
-  echo "ERROR: Config file not found: ${CI_K8_FILE}" >&2
+# CI_K8_FILE takes one config file or a comma/space-separated list of them.
+echo "[1/9] Using static workflow config(s) ${CI_K8_FILE}"
+conf_files=()
+while IFS= read -r conf; do
+  [[ -n "${conf}" ]] || continue
+  if [[ ! -f "${conf}" ]]; then
+    echo "ERROR: Config file not found: ${conf}" >&2
+    exit 1
+  fi
+  conf_files+=("${conf}")
+done < <(echo "${CI_K8_FILE}" | tr ', ' '\n')
+if [[ "${#conf_files[@]}" -eq 0 ]]; then
+  echo "ERROR: CI_K8_FILE names no config file" >&2
   exit 1
 fi
-conf_files=("${CI_K8_FILE}")
 
 target_arch_list=()
 while IFS= read -r arch; do
