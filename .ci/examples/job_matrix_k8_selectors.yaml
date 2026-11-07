@@ -1,0 +1,93 @@
+---
+# Example: containerSelector / agentSelector forms and imagePullSecrets as a
+# string list, on Kubernetes. Selectors and imagePullSecrets are parsed as data,
+# never evaluated as Groovy. GitHub Actions CI runs this file
+# (.github/workflows/ci.yml) and the last step checks which steps ran.
+job: ci-k8-selectors
+
+kubernetes:
+  cloud: swx-k8s
+  namespace: default
+  serviceAccount: jenkins
+  limits: "{memory: 1Gi, cpu: 500m}"
+  requests: "{memory: 256Mi, cpu: 250m}"
+  # Quotes around each name are optional. Pulls of public images still work
+  # when the secrets do not exist; the kubelet only logs a warning.
+  imagePullSecrets: "['ci-demo-pull-a', \"ci-demo-pull-b\"]"
+
+arch_table:
+  x86_64:
+    nodeSelector: "kubernetes.io/os=linux,kubernetes.io/arch=amd64"
+    jnlpImage: "jenkins/inbound-agent:latest"
+  aarch64:
+    nodeSelector: "kubernetes.io/os=linux,kubernetes.io/arch=arm64"
+    jnlpImage: "jenkins/inbound-agent:latest"
+
+runs_on_dockers:
+  - {name: "ubuntu-x86_64", url: "ubuntu:22.04", arch: "x86_64", category: "base"}
+  - {name: "ubuntu-aarch64", url: "ubuntu:22.04", arch: "aarch64", category: "base"}
+
+matrix:
+  axes:
+    arch:
+      - x86_64
+      - aarch64
+    flavor:
+      - a
+      - b
+  include:
+    - {arch: '${TARGET_ARCH}'}
+
+steps:
+  # agentSelector applies to agent runs; on Kubernetes the containerSelector decides.
+  - name: Both selectors
+    containerSelector: "{flavor: 'b'}"
+    agentSelector: "{arch: 'no-such-arch'}"
+    run: touch sel-both
+
+  - name: Single-quoted value
+    containerSelector: "{flavor: 'a'}"
+    run: touch sel-single-quoted
+
+  - name: Double-quoted value
+    containerSelector: '{flavor:"a"}'
+    run: touch sel-double-quoted
+
+  - name: Integer value
+    containerSelector: "{category:'base',variant:1}"
+    run: touch sel-integer
+
+  - name: Regular expressions
+    containerSelector: "{name: 'ubuntu-.*', arch: 'x86_64|aarch64'}"
+    run: touch sel-regex
+
+  - name: List of selectors
+    containerSelector:
+      - "{flavor: 'no-such-flavor'}"
+      - "{flavor: 'a'}"
+    run: touch sel-list
+
+  - name: No match
+    containerSelector: "{name: 'no-such-image'}"
+    run: touch sel-none
+
+  - name: Check selected steps
+    run: |
+      check() {
+        if [ -e "$1" ] && [ "$2" = no ]; then echo "FAIL: step for $1 ran"; exit 1; fi
+        if [ ! -e "$1" ] && [ "$2" = yes ]; then echo "FAIL: step for $1 did not run"; exit 1; fi
+        echo "ok: $1 ran=$2"
+      }
+      on_a=no; [ "$flavor" = a ] && on_a=yes
+      on_b=no; [ "$flavor" = b ] && on_b=yes
+      on_first=no; [ "$variant" = 1 ] && on_first=yes
+      echo "flavor=$flavor variant=$variant"
+      check sel-both "$on_b"
+      check sel-single-quoted "$on_a"
+      check sel-double-quoted "$on_a"
+      check sel-integer "$on_first"
+      check sel-regex yes
+      check sel-list "$on_a"
+      check sel-none no
+
+failFast: false
