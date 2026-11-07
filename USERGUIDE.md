@@ -78,7 +78,7 @@ When using Kubernetes, the Jenkins server must have the Kubernetes cloud(s) refe
 | `imagePullSecrets` | `str/list` |
 | `arch_table` | `map` |
 
-`imagePullSecrets` is a YAML list of Kubernetes secret names, or a string holding `[]`, a bracketed list such as `"['secret-a', 'secret-b']"` (quotes around names are optional) or a single name. Each name must be a valid Kubernetes secret name: lowercase letters, digits, `-` and `.`. The value is parsed as data, never evaluated as Groovy; anything else fails the build with a config error.
+`imagePullSecrets` is a YAML list of Kubernetes secret names, or a string holding `[]`, a bracketed list such as `"['secret-a', 'secret-b']"` (quotes around names are optional) or a single name. Each name must be a valid Kubernetes secret name: at most 253 characters of lowercase letters, digits, `-` and `.`, where each dot-separated part starts and ends with a letter or digit. Quote a name that YAML would read as a number or boolean, such as `'123'`. The value is parsed as data, never evaluated as Groovy; anything else fails the build with a config error.
 
 ### Volume Objects
 
@@ -217,4 +217,4 @@ Validate a file with:
 python3 schema_validator/ci_demo_yaml_validator.py <path-to-matrix-yaml>
 ```
 
-In local/GHA flow, validation is already run by `scripts/local_gha_ci.sh` before Jenkins build trigger.
+In local/GHA flow, validation is already run by `scripts/local_gha_ci.sh` before Jenkins build trigger. The same script first runs the Groovy unit tests in `tests/` through `scripts/run_groovy_tests.sh`, with the Groovy bundled in the CI Jenkins image.

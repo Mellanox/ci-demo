@@ -917,8 +917,7 @@ def isK8sSecretName(name) {
 
 // Parses kubernetes.imagePullSecrets as data (it is never evaluated): a list of
 // secret names, or a string holding "[]", "['a', 'b']" (quotes optional) or a
-// single name. getConfigVal() turns a one-item YAML list into that single name.
-// Returns the list of names, or an error message.
+// single name. Returns the list of names, or an error message.
 @NonCPS
 def parseImagePullSecretNames(secretsInput) {
     List names = []
@@ -964,6 +963,12 @@ def parseImagePullSecrets(secretsInput) {
         reportFail('config', names)
     }
     return names
+}
+
+// toString=false keeps a one-item YAML list a list, so that its member is
+// validated as a name rather than parsed as the whole value.
+def readImagePullSecrets(config) {
+    return parseImagePullSecrets(getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]", false))
 }
 
 def runK8(image, branchName, config, axis, steps=config.steps) {
@@ -1012,7 +1017,7 @@ def runK8(image, branchName, config, axis, steps=config.steps) {
     def service_account = getConfigVal(config, ['kubernetes', 'serviceAccount'], "default")
     def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
-    def imagePullSecrets = parseImagePullSecrets(getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]"))
+    def imagePullSecrets = readImagePullSecrets(config)
     def yaml = """
 spec:
   containers:
@@ -1552,7 +1557,7 @@ def build_docker_on_k8(image, config) {
     def service_account = getConfigVal(config, ['kubernetes', 'serviceAccount'], "default")
     def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
-    def imagePullSecrets = parseImagePullSecrets(getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]"))
+    def imagePullSecrets = readImagePullSecrets(config)
     def yaml = """
 spec:
   containers:

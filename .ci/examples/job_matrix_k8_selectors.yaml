@@ -14,14 +14,13 @@ kubernetes:
   # Quotes around each name are optional. Pulls of public images still work
   # when the secrets do not exist; the kubelet only logs a warning.
   imagePullSecrets: "['ci-demo-pull-a', \"ci-demo-pull-b\"]"
-
-arch_table:
-  x86_64:
-    nodeSelector: "kubernetes.io/os=linux,kubernetes.io/arch=amd64"
-    jnlpImage: "jenkins/inbound-agent:latest"
-  aarch64:
-    nodeSelector: "kubernetes.io/os=linux,kubernetes.io/arch=arm64"
-    jnlpImage: "jenkins/inbound-agent:latest"
+  arch_table:
+    x86_64:
+      nodeSelector: "kubernetes.io/os=linux,kubernetes.io/arch=amd64"
+      jnlpImage: "jenkins/inbound-agent:latest"
+    aarch64:
+      nodeSelector: "kubernetes.io/os=linux,kubernetes.io/arch=arm64"
+      jnlpImage: "jenkins/inbound-agent:latest"
 
 runs_on_dockers:
   - {name: "ubuntu-x86_64", url: "ubuntu:22.04", arch: "x86_64", category: "base"}
