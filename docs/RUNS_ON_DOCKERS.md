@@ -120,7 +120,7 @@ These mirror the `kubernetes:` block and apply only to K8s placement. If unset, 
 3. **Dependency changed:** any path listed in `deps:` appears in the changed-files list.
 4. **Image missing in registry:** *only when `deps:` is unset* — if the registry doesn't have `url`, build it. With `deps:` set, the registry-existence check is skipped: dependencies are the sole signal.
 
-The changed-files list is what `git diff` produces against the merge base of the PR and its target branch (on push builds, of the previously built commit and the current one), so a PR that is behind its target lists only its own changes. The clone must reach that merge base: in a clone too shallow for it, the diff fails with a warning and lists nothing. Paths must match exactly — repo-relative, no leading `./`.
+The changed-files list is what `git diff` produces against the merge base of the PR and its target branch (on push builds, against the previously built commit), so a PR that is behind its target lists only its own changes. The clone must reach that merge base: in a clone too shallow for it, the diff fails with a warning and lists nothing. Paths must match exactly — repo-relative, no leading `./`.
 
 ### Putting it together — file change triggers
 

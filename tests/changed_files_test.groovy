@@ -134,6 +134,10 @@ try {
     File noTarget = new File(root, 'no-target')
     git(root, 'clone', '-q', up.absolutePath, noTarget.absolutePath)
     git(noTarget, 'update-ref', '-d', 'refs/remotes/origin/master')
+    // A clone after the target branch was moved back from T to B.
+    File rewound = new File(root, 'rewound')
+    git(root, 'clone', '-q', up.absolutePath, rewound.absolutePath)
+    git(rewound, 'update-ref', 'refs/remotes/origin/master', B)
     // A clone too shallow to reach the merge base of the target and the PR.
     File shallow = new File(root, 'shallow')
     git(root, 'clone', '-q', '--depth', '1', '--no-single-branch', 'file://' + up.absolutePath, shallow.absolutePath)
@@ -173,8 +177,10 @@ try {
              [GIT_COMMIT: T, GIT_PREV_COMMIT: B], ['.ci/Dockerfile', '.ci/install.sh'])
     scenario('without the target ref, a commit added since the last build is listed', noTarget, P1b,
              pr + [ghprbActualCommit: P1b, GIT_COMMIT: P1b, GIT_PREV_COMMIT: P1], ['.ci/Dockerfile'])
-    scenario('without the target ref, a branch moved back to an older base lists only its own change', noTarget, P1,
+    scenario('without the target ref, a PR moved back to an older base lists only its own change', noTarget, P1,
              pr + [ghprbActualCommit: P1, GIT_COMMIT: P1, GIT_PREV_COMMIT: P1r], ['src/app.c'])
+    scenario('branch build after the branch was moved back lists the rolled-back files', rewound, B,
+             [GIT_COMMIT: B, GIT_PREV_COMMIT: T], ['.ci/Dockerfile', '.ci/install.sh'])
     scenario('a clone too shallow for the merge base lists nothing and warns', shallow, P1,
              pr + [ghprbActualCommit: P1], [], true)
 } finally {
