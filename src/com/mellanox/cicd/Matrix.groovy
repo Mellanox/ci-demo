@@ -1241,7 +1241,7 @@ Boolean isEnvVarSet(var) {
     return false
 }
 
-int tryFindChangedList(config, dcmd) {
+List tryFindChangedList(config, dcmd) {
     def cFiles = null
     def logger = config.get("logger")
     def ret = run_shell(dcmd, 'Checking changed files list')
@@ -1260,7 +1260,7 @@ int tryFindChangedList(config, dcmd) {
     return cFiles
 }
 
-String getChangedFilesList(config) {
+List getChangedFilesList(config) {
 
     def cFiles = []
     def logger = config.get("logger")
@@ -1285,7 +1285,9 @@ String getChangedFilesList(config) {
             sha = env.ghprbActualCommit
         }
 
-        dcmd = "git diff --name-only origin/${br}..${sha}"
+        // A...B diffs B against the merge base: a branch that is behind its
+        // target must not list the target's newer changes as its own.
+        dcmd = "git diff --name-only origin/${br}...${sha}"
         cFiles = tryFindChangedList(config, dcmd);
         if (cFiles != null && cFiles.size() > 0) {
             return cFiles
@@ -1293,7 +1295,7 @@ String getChangedFilesList(config) {
 
        if (isEnvVarSet(env.GIT_COMMIT) && isEnvVarSet(env.GIT_PREV_COMMIT)) {
             logger.debug("Checking changes for git commit: ${env.GIT_COMMIT} prev commit: ${env.GIT_PREV_COMMIT}")
-            dcmd = "git diff --name-only ${env.GIT_PREV_COMMIT} ${env.GIT_COMMIT}"
+            dcmd = "git diff --name-only ${env.GIT_PREV_COMMIT}...${env.GIT_COMMIT}"
             cFiles = tryFindChangedList(config, dcmd);
             if (cFiles != null && cFiles.size() > 0) {
                 return cFiles
