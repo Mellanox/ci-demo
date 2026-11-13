@@ -1289,7 +1289,13 @@ List getChangedFilesList(config) {
 
        if (isEnvVarSet(env.GIT_COMMIT) && isEnvVarSet(env.GIT_PREV_COMMIT)) {
             logger.debug("Checking changes for git commit: ${env.GIT_COMMIT} prev commit: ${env.GIT_PREV_COMMIT}")
-            dcmd = "git diff --name-only ${env.GIT_PREV_COMMIT}...${env.GIT_COMMIT}"
+            if (isEnvVarSet(env.ghprbTargetBranch)) {
+                // A PR's previous build need not be an ancestor of this one.
+                dcmd = "git diff --name-only ${env.GIT_PREV_COMMIT}...${env.GIT_COMMIT}"
+            } else {
+                // A branch build compares the endpoints, so a rollback rebuilds too.
+                dcmd = "git diff --name-only ${env.GIT_PREV_COMMIT} ${env.GIT_COMMIT}"
+            }
             cFiles = tryFindChangedList(config, dcmd);
             if (cFiles != null && cFiles.size() > 0) {
                 return cFiles
