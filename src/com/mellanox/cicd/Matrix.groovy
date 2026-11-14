@@ -1326,7 +1326,7 @@ def imageExistsInRegistry(String img, config) {
         def quotedRepo = "'" + parts[0].replaceAll("'", "'\\\\''") + "'"
         def tag = parts.size() == 2 ? parts[1] : "latest"
         def quotedTag = "'" + tag.replaceAll("'", "'\\\\''") + "'"
-        result = run_shell("podman search --list-tags --format \"{{.Tag}}\" ${quotedRepo} 2> /dev/null | grep ${quotedTag}", "Check tag via podman search", false)
+        result = run_shell("podman search --list-tags --format \"{{.Tag}}\" ${quotedRepo} 2> /dev/null | grep -Fx -- ${quotedTag}", "Check tag via podman search", false)
         if (result.rc == 0) {
             config.logger.info("Image found in registry (podman search) - ${img}")
             return true
@@ -1344,50 +1344,18 @@ def imageExistsInRegistry(String img, config) {
     }
 }
 
-// Why the image is rebuilt whatever the registry holds: build_dockers=true,
-// or its `file:` or a `deps:` path is in the changed files. Empty if none.
-List imageRebuildReasons(image, config) {
-
-    // Vasily Ryabov: we need .toString() to make changed_files.contains(filename) work correctly
-    // See https://stackoverflow.com/q/56829842/3648361
-    def filename = image.filename.toString().trim()
-    def changed_files = config.get("cFiles")
-
-    if ("${env.build_dockers}" == "true") {
-        return ["Forcing building file per user request: ${filename} ... "]
-    }
-    if (changed_files.contains(filename)) {
-        return ["Forcing building, by modified file: ${filename} ... "]
-    }
-    def reasons = []
-    def deps = image.deps ?: []
-    for (int i=0; i<deps.size(); i++) {
-        def oneDep = deps[i]
-        config.logger.debug("Checking " + oneDep)
-        if (changed_files.contains(oneDep)) {
-            reasons.add("Forcing building by dependency on changed file: ${oneDep} ... ")
-        }
-    }
-    return reasons
-}
-
 // <url>-pr<id>, or <url>:latest-pr<id> when the url has no tag.
 String prScopedImageUrl(String url, prId) {
     def name = url.substring(url.lastIndexOf('/') + 1)
     return url + (name.contains(':') ? '' : ':latest') + '-pr' + prId
 }
 
-// With `pr_image_tag: true`, a PR build pushes the images it builds as
-// <tag>-pr<ghprbPullId> and runs on them, so <tag> keeps the target's image.
+// With `pr_image_tag: true`, a PR build pushes the images it builds to
+// pr_url (buildImage) and runs on them, so their tag keeps the target's image.
 def setPrImageUrl(image, config) {
-    if (!image.file || !isEnvVarSet(env.ghprbPullId) ||
-        !getConfigVal(config, ['pr_image_tag'], false).toString().toBoolean()) {
-        return
-    }
-    image.pr_url = prScopedImageUrl(image.url, env.ghprbPullId)
-    if (imageRebuildReasons(image, config)) {
-        config.logger.info("PR build: image ${image.name} is built as ${image.pr_url}")
-        image.url = image.pr_url
+    if (image.file && isEnvVarSet(env.ghprbPullId) &&
+        getConfigVal(config, ['pr_image_tag'], false).toString().toBoolean()) {
+        image.pr_url = prScopedImageUrl(image.url, env.ghprbPullId)
     }
 }
 
@@ -1406,29 +1374,45 @@ List refreshImageUrl(List axisEnv, oldUrl, newUrl) {
 
 def buildImage(config, image) {
 
+    // Vasily Ryabov: we need .toString() to make changed_files.contains(filename) work correctly
+    // See https://stackoverflow.com/q/56829842/3648361
     def filename = image.filename.toString().trim()
     def extra_args = image.build_args
-    def reasons = imageRebuildReasons(image, config)
-    def need_build = reasons.size()
+    def changed_files = config.get("cFiles")
+    def need_build = 0
+    def img = image.url
 
-    for (int i=0; i<reasons.size(); i++) {
-        config.logger.info(reasons[i])
-    }
-    if (!need_build && !image.deps) {
-        def imageExists = imageExistsInRegistry(image.url, config)
+    if ("${env.build_dockers}" == "true") {
+        config.logger.info("Forcing building file per user request: ${filename} ... ")
+        need_build++
+    } else if (changed_files.contains(filename)) {
+        config.logger.info("Forcing building, by modified file: ${filename} ... ")
+        need_build++
+    } else if (image.deps) {
+        for (int i=0; i<image.deps.size(); i++) {
+            def oneDep = image.deps[i]
+            config.logger.debug("Checking " + oneDep)
+            if (changed_files.contains(oneDep)) {
+                config.logger.info("Forcing building by dependency on changed file: ${oneDep} ... ")
+                need_build++
+            }
+        }
+    } else {
+        def imageExists = imageExistsInRegistry(img, config)
         if (!imageExists) {
-            config.logger.info("Image NOT found in registry - ${image.url} - will build ${filename} ...")
+            config.logger.info("Image NOT found in registry - ${img} - will build ${filename} ...")
             need_build++
         }
     }
 
-    if (need_build && image.pr_url && image.url != image.pr_url) {
-        config.logger.info("PR build: image ${image.name} is built as ${image.pr_url}")
+    if (need_build && image.pr_url) {
+        config.logger.info("PR build: image ${image.name} is pushed as ${image.pr_url}")
         image.url = image.pr_url
+        img = image.url
     }
     if (need_build) {
-        config.logger.info("Building - ${image.url} - ${filename}")
-        buildImage(image.url, filename, extra_args, config, image)
+        config.logger.info("Building - ${img} - ${filename}")
+        buildImage(img, filename, extra_args, config, image)
     }
     return need_build
 }

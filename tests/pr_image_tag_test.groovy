@@ -2,10 +2,10 @@
 // With it, a PR build never pushes an image's declared tag: an image it
 // rebuilds goes to <tag>-pr<ghprbPullId>, and its steps run on that image.
 // Without it, and in branch builds, images are pushed to the declared tag.
-// Each case runs gen_image_map(), getMatrixTasks() and buildImage() as a
+// Each case runs gen_image_map(), getMatrixTasks() and buildDocker() as a
 // pipeline run does, with recording Docker, registry and pod stand-ins.
-// Run with scripts/run_groovy_tests.sh, or with any Groovy 2.4+ from the
-// repository root:
+// Run with scripts/run_groovy_tests.sh, or with any Groovy 2.4+ and bash
+// from the repository root:
 //   groovy tests/pr_image_tag_test.groovy [path/to/Matrix.groovy]
 
 import org.codehaus.groovy.control.CompilerConfiguration
@@ -37,13 +37,14 @@ def imports = new ImportCustomizer()
 imports.addImports('com.cloudbees.groovy.cps.NonCPS')
 cc.addCompilationCustomizers(imports)
 
-// Docker calls, the step env and the pod image of each task are recorded;
-// pushes also go to a log that outlives a run.
+// Docker calls, the env of each task and the pod image of each task are
+// recorded; pushes also go to a log that outlives a run.
 List events = []
 List pushes = []
-List stepEnvs = []
+List taskEnvs = []
 List podUrls = []
 Set registry = [] as Set
+Closure shell = null
 def env = new FakeEnv()
 def docker = new Expando()
 docker.build = { name, args ->
@@ -53,18 +54,40 @@ docker.build = { name, args ->
     built.push = { -> events << 'push ' + img; pushes << img; registry << img }
     return built
 }
+docker.withRegistry = { Object[] a -> a[-1].call() }
+docker.image = { String name ->
+    def pulled = new Expando()
+    pulled.pull = { -> throw new IllegalStateException('no such image ' + name) }
+    return pulled
+}
 def binding = new Binding()
 binding.setVariable('env', env)
 binding.setVariable('currentBuild', [result: null])
 binding.setVariable('error', { msg -> throw new IllegalStateException(msg.toString()) })
 binding.setVariable('docker', docker)
+binding.setVariable('withCredentials', { List c, Closure body -> body() })
+binding.setVariable('sh', { Map a -> shell(a.script.toString()) })
+// withEnv sets its variables in `env` for the body, as Jenkins does.
 binding.setVariable('withEnv', { List vars, Closure body ->
-    stepEnvs << vars.collect { it.toString() }
-    body()
+    List kv = vars.collect { it.toString() }
+    if (kv.any { it.startsWith('job=') }) {
+        taskEnvs << kv
+    }
+    Map saved = new LinkedHashMap(env)
+    kv.each { e -> env[e.substring(0, e.indexOf('='))] = e.substring(e.indexOf('=') + 1) }
+    try {
+        body()
+    } finally {
+        env.clear()
+        env.putAll(saved)
+    }
 })
-def matrix = new GroovyShell(gcl, binding, cc).parse(new File(matrixPath))
+def shellParser = new GroovyShell(gcl, binding, cc)
+def matrix = shellParser.parse(new File(matrixPath))
 matrix.metaClass.imageExistsInRegistry = { String img, config -> registry.contains(img) }
 matrix.metaClass.runK8 = { image, branchName, config, axis -> podUrls << image.url }
+// A second copy keeps the library's own imageExistsInRegistry().
+def plain = shellParser.parse(new File(matrixPath))
 
 def logger = new Expando()
 logger.trace = { level, msg -> }
@@ -95,7 +118,7 @@ def run = { Map vars, List changed, Map top, List images, int setupAttempts = 1 
     env.clear()
     env.putAll(vars)
     events.clear()
-    stepEnvs.clear()
+    taskEnvs.clear()
     podUrls.clear()
     Map config = [job: 'test', registry_host: 'harbor.example.com', registry_path: '/proj',
                   kubernetes: [cloud: 'k8s'], steps: [[name: 'test', run: 'true']],
@@ -106,13 +129,16 @@ def run = { Map vars, List changed, Map top, List images, int setupAttempts = 1 
         built = matrix.gen_image_map(config)['x86_64']
         Map tasks = [:]
         built.each { tasks += matrix.getMatrixTasks(it, config) }
-        // Setup may run more than once: the build pod is retried on agent loss.
-        setupAttempts.times { built.each { if (it.file) { matrix.buildImage(config, it) } } }
+        // Images are set up when any entry has a Dockerfile; the build pod is
+        // retried when its agent is lost.
+        if (built.any { it.file }) {
+            setupAttempts.times { built.each { matrix.buildDocker(it, config) } }
+        }
         tasks.values().each { it.call() }
     } catch (Throwable t) {
         return [error: t.getClass().name + ': ' + t.message]
     }
-    def envOf = { String key -> stepEnvs.collect { e -> e.find { it.startsWith(key + '=') } } }
+    def envOf = { String key -> taskEnvs.collect { e -> e.find { it.startsWith(key + '=') } } }
     return [events: events.clone(), pods: podUrls.clone(), url: envOf('url'), tag: envOf('tag'),
             uri: envOf('uri'), pr_url: built.collect { it.pr_url }]
 }
@@ -151,6 +177,13 @@ expect('a changed dependency selects the PR tag',
 expect('build_dockers=true in a PR build selects the PR tag',
        run(prBuild + [build_dockers: 'true'], [], on, [dockerfile]),
        [events: ['build ' + PR, 'push ' + PR], pods: [PR], url: ['url=' + PR]])
+expect('build_dockers=true from the matrix env selects the PR tag',
+       run(prBuild, [], on + [env: [build_dockers: 'true']], [dockerfile]),
+       [events: ['build ' + PR, 'push ' + PR], pods: [PR], url: ['url=' + PR]])
+expect('a matrix env build_dockers=false over the job parameter leaves the image alone',
+       run(prBuild + [build_dockers: 'true'], [], on + [env: [build_dockers: 'false']],
+           [dockerfile + [deps: ['.ci/install.sh']]]),
+       [events: [], pods: [SHARED], url: ['url=' + SHARED]])
 expect('pr_image_tag given as a string is read as a boolean',
        run(prBuild, ['.ci/Dockerfile'], [pr_image_tag: 'true'], [dockerfile]),
        [events: ['build ' + PR, 'push ' + PR], pods: [PR]])
@@ -180,9 +213,10 @@ expect('a branch build seeds a missing declared tag',
        run([:], [], on, [dockerfile + [tag: 'new']]),
        [events: ['build harbor.example.com/proj/x86_64/ub22:new', 'push harbor.example.com/proj/x86_64/ub22:new'],
         pods: ['harbor.example.com/proj/x86_64/ub22:new']])
-expect('a pull-only image keeps its URL in a PR build',
-       run(prBuild + [build_dockers: 'true'], [], on, [[name: 'tool', arch: 'x86_64', url: 'harbor.example.com/tools/lint:1.0']]),
-       [events: [], pods: ['harbor.example.com/tools/lint:1.0'], pr_url: [null]])
+expect('a pull-only image beside a built one keeps its URL in a PR build',
+       run(prBuild + [build_dockers: 'true'], [], on,
+           [dockerfile, [name: 'tool', arch: 'x86_64', url: 'harbor.example.com/tools/lint:1.0']]),
+       [events: ['build ' + PR, 'push ' + PR], pods: [PR, 'harbor.example.com/tools/lint:1.0'], pr_url: [PR, null]])
 
 registry.clear()
 expect('an explicit url with a tag and a registry port gets the suffix on its tag',
@@ -193,6 +227,33 @@ expect('an explicit url without a tag is pushed as latest-pr<id>',
        run(prBuild, ['.ci/Dockerfile'], on, [dockerfile + [url: 'reg.example.com:5000/a/b']]),
        [events: ['build reg.example.com:5000/a/b:latest-pr42', 'push reg.example.com:5000/a/b:latest-pr42'],
         pods: ['reg.example.com:5000/a/b:latest-pr42']])
+
+// imageExistsInRegistry() with the manifest check failing: its podman search
+// pipeline runs with the search replaced by `tags`, and docker pull fails.
+def fallbackFinds = { String img, List tags ->
+    shell = { String script ->
+        if (script.startsWith('docker manifest inspect ')) {
+            return 1
+        }
+        def m = script =~ /^podman search .* 2> \/dev\/null (\|.*)$/
+        if (!m.find()) {
+            throw new IllegalStateException('unexpected command: ' + script)
+        }
+        def listing = "printf '%s\\n' " + tags.collect { "'" + it + "'" }.join(' ')
+        def proc = new ProcessBuilder(['bash', '-c', listing + ' ' + m.group(1)]).start()
+        proc.waitForProcessOutput(new StringBuilder(), new StringBuilder())
+        return proc.exitValue()
+    }
+    try {
+        return plain.imageExistsInRegistry(img, [logger: logger])
+    } catch (Throwable t) {
+        return t.getClass().name + ': ' + t.message
+    }
+}
+def found = fallbackFinds(SHARED, ['20261113-pr42', 'latest'])
+check('the registry fallback does not take a PR tag for the declared tag', found == false, "got ${found}")
+found = fallbackFinds(SHARED, ['20261113-pr42', '20261113'])
+check('the registry fallback finds the declared tag among PR tags', found == true, "got ${found}")
 
 println "\n${passed} passed, ${failed} failed"
 if (failed || passed == 0) {
