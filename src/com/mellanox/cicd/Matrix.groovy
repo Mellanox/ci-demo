@@ -283,6 +283,7 @@ def gen_image_map(config) {
                 dfile.uri = resolveTemplate(dfile, dfile.uri, config)
                 dfile.url = dfile.url ?: "${config.registry_host}${config.registry_path}/${dfile.uri}:${dfile.tag}"
                 dfile.url = resolveTemplate(dfile, dfile.url, config)
+                setPrImageUrl(dfile, config)
 
                 config.logger.debug("Adding docker to image_map for " + dfile.arch + ' name: ' + dfile.name)
                 images.add(dfile)
@@ -1116,8 +1117,9 @@ Map getTasks(axes, image, config, include, exclude) {
         }
 
         config.logger.trace(5, "task name " + branchName)
+        def taskImageUrl = image.url
         tasks[branchName] = { ->
-            withEnv(axisEnv) {
+            withEnv(refreshImageUrl(axisEnv, taskImageUrl, image.url)) {
                 if ((config.get("kubernetes") == null) &&
                     (image.nodeLabel == null) &&
                     (image.cloud == null)
@@ -1342,42 +1344,91 @@ def imageExistsInRegistry(String img, config) {
     }
 }
 
-def buildImage(config, image) {
+// Why the image is rebuilt whatever the registry holds: build_dockers=true,
+// or its `file:` or a `deps:` path is in the changed files. Empty if none.
+List imageRebuildReasons(image, config) {
 
     // Vasily Ryabov: we need .toString() to make changed_files.contains(filename) work correctly
     // See https://stackoverflow.com/q/56829842/3648361
     def filename = image.filename.toString().trim()
-    def extra_args = image.build_args
     def changed_files = config.get("cFiles")
-    def need_build = 0
-    def img = image.url
 
     if ("${env.build_dockers}" == "true") {
-        config.logger.info("Forcing building file per user request: ${filename} ... ")
-        need_build++
-    } else if (changed_files.contains(filename)) {
-        config.logger.info("Forcing building, by modified file: ${filename} ... ")
-        need_build++
-    } else if (image.deps) {
-        for (int i=0; i<image.deps.size(); i++) {
-            def oneDep = image.deps[i]
-            config.logger.debug("Checking " + oneDep)
-            if (changed_files.contains(oneDep)) {
-                config.logger.info("Forcing building by dependency on changed file: ${oneDep} ... ")
-                need_build++
-            }
+        return ["Forcing building file per user request: ${filename} ... "]
+    }
+    if (changed_files.contains(filename)) {
+        return ["Forcing building, by modified file: ${filename} ... "]
+    }
+    def reasons = []
+    def deps = image.deps ?: []
+    for (int i=0; i<deps.size(); i++) {
+        def oneDep = deps[i]
+        config.logger.debug("Checking " + oneDep)
+        if (changed_files.contains(oneDep)) {
+            reasons.add("Forcing building by dependency on changed file: ${oneDep} ... ")
         }
-    } else {
-        def imageExists = imageExistsInRegistry(img, config)
+    }
+    return reasons
+}
+
+// <url>-pr<id>, or <url>:latest-pr<id> when the url has no tag.
+String prScopedImageUrl(String url, prId) {
+    def name = url.substring(url.lastIndexOf('/') + 1)
+    return url + (name.contains(':') ? '' : ':latest') + '-pr' + prId
+}
+
+// With `pr_image_tag: true`, a PR build pushes the images it builds as
+// <tag>-pr<ghprbPullId> and runs on them, so <tag> keeps the target's image.
+def setPrImageUrl(image, config) {
+    if (!image.file || !isEnvVarSet(env.ghprbPullId) ||
+        !getConfigVal(config, ['pr_image_tag'], false).toString().toBoolean()) {
+        return
+    }
+    image.pr_url = prScopedImageUrl(image.url, env.ghprbPullId)
+    if (imageRebuildReasons(image, config)) {
+        config.logger.info("PR build: image ${image.name} is built as ${image.pr_url}")
+        image.url = image.pr_url
+    }
+}
+
+// buildImage() can move an image to its PR tag after a task captured its env.
+List refreshImageUrl(List axisEnv, oldUrl, newUrl) {
+    if (oldUrl == newUrl) {
+        return axisEnv
+    }
+    def vars = []
+    for (int i=0; i<axisEnv.size(); i++) {
+        def kv = axisEnv[i].toString()
+        vars.add(kv == "url=${oldUrl}".toString() ? "url=${newUrl}".toString() : kv)
+    }
+    return vars
+}
+
+def buildImage(config, image) {
+
+    def filename = image.filename.toString().trim()
+    def extra_args = image.build_args
+    def reasons = imageRebuildReasons(image, config)
+    def need_build = reasons.size()
+
+    for (int i=0; i<reasons.size(); i++) {
+        config.logger.info(reasons[i])
+    }
+    if (!need_build && !image.deps) {
+        def imageExists = imageExistsInRegistry(image.url, config)
         if (!imageExists) {
-            config.logger.info("Image NOT found in registry - ${img} - will build ${filename} ...")
+            config.logger.info("Image NOT found in registry - ${image.url} - will build ${filename} ...")
             need_build++
         }
     }
 
+    if (need_build && image.pr_url && image.url != image.pr_url) {
+        config.logger.info("PR build: image ${image.name} is built as ${image.pr_url}")
+        image.url = image.pr_url
+    }
     if (need_build) {
-        config.logger.info("Building - ${img} - ${filename}")
-        buildImage(img, filename, extra_args, config, image)
+        config.logger.info("Building - ${image.url} - ${filename}")
+        buildImage(image.url, filename, extra_args, config, image)
     }
     return need_build
 }

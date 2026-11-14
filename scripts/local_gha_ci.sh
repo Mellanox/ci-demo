@@ -150,6 +150,10 @@ labels_csv=""
 echo "[2/9] Building Jenkins image ${JENKINS_IMAGE}"
 docker build -t "${JENKINS_IMAGE}" -f .github/Dockerfile.jenkins .
 
+echo "Running Groovy unit tests with the Groovy bundled in ${JENKINS_IMAGE}"
+docker run --rm -u root --entrypoint bash -v "${HOST_REPO_DIR}:${REPO_MOUNT}:ro" -w "${REPO_MOUNT}" \
+  "${JENKINS_IMAGE}" scripts/run_groovy_tests.sh
+
 if ! docker network inspect "${DOCKER_NETWORK}" >/dev/null 2>&1; then
   docker network create "${DOCKER_NETWORK}" >/dev/null
 fi
