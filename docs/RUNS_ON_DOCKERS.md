@@ -146,6 +146,18 @@ A change to anything else — even other files in `.ci/` — does **not** trigge
 
 > **Caveat.** Once you add `deps:`, the "image missing → build" fallback is **disabled** for that entry. If the image was never built (e.g. first run on a fresh registry) and none of the deps changed, the run will try to pull a non-existent image. Either bootstrap once with `build_dockers=true` or omit `deps:` for the first run.
 
+### PR builds and the shared tag — `pr_image_tag`
+
+By default, a PR build that rebuilds an image pushes it to `url`, the same tag that the target branch's builds and other PRs pull. They then run on the PR's image until the target branch rebuilds it. That includes the PR's own later builds after it drops its image change, since nothing rebuilds the image then.
+
+Set `pr_image_tag: true` at the top level to keep PR builds off that tag. In a PR build (the GitHub pull request builder sets `ghprbPullId`), an image with `file:` that gets rebuilt is pushed as `<tag>-pr<ghprbPullId>`, or as `latest-pr<ghprbPullId>` when `url` has no tag. A rebuild is triggered by `build_dockers=true`, by a change to `file:` or `deps:`, or, when `deps:` is unset or empty, by `url` missing from the registry. The PR's steps then run on that image, and the `url` variable in their environment names it; `tag` and `uri` keep the declared values. An image the PR does not rebuild is still pulled from `url`. Branch builds are unchanged, and only they push `url`.
+
+Before enabling it:
+
+- **Publishing.** After an image change merges, a branch build of the target (or a run with `build_dockers=true`) must push `url`; PR builds no longer do.
+- **Registry retention.** Each PR keeps one tag per image it rebuilt, and each later build of the PR overwrites it. A retention rule that keeps the N most recently pushed tags of a repository counts these tags too and can remove `url`'s tag. Exclude `*-pr*` tags from such rules, or give them a rule of their own.
+- **Tag immutability.** An immutability rule that covers the `*-pr*` tags makes the PR's second image build fail.
+
 ---
 
 ## Templating

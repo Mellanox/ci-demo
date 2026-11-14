@@ -283,6 +283,7 @@ def gen_image_map(config) {
                 dfile.uri = resolveTemplate(dfile, dfile.uri, config)
                 dfile.url = dfile.url ?: "${config.registry_host}${config.registry_path}/${dfile.uri}:${dfile.tag}"
                 dfile.url = resolveTemplate(dfile, dfile.url, config)
+                setPrImageUrl(dfile, config)
 
                 config.logger.debug("Adding docker to image_map for " + dfile.arch + ' name: ' + dfile.name)
                 images.add(dfile)
@@ -1116,8 +1117,9 @@ Map getTasks(axes, image, config, include, exclude) {
         }
 
         config.logger.trace(5, "task name " + branchName)
+        def taskImageUrl = image.url
         tasks[branchName] = { ->
-            withEnv(axisEnv) {
+            withEnv(refreshImageUrl(axisEnv, taskImageUrl, image.url)) {
                 if ((config.get("kubernetes") == null) &&
                     (image.nodeLabel == null) &&
                     (image.cloud == null)
@@ -1324,7 +1326,7 @@ def imageExistsInRegistry(String img, config) {
         def quotedRepo = "'" + parts[0].replaceAll("'", "'\\\\''") + "'"
         def tag = parts.size() == 2 ? parts[1] : "latest"
         def quotedTag = "'" + tag.replaceAll("'", "'\\\\''") + "'"
-        result = run_shell("podman search --list-tags --format \"{{.Tag}}\" ${quotedRepo} 2> /dev/null | grep ${quotedTag}", "Check tag via podman search", false)
+        result = run_shell("podman search --list-tags --format \"{{.Tag}}\" ${quotedRepo} 2> /dev/null | grep -Fx -- ${quotedTag}", "Check tag via podman search", false)
         if (result.rc == 0) {
             config.logger.info("Image found in registry (podman search) - ${img}")
             return true
@@ -1340,6 +1342,34 @@ def imageExistsInRegistry(String img, config) {
     } catch (exception) {
         return false
     }
+}
+
+// <url>-pr<id>, or <url>:latest-pr<id> when the url has no tag.
+String prScopedImageUrl(String url, prId) {
+    def name = url.substring(url.lastIndexOf('/') + 1)
+    return url + (name.contains(':') ? '' : ':latest') + '-pr' + prId
+}
+
+// With `pr_image_tag: true`, a PR build pushes the images it builds to
+// pr_url (buildImage) and runs on them, so their tag keeps the target's image.
+def setPrImageUrl(image, config) {
+    if (image.file && isEnvVarSet(env.ghprbPullId) &&
+        getConfigVal(config, ['pr_image_tag'], false).toString().toBoolean()) {
+        image.pr_url = prScopedImageUrl(image.url, env.ghprbPullId)
+    }
+}
+
+// buildImage() can move an image to its PR tag after a task captured its env.
+List refreshImageUrl(List axisEnv, oldUrl, newUrl) {
+    if (oldUrl == newUrl) {
+        return axisEnv
+    }
+    def vars = []
+    for (int i=0; i<axisEnv.size(); i++) {
+        def kv = axisEnv[i].toString()
+        vars.add(kv == "url=${oldUrl}".toString() ? "url=${newUrl}".toString() : kv)
+    }
+    return vars
 }
 
 def buildImage(config, image) {
@@ -1375,6 +1405,11 @@ def buildImage(config, image) {
         }
     }
 
+    if (need_build && image.pr_url) {
+        config.logger.info("PR build: image ${image.name} is pushed as ${image.pr_url}")
+        image.url = image.pr_url
+        img = image.url
+    }
     if (need_build) {
         config.logger.info("Building - ${img} - ${filename}")
         buildImage(img, filename, extra_args, config, image)
