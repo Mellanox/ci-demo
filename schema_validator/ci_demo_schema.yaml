@@ -5,6 +5,7 @@ registry_host: str(required=False)
 registry_path: str(required=False)
 registry_auth: str(required=False)
 registry_jnlp_path: str(required=False)
+pr_image_tag: bool(required=False)
 docker_opt: str(required=False)
 
 kubernetes: include('kubernetes_conf', required=False)
