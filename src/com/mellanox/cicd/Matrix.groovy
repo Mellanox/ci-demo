@@ -1307,21 +1307,19 @@ List getChangedFilesList(config) {
         if (cFiles) {
             return cFiles
         }
-        def prev = null
-        if (havePrev) {
+        // Without its merge base with the target, a PR's changes are unknown:
+        // a delta since its previous build is only part of them.
+        def unknown = cFiles == null && isMergeBaseMissing("origin/${br}", sha)
+        if (!unknown && havePrev) {
             // A PR's previous build need not be an ancestor of this one.
-            prev = tryFindChangedList(config, "git diff --name-only ${env.GIT_PREV_COMMIT}...${env.GIT_COMMIT}")
+            def prev = tryFindChangedList(config, "git diff --name-only ${env.GIT_PREV_COMMIT}...${env.GIT_COMMIT}")
             if (prev) {
                 return prev
             }
+            // Without the target ref (a PR-refs-only clone) this delta is all there is.
+            unknown = cFiles == null && prev == null && isMergeBaseMissing(env.GIT_PREV_COMMIT, env.GIT_COMMIT)
         }
-        if (cFiles != null || prev != null) {
-            return []
-        }
-        // Neither diff ran. Without a merge base the PR's changes are unknown;
-        // without the target ref (a PR-refs-only clone) no list was ever made.
-        if (isMergeBaseMissing("origin/${br}", sha) ||
-            (havePrev && isMergeBaseMissing(env.GIT_PREV_COMMIT, env.GIT_COMMIT))) {
+        if (unknown) {
             logger.warn("Unable to tell which files this PR changes: the clone does not reach the merge base")
             return null
         }
