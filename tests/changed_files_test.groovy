@@ -188,6 +188,8 @@ try {
     String P1c = commit(up, ['.ci/Dockerfile': 'FROM ubuntu:22.04\n'], 'branch: revert the image change')
     git(up, 'checkout', '-q', '-b', 'pr-docker', B)
     String P2 = commit(up, ['.ci/Dockerfile': 'FROM ubuntu:22.04\nRUN true\n'], 'stale PR: image change')
+    git(up, 'checkout', '-q', '-b', 'pr-docker-more', P2)
+    String P2b = commit(up, ['src/app.c': 'int main(void) { return 2; }\n'], 'stale PR: code change after its image change')
     git(up, 'checkout', '-q', '-b', 'pr-fresh', T)
     String P3 = commit(up, ['src/app.c': 'int main(void) { return 3; }\n'], 'current PR: code change')
     git(up, 'checkout', '-q', '-b', 'pr-rebased', T)
@@ -212,6 +214,12 @@ try {
     // A clone too shallow to reach the merge base of the target and the PR.
     File shallow = new File(root, 'shallow')
     git(root, 'clone', '-q', '--depth', '1', '--no-single-branch', 'file://' + up.absolutePath, shallow.absolutePath)
+    // Two commits deep on one PR branch and on the target: the PR's previous
+    // commit is in the clone, its merge base with the target is not.
+    File shallow2 = new File(root, 'shallow2')
+    git(root, 'clone', '-q', '--depth', '2', '--single-branch', '--branch', 'pr-docker-more',
+        'file://' + up.absolutePath, shallow2.absolutePath)
+    git(shallow2, 'fetch', '-q', '--depth', '2', 'origin', '+refs/heads/master:refs/remotes/origin/master')
 
     // Checks the list (null: unknown, with a warning), then each named image
     // decision against its expected outcome.
@@ -263,6 +271,8 @@ try {
              [exists: 'none'])
     scenario('no target ref and no previous build, as before', noTarget, P1,
              pr + [ghprbActualCommit: P1], [], [exists: 'none', deps: 'none'])
+    scenario('no target ref, previous commit not in the clone, as before', noTarget, P1,
+             pr + [ghprbActualCommit: P1, GIT_COMMIT: P1, GIT_PREV_COMMIT: gone], [], [exists: 'none', deps: 'none'])
 
     // PRs whose clone does not reach a merge base: unknown, so no guess.
     scenario('shallow clone, stale PR', shallow, P1,
@@ -272,6 +282,10 @@ try {
              pr + [ghprbActualCommit: P2], null, [exists: 'reject', deps: 'reject', forced: 'build'])
     scenario('shallow clone, PR that changes the Dockerfile, previous build on the target', shallow, P2,
              pr + [ghprbActualCommit: P2, GIT_COMMIT: P2, GIT_PREV_COMMIT: T], null, [deps: 'reject'])
+    scenario('shallow clone, repeated build of a PR that changes the Dockerfile', shallow, P2,
+             pr + [ghprbActualCommit: P2, GIT_COMMIT: P2, GIT_PREV_COMMIT: P2], null, [exists: 'reject'])
+    scenario('shallow clone, PR built one commit after its image change', shallow2, P2b,
+             pr + [ghprbActualCommit: P2b, GIT_COMMIT: P2b, GIT_PREV_COMMIT: P2], null, [exists: 'reject'])
 
     // Branch builds: changes against the target plus those since the previous build.
     scenario('branch build behind the target, no previous build', full, P1,
