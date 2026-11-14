@@ -1235,7 +1235,7 @@ Boolean isEnvVarSet(var) {
     return false
 }
 
-int tryFindChangedList(config, dcmd) {
+List tryFindChangedList(config, dcmd) {
     def cFiles = null
     def logger = config.get("logger")
     def ret = run_shell(dcmd, 'Checking changed files list')
@@ -1254,16 +1254,24 @@ int tryFindChangedList(config, dcmd) {
     return cFiles
 }
 
-String getChangedFilesList(config) {
+// True when both commits are in the clone but share no history there, as in a
+// clone too shallow to reach their merge base.
+Boolean isMergeBaseMissing(a, b) {
+    return run_shell("git merge-base ${a} ${b}", 'Checking for a merge base').rc == 1
+}
 
-    def cFiles = []
+// Returns the files this build changes, or null when they cannot be known: a
+// PR whose clone does not reach a merge base, or a branch build with no diff.
+List getChangedFilesList(config) {
+
     def logger = config.get("logger")
-    def dcmd
+    def prBuild = isEnvVarSet(env.ghprbTargetBranch)
+    def havePrev = isEnvVarSet(env.GIT_COMMIT) && isEnvVarSet(env.GIT_PREV_COMMIT)
 
     try {
 
         def br
-        if (isEnvVarSet(env.ghprbTargetBranch)) {
+        if (prBuild) {
             br = env.ghprbTargetBranch
         } else {
             def ret = run_shell('git ls-remote -q | grep -q refs/heads/master', 'detecting branch name')
@@ -1279,21 +1287,42 @@ String getChangedFilesList(config) {
             sha = env.ghprbActualCommit
         }
 
-        dcmd = "git diff --name-only origin/${br}..${sha}"
-        cFiles = tryFindChangedList(config, dcmd);
-        if (cFiles != null && cFiles.size() > 0) {
-            return cFiles
+        // A...B diffs B against the merge base: a branch that is behind its
+        // target must not list the target's newer changes as its own.
+        def cFiles = tryFindChangedList(config, "git diff --name-only origin/${br}...${sha}")
+        if (havePrev) {
+            logger.debug("Checking changes for git commit: ${env.GIT_COMMIT} prev commit: ${env.GIT_PREV_COMMIT}")
         }
 
-       if (isEnvVarSet(env.GIT_COMMIT) && isEnvVarSet(env.GIT_PREV_COMMIT)) {
-            logger.debug("Checking changes for git commit: ${env.GIT_COMMIT} prev commit: ${env.GIT_PREV_COMMIT}")
-            dcmd = "git diff --name-only ${env.GIT_PREV_COMMIT} ${env.GIT_COMMIT}"
-            cFiles = tryFindChangedList(config, dcmd);
-            if (cFiles != null && cFiles.size() > 0) {
+        if (!prBuild) {
+            if (!havePrev) {
                 return cFiles
             }
+            // A branch build adds its delta since the previous build, so a
+            // rollback or a revert rebuilds too.
+            def delta = tryFindChangedList(config, "git diff --name-only ${env.GIT_PREV_COMMIT} ${env.GIT_COMMIT}")
+            return delta == null ? null : ((cFiles ?: []) + delta).unique()
         }
 
+        if (cFiles) {
+            return cFiles
+        }
+        // Without its merge base with the target, a PR's changes are unknown:
+        // a delta since its previous build is only part of them.
+        def unknown = cFiles == null && isMergeBaseMissing("origin/${br}", sha)
+        if (!unknown && havePrev) {
+            // A PR's previous build need not be an ancestor of this one.
+            def prev = tryFindChangedList(config, "git diff --name-only ${env.GIT_PREV_COMMIT}...${env.GIT_COMMIT}")
+            if (prev) {
+                return prev
+            }
+            // Without the target ref (a PR-refs-only clone) this delta is all there is.
+            unknown = cFiles == null && prev == null && isMergeBaseMissing(env.GIT_PREV_COMMIT, env.GIT_COMMIT)
+        }
+        if (unknown) {
+            logger.warn("Unable to tell which files this PR changes: the clone does not reach the merge base")
+            return null
+        }
 
     } catch (e) {
         logger.warn("Unable to calc changed file list - make sure shallow clone depth is configured in Jenkins, reason: " + e)
@@ -1355,14 +1384,26 @@ def buildImage(config, image) {
     if ("${env.build_dockers}" == "true") {
         config.logger.info("Forcing building file per user request: ${filename} ... ")
         need_build++
-    } else if (changed_files.contains(filename)) {
+    } else if (changed_files == null && filename) {
+        // Unknown changes: a branch build rebuilds from its own revision; a
+        // PR build must not guess either way.
+        if (!isEnvVarSet(env.ghprbTargetBranch)) {
+            config.logger.info("Changed files unknown, building ${filename} from this revision ... ")
+            need_build++
+        } else if (!image.deps && !imageExistsInRegistry(img, config)) {
+            config.logger.info("Image NOT found in registry - ${img} - will build ${filename} ...")
+            need_build++
+        } else {
+            reportFail('docker build', "Unable to tell whether this PR changes ${filename} or its deps: the clone does not reach the merge base (see the warnings above). Rebase the PR, clone more history, or set build_dockers=true.")
+        }
+    } else if (changed_files?.contains(filename)) {
         config.logger.info("Forcing building, by modified file: ${filename} ... ")
         need_build++
     } else if (image.deps) {
         for (int i=0; i<image.deps.size(); i++) {
             def oneDep = image.deps[i]
             config.logger.debug("Checking " + oneDep)
-            if (changed_files.contains(oneDep)) {
+            if (changed_files?.contains(oneDep)) {
                 config.logger.info("Forcing building by dependency on changed file: ${oneDep} ... ")
                 need_build++
             }
