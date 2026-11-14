@@ -150,7 +150,7 @@ A change to anything else — even other files in `.ci/` — does **not** trigge
 
 By default, a PR build that rebuilds an image pushes it to `url`, the same tag that the target branch's builds and other PRs pull. They then run on the PR's image until the target branch rebuilds it. That includes the PR's own later builds after it drops its image change, since nothing rebuilds the image then.
 
-Set `pr_image_tag: true` at the top level to keep PR builds off that tag. In a PR build (the GitHub pull request builder sets `ghprbPullId`), an image with `file:` that gets rebuilt is pushed as `<tag>-pr<ghprbPullId>`, or as `latest-pr<ghprbPullId>` when `url` has no tag. A rebuild is triggered by `build_dockers=true`, by a change to `file:` or `deps:`, or by `url` missing from the registry. The PR's steps then run on that image, and the `url` variable in their environment names it; `tag` and `uri` keep the declared values. An image the PR does not rebuild is still pulled from `url`. Branch builds are unchanged, and only they push `url`.
+Set `pr_image_tag: true` at the top level to keep PR builds off that tag. In a PR build (the GitHub pull request builder sets `ghprbPullId`), an image with `file:` that gets rebuilt is pushed as `<tag>-pr<ghprbPullId>`, or as `latest-pr<ghprbPullId>` when `url` has no tag. A rebuild is triggered by `build_dockers=true`, by a change to `file:` or `deps:`, or, when `deps:` is unset or empty, by `url` missing from the registry. The PR's steps then run on that image, and the `url` variable in their environment names it; `tag` and `uri` keep the declared values. An image the PR does not rebuild is still pulled from `url`. Branch builds are unchanged, and only they push `url`.
 
 Before enabling it:
 
