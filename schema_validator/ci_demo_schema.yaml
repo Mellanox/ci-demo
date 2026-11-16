@@ -112,6 +112,7 @@ docker_image:
   on_image_build: any(str(), map(), required=False)
   build_args: any(str(), list(), map(), required=False)
   deps: list(str(), required=False)
+  credentialsId: any(str(), list(str()), required=False)
 
 agent_image:
   nodeLabel: str(required=False)

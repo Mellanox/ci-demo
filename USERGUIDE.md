@@ -118,7 +118,7 @@ Common keys:
 - runtime/security: `hostNetwork`, `privileged`, `runAsUser`, `runAsGroup`
 - resources/scheduling: `limits`, `requests`, `namespace`, `tolerations`, `annotations`
 - pull/secrets/caps: `imagePullSecrets`, `caps_add`
-- build helpers: `on_image_build`, `build_args`, `deps`
+- build helpers: `on_image_build`, `build_args`, `deps`, `credentialsId`
 
 All are optional in schema.
 
