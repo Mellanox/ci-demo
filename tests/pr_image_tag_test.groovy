@@ -3,7 +3,8 @@
 // rebuilds goes to <tag>-pr<ghprbPullId>, and its steps run on that image.
 // Without it, and in branch builds, images are pushed to the declared tag.
 // Each case runs gen_image_map(), getMatrixTasks() and buildDocker() as a
-// pipeline run does, with recording Docker, registry and pod stand-ins.
+// pipeline run does, with recording Docker, registry and pod stand-ins; the
+// cases about a lost or failed image setup run startPipeline() itself.
 // Run with scripts/run_groovy_tests.sh, or with any Groovy 2.4+ and bash
 // from the repository root:
 //   groovy tests/pr_image_tag_test.groovy [path/to/Matrix.groovy]
@@ -15,6 +16,13 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer
 class FakeEnv extends LinkedHashMap {
     Map getEnvironment() {
         return new LinkedHashMap(this)
+    }
+}
+
+// The loss of a build pod, which the kubernetesAgent() retry condition matches.
+class AgentLost extends RuntimeException {
+    AgentLost(String message) {
+        super(message)
     }
 }
 
@@ -43,15 +51,31 @@ List events = []
 List pushes = []
 List taskEnvs = []
 List podUrls = []
+List stopUrls = []
 Set registry = [] as Set
+// Each queued fault makes the next build or push lose its pod ('lost') or fail.
+Map faults = [build: [], push: []]
 Closure shell = null
 def env = new FakeEnv()
+def fault = { String op, String img ->
+    String f = faults[op] ? faults[op].remove(0) : null
+    if (f) {
+        events << f + ' ' + op + ' ' + img
+        throw f == 'lost' ? new AgentLost(op + ' ' + img) : new IllegalStateException(op + ' ' + img + ' failed')
+    }
+}
 def docker = new Expando()
 docker.build = { name, args ->
     String img = name.toString()
+    fault('build', img)
     events << 'build ' + img
     def built = new Expando()
-    built.push = { -> events << 'push ' + img; pushes << img; registry << img }
+    built.push = { ->
+        fault('push', img)
+        events << 'push ' + img
+        pushes << img
+        registry << img
+    }
     return built
 }
 docker.withRegistry = { Object[] a -> a[-1].call() }
@@ -66,7 +90,7 @@ binding.setVariable('currentBuild', [result: null])
 binding.setVariable('error', { msg -> throw new IllegalStateException(msg.toString()) })
 binding.setVariable('docker', docker)
 binding.setVariable('withCredentials', { List c, Closure body -> body() })
-binding.setVariable('sh', { Map a -> shell(a.script.toString()) })
+binding.setVariable('sh', { a -> shell(a instanceof Map ? a.script.toString() : a.toString()) })
 // withEnv sets its variables in `env` for the body, as Jenkins does.
 binding.setVariable('withEnv', { List vars, Closure body ->
     List kv = vars.collect { it.toString() }
@@ -82,10 +106,51 @@ binding.setVariable('withEnv', { List vars, Closure body ->
         env.putAll(saved)
     }
 })
+// The other steps that startPipeline() runs. `retry` runs its body again
+// after a lost pod, and `parallel` runs every branch, then rethrows the
+// first failure.
+Closure runBody = { Object[] a -> a[-1].call() }
+['node', 'stage', 'container', 'podTemplate', 'timeout', 'timestamps'].each { binding.setVariable(it, runBody) }
+binding.setVariable('retry', { Map opts, Closure body ->
+    for (int attempt = 1; attempt <= opts.count; attempt++) {
+        try {
+            return body()
+        } catch (AgentLost e) {
+            if (attempt == opts.count) {
+                throw e
+            }
+        }
+    }
+})
+binding.setVariable('parallel', { Map branches ->
+    Throwable first = null
+    branches.each { name, branch ->
+        if (branch instanceof Closure) {
+            try {
+                branch()
+            } catch (Throwable t) {
+                first = first ?: t
+            }
+        }
+    }
+    if (first) {
+        throw first
+    }
+})
+[echo: { m -> }, sleep: { Map m -> }, pwd: { -> '/ws' }, fileExists: { p -> true },
+ checkout: { s -> [GIT_COMMIT: 'c1', GIT_PREVIOUS_COMMIT: 'c0'] }, stash: { Map m -> }, unstash: { n -> },
+ containerTemplate: { Map m -> m }, merge: { -> null }, kubernetesAgent: { -> null }, nonresumable: { -> null },
+ scm: 'scm', POD_LABEL: 'pod'].each { k, v -> binding.setVariable(k, v) }
 def shellParser = new GroovyShell(gcl, binding, cc)
 def matrix = shellParser.parse(new File(matrixPath))
 matrix.metaClass.imageExistsInRegistry = { String img, config -> registry.contains(img) }
 matrix.metaClass.runK8 = { image, branchName, config, axis -> podUrls << image.url }
+// startPipeline() runs pipeline_stop through runK8() with its own steps.
+matrix.metaClass.runK8 = { image, branchName, config, axis, steps, wrapStage -> stopUrls << image.url }
+Map pipelineConfig = null
+List pipelineChanged = null
+matrix.metaClass.loadConfigFile = { path, log -> pipelineConfig }
+matrix.metaClass.getChangedFilesList = { config -> pipelineChanged }
 // A second copy keeps the library's own imageExistsInRegistry().
 def plain = shellParser.parse(new File(matrixPath))
 
@@ -144,7 +209,8 @@ def run = { Map vars, List changed, Map top, List images, int setupAttempts = 1 
 }
 def expect = { String label, Map got, Map want ->
     def bad = want.findAll { k, v -> got[k] != v }
-    check(label, !got.error && !bad, got.error ?: "expected ${want}, got ${got.subMap(want.keySet())}")
+    check(label, !got.error && !bad,
+          got.error ?: "expected ${want}, got ${got.subMap(want.keySet())}" + (got.failure ? "; ${got.failure}" : ''))
 }
 Map on = [pr_image_tag: true]
 
@@ -227,6 +293,60 @@ expect('an explicit url without a tag is pushed as latest-pr<id>',
        run(prBuild, ['.ci/Dockerfile'], on, [dockerfile + [url: 'reg.example.com:5000/a/b']]),
        [events: ['build reg.example.com:5000/a/b:latest-pr42', 'push reg.example.com:5000/a/b:latest-pr42'],
         pods: ['reg.example.com:5000/a/b:latest-pr42']])
+
+registry.clear()
+registry << SHARED
+expect('an image with a blank file: is not built, so it keeps the declared tag',
+       run(prBuild + [build_dockers: 'true'], [], on, [dockerfile + [file: ' ']]),
+       [events: [], pods: [SHARED], url: ['url=' + SHARED]])
+
+// One startPipeline() run, whose pipeline_stop selects the ub22 image.
+def pipeline = { Map vars, List changed, Map queued ->
+    env.clear()
+    env.putAll(vars + [conf_file: '.ci/job_matrix.yaml', BUILD_NUMBER: '7'])
+    shell = { String script -> script.startsWith('test -x ') ? 1 : 0 }
+    events.clear()
+    podUrls.clear()
+    stopUrls.clear()
+    faults.build = new ArrayList(queued.build ?: [])
+    faults.push = new ArrayList(queued.push ?: [])
+    pipelineChanged = changed
+    pipelineConfig = [job: 'test', registry_host: 'harbor.example.com', registry_path: '/proj',
+                      kubernetes: [cloud: 'k8s'], steps: [[name: 'test', run: 'true']],
+                      runs_on_dockers: [new LinkedHashMap(dockerfile)],
+                      pipeline_stop: [run: 'true', containerSelector: "{name: 'ub22'}"]] + on
+    String failure = null
+    try {
+        matrix.startPipeline('master')
+    } catch (Throwable t) {
+        failure = t.getClass().name + ': ' + t.message
+    }
+    faults.build.clear()
+    faults.push.clear()
+    return [events: events.clone(), pods: podUrls.clone(), stop: stopUrls.clone(), failed: failure != null,
+            failure: failure]
+}
+
+registry.clear()
+registry << PR
+expect('a setup retried after a lost pod rebuilds instead of running on an older PR tag',
+       pipeline(prBuild, [], [build: ['lost']]),
+       [events: ['lost build ' + PR, 'build ' + PR, 'push ' + PR], pods: [PR], stop: [PR], failed: false])
+
+registry.clear()
+registry << SHARED
+expect('pipeline_stop runs on the PR image that the setup pushed',
+       pipeline(prBuild, ['.ci/Dockerfile'], [:]),
+       [events: ['build ' + PR, 'push ' + PR], pods: [PR], stop: [PR], failed: false])
+registry.clear()
+registry << SHARED
+expect('pipeline_stop runs on the declared image after the PR image fails to build',
+       pipeline(prBuild, ['.ci/Dockerfile'], [build: ['fail']]),
+       [events: ['fail build ' + PR], pods: [], stop: [SHARED], failed: true])
+expect('pipeline_stop runs on the declared image after the PR image fails to push',
+       pipeline(prBuild, ['.ci/Dockerfile'], [push: ['fail', 'fail', 'fail']]),
+       [events: ['build ' + PR] + ['fail push ' + PR] * 3, pods: [], stop: [SHARED], failed: true])
+check('the failed setups left the PR tag missing', !registry.contains(PR), "registry ${registry}")
 
 // imageExistsInRegistry() with the manifest check failing: its podman search
 // pipeline runs with the search replaced by `tags`, and docker pull fails.

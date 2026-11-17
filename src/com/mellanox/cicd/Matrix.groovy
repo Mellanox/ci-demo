@@ -1201,7 +1201,7 @@ def getMatrixTasks(image, config) {
 def buildImage(img, filename, extra_args, config, image) {
     if (filename == "") {
         config.logger.warn("No docker filename specified, skipping build docker")
-        return
+        return false
     }
 
     def preBuild = null
@@ -1227,6 +1227,7 @@ def buildImage(img, filename, extra_args, config, image) {
             }
         }
     }
+    return true
 }
 
 Boolean isEnvVarSet(var) {
@@ -1411,14 +1412,16 @@ def buildImage(config, image) {
         }
     }
 
-    if (need_build && image.pr_url) {
-        config.logger.info("PR build: image ${image.name} is pushed as ${image.pr_url}")
-        image.url = image.pr_url
-        img = image.url
-    }
     if (need_build) {
-        config.logger.info("Building - ${img} - ${filename}")
-        buildImage(img, filename, extra_args, config, image)
+        // The image moves to pr_url only once that is pushed: a retry then
+        // decides on the declared url again, and a failed build or push
+        // leaves pipeline_stop on it.
+        def target = image.pr_url ?: img
+        config.logger.info("Building - ${target} - ${filename}")
+        if (buildImage(target, filename, extra_args, config, image) && image.pr_url) {
+            config.logger.info("PR build: image ${image.name} runs on ${image.pr_url}")
+            image.url = image.pr_url
+        }
     }
     return need_build
 }
