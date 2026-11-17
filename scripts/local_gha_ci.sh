@@ -119,12 +119,21 @@ fi
 
 mkdir -p "${LOG_DIR}"
 
-echo "[1/9] Using static workflow config ${CI_K8_FILE}"
-if [[ ! -f "${CI_K8_FILE}" ]]; then
-  echo "ERROR: Config file not found: ${CI_K8_FILE}" >&2
+# CI_K8_FILE takes one config file or a comma/space-separated list of them.
+echo "[1/9] Using static workflow config(s) ${CI_K8_FILE}"
+conf_files=()
+while IFS= read -r conf; do
+  [[ -n "${conf}" ]] || continue
+  if [[ ! -f "${conf}" ]]; then
+    echo "ERROR: Config file not found: ${conf}" >&2
+    exit 1
+  fi
+  conf_files+=("${conf}")
+done < <(echo "${CI_K8_FILE}" | tr ', ' '\n')
+if [[ "${#conf_files[@]}" -eq 0 ]]; then
+  echo "ERROR: CI_K8_FILE names no config file" >&2
   exit 1
 fi
-conf_files=("${CI_K8_FILE}")
 
 target_arch_list=()
 while IFS= read -r arch; do
@@ -149,6 +158,10 @@ labels_csv=""
 
 echo "[2/9] Building Jenkins image ${JENKINS_IMAGE}"
 docker build -t "${JENKINS_IMAGE}" -f .github/Dockerfile.jenkins .
+
+echo "Running Groovy unit tests with the Groovy bundled in ${JENKINS_IMAGE}"
+docker run --rm -u root --entrypoint bash -v "${HOST_REPO_DIR}:${REPO_MOUNT}:ro" -w "${REPO_MOUNT}" \
+  "${JENKINS_IMAGE}" scripts/run_groovy_tests.sh
 
 if ! docker network inspect "${DOCKER_NETWORK}" >/dev/null 2>&1; then
   docker network create "${DOCKER_NETWORK}" >/dev/null
@@ -281,20 +294,38 @@ jenkins_cli() {
 jenkins_script() {
   docker exec "${JENKINS_NAME}" curl -sf -X POST --data-urlencode "script=$1" http://localhost:8080/scriptText
 }
+# Reads a build's api/json on stdin and checks its root number and parameters.
+check_build_py='
+import json, sys
+number, conf, arch = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+build = json.load(sys.stdin)
+params = {}
+for action in build.get("actions") or []:
+    for param in (action or {}).get("parameters") or []:
+        params[param.get("name")] = param.get("value")
+got = (build.get("number"), params.get("conf_file"), params.get("TARGET_ARCH"))
+print("Jenkins build #%s: result=%s conf_file=%s TARGET_ARCH=%s" % (got[0], build.get("result"), got[1], got[2]), flush=True)
+if got != (number, conf, arch):
+    sys.exit("ERROR: expected build #%d with conf_file=%s TARGET_ARCH=%s" % (number, conf, arch))
+'
+# Archives the console and JSON of the build the CLI started ("Started ci-demo #N"
+# in its output) and checks that the build ran the requested config and arch.
 save_jenkins_artifacts() {
-  local prefix="$1"
+  local prefix="$1" cli_log="$2" conf="$3" arch="$4"
+  local build_json="${LOG_DIR}/${prefix}.jenkins-build.json"
   local build_number
-  build_number=$(docker exec "${JENKINS_NAME}" sh -lc "curl -sf http://localhost:8080/job/ci-demo/lastBuild/api/json" 2>/dev/null \
-    | sed -n 's/.*"number":[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -n1 || true)
-
-  if [[ -n "${build_number}" ]]; then
-    docker exec "${JENKINS_NAME}" sh -lc "curl -sf http://localhost:8080/job/ci-demo/${build_number}/consoleText" > "${LOG_DIR}/${prefix}.jenkins-console.log" 2>/dev/null || true
-    docker exec "${JENKINS_NAME}" sh -lc "curl -sf http://localhost:8080/job/ci-demo/${build_number}/api/json" > "${LOG_DIR}/${prefix}.jenkins-build.json" 2>/dev/null || true
-  else
-    docker exec "${JENKINS_NAME}" sh -lc "curl -sf http://localhost:8080/job/ci-demo/lastBuild/consoleText" > "${LOG_DIR}/${prefix}.jenkins-console.log" 2>/dev/null || true
-  fi
 
   docker logs "${JENKINS_NAME}" > "${LOG_DIR}/${prefix}.jenkins-container.log" 2>&1 || true
+  build_number=$(awk '{ sub(/\r$/, "") } /^Started ci-demo #[0-9]+$/ { sub(/^Started ci-demo #/, ""); print; exit }' "${cli_log}")
+  if [[ -z "${build_number}" ]]; then
+    echo "ERROR: no 'Started ci-demo #N' line in ${cli_log}" >&2
+    return 1
+  fi
+  docker exec "${JENKINS_NAME}" curl -sf "http://localhost:8080/job/ci-demo/${build_number}/consoleText" \
+    > "${LOG_DIR}/${prefix}.jenkins-console.log" || return 1
+  docker exec "${JENKINS_NAME}" curl -sf "http://localhost:8080/job/ci-demo/${build_number}/api/json" \
+    > "${build_json}" || return 1
+  docker exec -i "${JENKINS_NAME}" python3 -c "${check_build_py}" "${build_number}" "${conf}" "${arch}" < "${build_json}"
 }
 
 echo "Waiting for Jenkins CLI readiness"
@@ -558,14 +589,11 @@ for conf in "${conf_files[@]}"; do
       | tee "${job_output_log}" | tee "${LOG_DIR}/${conf_base}.${target_arch}.log" >/dev/null
     rc=${PIPESTATUS[0]}
     set -e
-    save_jenkins_artifacts "${output_prefix}"
+    archived=true
+    save_jenkins_artifacts "${output_prefix}" "${job_output_log}" "${conf_rel}" "${target_arch}" || archived=false
 
-    if [[ "${rc}" -ne 0 ]]; then
+    if [[ "${rc}" -ne 0 || "${archived}" != "true" ]]; then
       echo "FAIL ${conf_rel} TARGET_ARCH=${target_arch}"
-      if [[ -f "${LOG_DIR}/${output_prefix}.jenkins-build.json" ]]; then
-        build_result=$(sed -n 's/.*"result":"\([^"]*\)".*/\1/p' "${LOG_DIR}/${output_prefix}.jenkins-build.json" | head -n1 || true)
-        [[ -n "${build_result}" ]] && echo "Jenkins build result: ${build_result}"
-      fi
       echo "---- tail: ${job_output_log} ----"
       tail -n 120 "${job_output_log}" || true
       if [[ -f "${LOG_DIR}/${output_prefix}.jenkins-console.log" ]]; then
