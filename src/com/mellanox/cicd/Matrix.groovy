@@ -945,7 +945,7 @@ spec:
         imagePullSecrets: imagePullSecrets
     )
     {
-        retry(count: 2, conditions: [kubernetesAgent(), nonresumable()]) {
+        retryK8Pod {
             node(POD_LABEL) {
                 stage (branchName) {
                     container(cname) {
@@ -956,6 +956,20 @@ spec:
         }
     }
     config.logger.trace(2, "runK8 ${branchName} done")
+}
+
+// A pod that fails before its agent connects (e.g. kubelet OutOfcpu) is judged by the
+// enclosing node('master') block, so plain kubernetesAgent() would not retry it.
+def retryK8Pod(Closure body) {
+    def firstAttempt = true
+    retry(count: 2, conditions: [kubernetesAgent(handleNonKubernetes: true), nonresumable()]) {
+        if (!firstAttempt) {
+            // An immediate retry tends to land on the same full node.
+            sleep(time: 60, unit: 'SECONDS')
+        }
+        firstAttempt = false
+        body()
+    }
 }
 
 @NonCPS
@@ -1500,7 +1514,7 @@ spec:
         imagePullSecrets: imagePullSecrets
     )
     {
-        retry(count: 2, conditions: [kubernetesAgent(), nonresumable()]) {
+        retryK8Pod {
             node(POD_LABEL) {
                 unstashWS(getStashName(), config)
                 onUnstash()
