@@ -160,16 +160,25 @@ def forceCleanupWS() {
 }
 
 
+def jnlpResourceToYaml(val) {
+    // Strings are passed as-is (e.g. "{memory: 1Gi}"); maps are rendered as a YAML flow mapping
+    if (val instanceof Map) {
+        return '{' + val.collect { k, v -> "${k}: '${v}'" }.join(', ') + '}'
+    }
+    return val.toString()
+}
+
 def getJnlpResourcesYaml(config, image) {
-    // Optional resources for the jnlp container; empty (no override) unless configured
-    def jl = image?.jnlp_limits ?: getConfigVal(config, ['kubernetes', 'jnlp_limits'], null, false)
-    def jr = image?.jnlp_requests ?: getConfigVal(config, ['kubernetes', 'jnlp_requests'], null, false)
-    if (!jl && !jr) {
+    // Optional resources for the jnlp container; empty (no override) unless configured.
+    // Image-level value wins over global, even when it is an empty map ({}).
+    def jl = image?.jnlp_limits != null ? image.jnlp_limits : getConfigVal(config, ['kubernetes', 'jnlp_limits'], null, false)
+    def jr = image?.jnlp_requests != null ? image.jnlp_requests : getConfigVal(config, ['kubernetes', 'jnlp_requests'], null, false)
+    if (jl == null && jr == null) {
         return ''
     }
     def res = ''
-    if (jl) { res += "        limits: ${jl}\n" }
-    if (jr) { res += "        requests: ${jr}\n" }
+    if (jl != null) { res += "        limits: ${jnlpResourceToYaml(jl)}\n" }
+    if (jr != null) { res += "        requests: ${jnlpResourceToYaml(jr)}\n" }
     return "    - name: jnlp\n      resources:\n" + res
 }
 

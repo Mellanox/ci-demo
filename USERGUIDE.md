@@ -90,6 +90,17 @@ kubernetes:
   activeDeadlineSeconds: 9000
 ```
 
+`jnlp_limits` / `jnlp_requests` set resources of the `jnlp` container. They can also be set per image under `runs_on_dockers`, where they override the global `kubernetes` values (an empty `{}` clears the global value):
+
+```yaml
+kubernetes:
+  jnlp_limits: {memory: 512Mi, cpu: 500m}
+  jnlp_requests: {memory: 256Mi, cpu: 250m}
+
+runs_on_dockers:
+  - {name: big, url: 'img:latest', arch: x86_64, jnlp_limits: {memory: 1Gi, cpu: 1}}
+```
+
 ### Volume Objects
 
 `host_volume`
