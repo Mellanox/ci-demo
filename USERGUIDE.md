@@ -72,6 +72,8 @@ When using Kubernetes, the Jenkins server must have the Kubernetes cloud(s) refe
 | `privileged` | `bool` |
 | `limits` | `str/map` |
 | `requests` | `str/map` |
+| `jnlp_limits` | `str/map` |
+| `jnlp_requests` | `str/map` |
 | `annotations` | `list/map/str` |
 | `caps_add` | `str/list` |
 | `tolerations` | `str/list` |

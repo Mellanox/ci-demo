@@ -160,6 +160,19 @@ def forceCleanupWS() {
 }
 
 
+def getJnlpResourcesYaml(config, image) {
+    // Optional resources for the jnlp container; empty (no override) unless configured
+    def jl = image?.jnlp_limits ?: getConfigVal(config, ['kubernetes', 'jnlp_limits'], null, false)
+    def jr = image?.jnlp_requests ?: getConfigVal(config, ['kubernetes', 'jnlp_requests'], null, false)
+    if (!jl && !jr) {
+        return ''
+    }
+    def res = ''
+    if (jl) { res += "        limits: ${jl}\n" }
+    if (jr) { res += "        requests: ${jr}\n" }
+    return "    - name: jnlp\n      resources:\n" + res
+}
+
 def getArchConf(config, arch) {
 
     def k8sArchConfTable = [:]
@@ -938,10 +951,11 @@ def runK8(image, branchName, config, axis, steps=config.steps, wrapStage=true) {
     def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
     def imagePullSecrets = parseImagePullSecrets(getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]"))
+    def jnlpRes = getJnlpResourcesYaml(config, image)
     def yaml = """
 spec:
   containers:
-    - name: ${cname}
+${jnlpRes}    - name: ${cname}
       env:
         - name: K8S_NODE_NAME
           valueFrom:
@@ -1485,10 +1499,11 @@ def build_docker_on_k8(image, config) {
     def namespace = image.namespace ?: getConfigVal(config, ['kubernetes', 'namespace'], "default")
     def tolerations = image.tolerations ?: getConfigVal(config, ['kubernetes', 'tolerations'], "[]")
     def imagePullSecrets = parseImagePullSecrets(getConfigVal(config, ['kubernetes', 'imagePullSecrets'], "[]"))
+    def jnlpRes = getJnlpResourcesYaml(config, image)
     def yaml = """
 spec:
   containers:
-    - name: docker
+${jnlpRes}    - name: docker
       env:
         - name: K8S_NODE_NAME
           valueFrom:
