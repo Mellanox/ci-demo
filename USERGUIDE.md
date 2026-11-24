@@ -76,7 +76,17 @@ When using Kubernetes, the Jenkins server must have the Kubernetes cloud(s) refe
 | `caps_add` | `str/list` |
 | `tolerations` | `str/list` |
 | `imagePullSecrets` | `str/list` |
+| `activeDeadlineSeconds` | `int` |
 | `arch_table` | `map` |
+
+`activeDeadlineSeconds` sets the pod spec field of the same name on the matrix and image-build pods: Kubernetes terminates a pod that many seconds after it starts, even when the build that created it is gone. It can also be set per image under `runs_on_dockers`, where it overrides the global `kubernetes` value. It must be a positive integer, any other value fails the build. Unset = no deadline. The deadline also ends a healthy pod, so keep it above the pipeline timeout (`timeout_minutes` * 60, default 90 minutes):
+
+```yaml
+timeout_minutes: 120
+
+kubernetes:
+  activeDeadlineSeconds: 9000
+```
 
 ### Volume Objects
 
@@ -116,7 +126,7 @@ Common keys:
 - identity/image: `name`, `url`, `tag`, `uri`, `file`
 - execution routing: `arch`, `nodeLabel`, `cloud`, `category`, `enable`
 - runtime/security: `hostNetwork`, `privileged`, `runAsUser`, `runAsGroup`
-- resources/scheduling: `limits`, `requests`, `namespace`, `tolerations`, `annotations`
+- resources/scheduling: `limits`, `requests`, `namespace`, `tolerations`, `annotations`, `activeDeadlineSeconds`
 - pull/secrets/caps: `imagePullSecrets`, `caps_add`
 - build helpers: `on_image_build`, `build_args`, `deps`, `credentialsId`
 

@@ -871,6 +871,23 @@ def parseImagePullSecrets(secretsInput) {
     reportFail('config', "imagePullSecrets must be a List or String, got: ${secretsInput.getClass().getName()}")
 }
 
+def getPodDeadlineYaml(config, image) {
+    // Optional pod activeDeadlineSeconds, image value wins over global
+    def k8s = config.get('kubernetes')
+    def deadline
+    if (image.containsKey('activeDeadlineSeconds')) {
+        deadline = image.activeDeadlineSeconds
+    } else if (k8s instanceof Map && k8s.containsKey('activeDeadlineSeconds')) {
+        deadline = k8s.activeDeadlineSeconds
+    } else {
+        return ''
+    }
+    if (!(deadline instanceof Integer) || deadline < 1) {
+        reportFail('config', "activeDeadlineSeconds must be a positive integer (seconds), got: ${deadline?.getClass()?.getName()} '${deadline}'")
+    }
+    return "  activeDeadlineSeconds: ${deadline}\n"
+}
+
 def runK8(image, branchName, config, axis, steps=config.steps, wrapStage=true) {
 
     def cloudName = image.cloud ?: getConfigVal(config, ['kubernetes', 'cloud'], null)
@@ -935,6 +952,7 @@ spec:
           add: ${caps_add}
   tolerations: ${tolerations}
 """
+    yaml += getPodDeadlineYaml(config, image)
     podTemplate(
         cloud: cloudName,
         runAsUser: runAsUser,
@@ -1478,6 +1496,7 @@ spec:
         requests: ${requests}
   tolerations: ${tolerations}
 """
+    yaml += getPodDeadlineYaml(config, image)
     podTemplate(
         cloud: cloudName,
         nodeSelector: nodeSelector,

@@ -108,6 +108,7 @@ These mirror the `kubernetes:` block and apply only to K8s placement. If unset, 
 | `annotations` | `[]` | List of annotations. |
 | `caps_add` | `[]` | List of Linux capabilities. |
 | `tolerations` | `[]` | List of toleration entries. |
+| `activeDeadlineSeconds` | unset (no deadline) | Pod deadline in seconds, positive integer. Keep it above `timeout_minutes` * 60. |
 
 ---
 
