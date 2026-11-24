@@ -51,7 +51,7 @@ kubernetes:
   # Optional: enable host network
   hostNetwork: false
 
-  # Optional: pod deadline in seconds, keep it above timeout_minutes * 60
+  # Optional: pod deadline in seconds (default: timeout_minutes * 60 + 600, 0 disables)
   activeDeadlineSeconds: 7200
 
 # Optional: multi-arch support with arch-specific configurations

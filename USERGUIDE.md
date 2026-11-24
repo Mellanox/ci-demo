@@ -79,7 +79,7 @@ When using Kubernetes, the Jenkins server must have the Kubernetes cloud(s) refe
 | `activeDeadlineSeconds` | `int` |
 | `arch_table` | `map` |
 
-`activeDeadlineSeconds` sets the pod spec field of the same name on the matrix and image-build pods: Kubernetes terminates a pod that many seconds after it starts, even when the build that created it is gone. It can also be set per image under `runs_on_dockers`, where it overrides the global `kubernetes` value. It must be a positive integer, any other value fails the build. Unset = no deadline. The deadline also ends a healthy pod, so keep it above the pipeline timeout (`timeout_minutes` * 60, default 90 minutes):
+`activeDeadlineSeconds` sets the pod spec field of the same name on the matrix and image-build pods: Kubernetes terminates a pod that many seconds after it starts, even when the build that created it is gone. It can also be set per image under `runs_on_dockers`, where it overrides the global `kubernetes` value. Unset = the pipeline timeout (`timeout_minutes`, default 90 minutes) plus 10 minutes, `0` = no deadline. Any value other than a non-negative integer fails the build. The deadline also ends a healthy pod, so keep an explicit value above the pipeline timeout:
 
 ```yaml
 timeout_minutes: 120
