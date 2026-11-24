@@ -872,7 +872,7 @@ def parseImagePullSecrets(secretsInput) {
 }
 
 def getPodDeadlineYaml(config, image) {
-    // Optional pod activeDeadlineSeconds, image value wins over global
+    // Pod activeDeadlineSeconds: image value, global value, else job timeout plus 10 minutes; 0 disables
     def k8s = config.get('kubernetes')
     def deadline
     if (image.containsKey('activeDeadlineSeconds')) {
@@ -880,10 +880,13 @@ def getPodDeadlineYaml(config, image) {
     } else if (k8s instanceof Map && k8s.containsKey('activeDeadlineSeconds')) {
         deadline = k8s.activeDeadlineSeconds
     } else {
-        return ''
+        deadline = (getConfigVal(config, ['timeout_minutes'], "90") as Integer) * 60 + 600
     }
-    if (!(deadline instanceof Integer) || deadline < 1) {
-        reportFail('config', "activeDeadlineSeconds must be a positive integer (seconds), got: ${deadline?.getClass()?.getName()} '${deadline}'")
+    if (!(deadline instanceof Integer) || deadline < 0) {
+        reportFail('config', "activeDeadlineSeconds must be a non-negative integer (seconds), got: ${deadline?.getClass()?.getName()} '${deadline}'")
+    }
+    if (deadline == 0) {
+        return ''
     }
     return "  activeDeadlineSeconds: ${deadline}\n"
 }

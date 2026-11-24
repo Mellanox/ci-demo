@@ -57,7 +57,7 @@ kubernetes_conf:
   caps_add: any(str(), list(), required=False)
   tolerations: any(str(), list(), required=False)
   imagePullSecrets: any(str(), list(), required=False)
-  activeDeadlineSeconds: int(min=1, required=False, none=False)
+  activeDeadlineSeconds: int(min=0, required=False, none=False)
   arch_table: map(required=False)
 
 host_volume:
@@ -110,7 +110,7 @@ docker_image:
   imagePullSecrets: any(str(), list(), required=False)
   annotations: any(list(), map(), str(), required=False)
   caps_add: any(str(), list(), required=False)
-  activeDeadlineSeconds: int(min=1, required=False, none=False)
+  activeDeadlineSeconds: int(min=0, required=False, none=False)
   on_image_build: any(str(), map(), required=False)
   build_args: any(str(), list(), map(), required=False)
   deps: list(str(), required=False)
