@@ -169,13 +169,13 @@ def getArchConf(config, arch) {
 
     k8sArchConfTable['x86_64']  = [
         nodeSelector: 'kubernetes.io/arch=amd64',
-        jnlpImage: 'jenkins/inbound-agent:latest',
+        jnlpImage: 'jenkins/inbound-agent:3396.ve02b_5cde31b_2-5-jdk21',
         dockerImage: 'quay.io/podman/stable:v5.7.1'
     ]
 
     k8sArchConfTable['aarch64'] = [
         nodeSelector: 'kubernetes.io/arch=arm64',
-        jnlpImage: "jenkins/inbound-agent:latest",
+        jnlpImage: "jenkins/inbound-agent:3396.ve02b_5cde31b_2-5-jdk21",
         dockerImage: 'quay.io/podman/stable:v5.7.1'
     ]
 
