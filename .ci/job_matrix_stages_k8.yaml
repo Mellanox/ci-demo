@@ -1,0 +1,69 @@
+---
+job: ci-k8-stages
+
+kubernetes:
+  cloud: swx-k8s
+  namespace: default
+  serviceAccount: jenkins
+  hostNetwork: false
+  privileged: false
+  limits: "{memory: 2Gi, cpu: 1000m}"
+  requests: "{memory: 512Mi, cpu: 250m}"
+  caps_add: "[]"
+  tolerations: "[]"
+  imagePullSecrets: "[]"
+
+arch_table:
+  x86_64:
+    nodeSelector: "kubernetes.io/os=linux,kubernetes.io/arch=amd64"
+    jnlpImage: "jenkins/inbound-agent:latest"
+  aarch64:
+    nodeSelector: "kubernetes.io/os=linux,kubernetes.io/arch=arm64"
+    jnlpImage: "jenkins/inbound-agent:latest"
+
+empty_volumes:
+  - {mountPath: /tmp/workspace, memory: false}
+
+runs_on_dockers:
+  - {name: "ubuntu-x86_64", url: "ubuntu:22.04", arch: "x86_64"}
+  - {name: "ubuntu-aarch64", url: "ubuntu:22.04", arch: "aarch64"}
+
+matrix:
+  axes:
+    arch:
+      - x86_64
+      - aarch64
+  include:
+    - {arch: '${TARGET_ARCH}'}
+
+# Steps are grouped into Jenkins stages via the 'stage' field.
+# Stages run sequentially in the order they first appear (build -> test -> publish),
+# and steps within a stage run together in that stage block.
+steps:
+  - name: Build lib
+    stage: build
+    run: echo "building lib for ${arch}"
+
+  - name: Build tools
+    stage: build
+    run: echo "building tools for ${arch}"
+
+  - name: Unit tests
+    stage: test
+    run: echo "running unit tests for ${arch}"
+
+  - name: Integration tests
+    stage: test
+    run: echo "running integration tests for ${arch}"
+
+  - name: Publish
+    stage: publish
+    run: echo "publishing artifacts for ${arch}"
+
+pipeline_start:
+  run: echo "pipeline_start for ${job}"
+
+pipeline_stop:
+  run: echo "pipeline_stop status=${pipeline_status}"
+
+failFast: false
