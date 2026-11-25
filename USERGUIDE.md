@@ -27,6 +27,7 @@ Source of truth: `schema_validator/ci_demo_schema.yaml`.
 | `registry_path` | `str` | no | Registry path prefix |
 | `registry_auth` | `str` | no | Jenkins credentials for registry auth |
 | `registry_jnlp_path` | `str` | no | Path used for JNLP image templates |
+| `pr_image_tag` | `bool` | no | PR builds push the images they rebuild as `<tag>-pr<ghprbPullId>` instead of `<tag>`; see `docs/RUNS_ON_DOCKERS.md` |
 | `docker_opt` | `str` | no | Extra docker run options |
 | `kubernetes` | `kubernetes_conf` | no | Global Kubernetes defaults |
 | `arch_table` | `map` | no | Optional arch mapping table |
